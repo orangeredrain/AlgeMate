@@ -4,7 +4,9 @@ project(AlgeMate LANGUAGES CXX VERSION 1.0.0)
 # ---------- C++ 标准 ----------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# 注: JKQtPlotter 依赖若干 POSIX 数学函数 (Bessel y0/y1/jn/yn),
+# 必须开启 GNU 扩展 (-std=gnu++17) 才能编过.
+set(CMAKE_CXX_EXTENSIONS ON)
 
 # ---------- 默认 Release ----------
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -38,18 +40,33 @@ else()
 endif()
 
 # ---------- Qt 6 ----------
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui Svg)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui Svg Xml)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
+
+# ---------- third_party: JKQTMathText (LaTeX 数学渲染) ----------
+# 关闭所有非数学渲染的目标, 减少编译时间、以静态库形式嵌入,
+# 库名不附带 _Debug/_Release 后缀, 方便链接.
+set(JKQtPlotter_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(JKQtPlotter_BUILD_STATIC_LIBS ON  CACHE BOOL "" FORCE)
+set(JKQtPlotter_BUILD_EXAMPLES    OFF CACHE BOOL "" FORCE)
+set(JKQtPlotter_BUILD_TOOLS       OFF CACHE BOOL "" FORCE)
+set(JKQtPlotter_BUILD_DECORATE_LIBNAMES_WITH_BUILDTYPE OFF CACHE BOOL "" FORCE)
+set(JKQtPlotter_BUILD_WITH_PRECOMPILED_HEADERS OFF CACHE BOOL "" FORCE)
+set(JKQtPlotter_BUILD_ONLY_MATHTEXT ON CACHE BOOL "" FORCE)  # 只要 JKQTMathText, 不编 plotter 子库
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/JKQtPlotter-master)
 
 # ---------- 目录组织 ----------
 set(ALGEMATE_SRC_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(ALGEMATE_RES_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 set(ALGEMATE_MODULES_DIR    ${ALGEMATE_SRC_DIR}/modules)
 
-# 各模块静态库（队友独立开发区）
+# 数学核心静态库（纯 C++，不依赖 Qt）
+add_subdirectory(${ALGEMATE_SRC_DIR}/math)
+
+# 各模块静态库（组内各成员独立开发区）
 add_subdirectory(${ALGEMATE_MODULES_DIR}/home)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/calculator)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/ai_solver)
@@ -89,6 +106,7 @@ target_link_libraries(AlgeMate
         Qt6::Gui
         Qt6::Widgets
         Qt6::Svg
+        algemate_math
         algemate_home
         algemate_calculator
         algemate_ai_solver

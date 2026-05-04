@@ -96,3 +96,6 @@ cmake_install.cmake
 
 # Qt Creator local
 .qtcreator/
+
+# Claude Code
+.claude/

@@ -209,3 +209,113 @@ QToolTip {
     padding: 4px 8px;
     border-radius: 4px;
 }
+
+/* ================= Calculator 模块 ================= */
+/* --- Tab 切换条 --- */
+QPushButton#CalcTabBtn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 8px 18px;
+    min-height: 28px;
+    color: #A0A3C0;
+    font-size: 14px;
+    font-weight: 500;
+}
+QPushButton#CalcTabBtn:hover {
+    background-color: #2D2B47;
+    color: #B8ACFF;
+    border-color: transparent;
+}
+QPushButton#CalcTabBtn:checked {
+    background-color: #3B3462;
+    color: #B8ACFF;
+    border-color: #8B7BFF;
+    font-weight: 700;
+}
+
+/* --- Notebook 历史区 --- */
+QTextBrowser#CalcHistory {
+    background-color: #1F1E31;
+    border: 1px solid #312F4A;
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: #E6E7F0;
+    selection-background-color: #8B7BFF;
+    selection-color: #1C1B2E;
+}
+
+/* --- 输入卡片 --- */
+QFrame#CalcInputCard {
+    background-color: #242338;
+    border: 1px solid #312F4A;
+    border-radius: 12px;
+}
+QFrame#CalcInputCard:focus-within {
+    border-color: #8B7BFF;
+}
+
+/* --- 输入框 --- */
+QPlainTextEdit#CalcInput {
+    background-color: #1C1B2E;
+    border: 1px solid #3A3754;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #F3F3FA;
+    selection-background-color: #8B7BFF;
+    selection-color: #1C1B2E;
+}
+QPlainTextEdit#CalcInput:focus {
+    border-color: #8B7BFF;
+}
+
+/* --- 输入卡底部变量标签 --- */
+QLabel#CalcVarsLabel {
+    color: #8B8DB0;
+    font-size: 12px;
+    padding-left: 4px;
+}
+
+/* --- 格式切换 / 小数位控件 --- */
+QComboBox#CalcFmtCombo {
+    background-color: #1C1B2E;
+    border: 1px solid #3A3754;
+    border-radius: 6px;
+    padding: 4px 10px;
+    min-width: 64px;
+    color: #E6E7F0;
+}
+QComboBox#CalcFmtCombo:hover         { border-color: #8B7BFF; }
+QComboBox#CalcFmtCombo::drop-down    { border: none; width: 16px; }
+QComboBox#CalcFmtCombo QAbstractItemView {
+    background-color: #242338;
+    color: #E6E7F0;
+    selection-background-color: #3B3462;
+    selection-color: #B8ACFF;
+    border: 1px solid #3A3754;
+    border-radius: 6px;
+    padding: 4px 0;
+}
+QSpinBox#CalcDecSpin {
+    background-color: #1C1B2E;
+    border: 1px solid #3A3754;
+    border-radius: 6px;
+    padding: 3px 6px;
+    color: #E6E7F0;
+}
+QSpinBox#CalcDecSpin:focus           { border-color: #8B7BFF; }
+QSpinBox#CalcDecSpin:disabled        { color: #6F7396; border-color: #2A2841; }
+
+/* --- 帮助对话框 --- */
+QDialog#CalcHelpDialog {
+    background-color: #1C1B2E;
+}
+QTextBrowser#CalcHelpView {
+    background-color: #1F1E31;
+    border: 1px solid #312F4A;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #E6E7F0;
+    selection-background-color: #8B7BFF;
+    selection-color: #1C1B2E;
+}

@@ -1,0 +1,65 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "msvc-debug",
+            "displayName": "MSVC x64 Debug",
+            "description": "Visual Studio 2022 / MSVC / Qt MSVC 2022 64-bit / Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/msvc-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_PREFIX_PATH": "D:/Qt/6.10.1/msvc2022_64",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            }
+        },
+        {
+            "name": "msvc-release",
+            "displayName": "MSVC x64 Release",
+            "description": "Visual Studio 2022 / MSVC / Qt MSVC 2022 64-bit / Release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/msvc-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_PREFIX_PATH": "D:/Qt/6.10.1/msvc2022_64",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            }
+        },
+        {
+            "name": "mingw-debug",
+            "displayName": "MinGW x64 Debug",
+            "description": "MinGW-w64 / Qt MinGW 6.10.1 / Debug (兼容 Qt Creator 原有工具链)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/mingw-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_PREFIX_PATH": "D:/Qt/6.10.1/mingw_64",
+                "CMAKE_C_COMPILER": "D:/Qt/Tools/mingw1310_64/bin/gcc.exe",
+                "CMAKE_CXX_COMPILER": "D:/Qt/Tools/mingw1310_64/bin/g++.exe"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "msvc-debug",   "configurePreset": "msvc-debug" },
+        { "name": "msvc-release", "configurePreset": "msvc-release" },
+        { "name": "mingw-debug",  "configurePreset": "mingw-debug" }
+    ]
+}
