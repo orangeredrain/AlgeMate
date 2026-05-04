@@ -3,5 +3,8 @@
   <qresource prefix="/">
     <file>styles/light.qss</file>
     <file>styles/dark.qss</file>
+    <file>knowledge/ch01_vectors.md</file>
+    <file>knowledge/ch01_matrices_intro.md</file>
+    <file>knowledge/ch02_matrix_multiply.md</file>
   </qresource>
 </RCC>
