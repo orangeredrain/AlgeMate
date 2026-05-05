@@ -9,6 +9,10 @@ int main(int argc, char* argv[]) {
         Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 
     QApplication app(argc, argv);
+    QFont font;
+    font.setFamily("Microsoft YaHei");  // Windows 推荐
+    font.setPointSize(10);
+    app.setFont(font);
     app.setOrganizationName(QStringLiteral("AlgeMate"));
     app.setApplicationName(AlgeMate::AppPaths::appName());
     app.setApplicationDisplayName(AlgeMate::AppPaths::appDisplayName());
