@@ -1,0 +1,25 @@
+1.1 向量与线性组合
+
+向量可以看成有方向和大小的量；在线性代数中常用列向量表示。
+
+讲解提要
+
+向量加法、数乘满足熟悉的运算规律。
+
+线性组合：给定向量 $\mathbf{v}_1,\ldots,\mathbf{v}_k$ 与标量 $c_1,\ldots,c_k$，$c_1\mathbf{v}_1 + \cdots + c_k\mathbf{v}_k$ 称为它们的一个线性组合。
+
+例题
+
+已知 $\mathbf{a}=(1,2)^\mathsf{T}$，$\mathbf{b}=(0,1)^\mathsf{T}$，求 $2\mathbf{a}-\mathbf{b}$。
+
+思路：按分量做数乘与加减即可。
+
+$$
+2\mathbf{a} - \mathbf{b} = 2\left(\begin{array}{cr}1&\\2&\end{array}\right) - \left(\begin{array}{cr}0&\\1&\end{array}\right) = \left(\begin{array}{cr}2&\\4&\end{array}\right) - \left(\begin{array}{cr}0&\\1&\end{array}\right) = \left(\begin{array}{cr}2&\\3&\end{array}\right)
+$$
+
+思考题
+
+平面上两个不共线向量，它们的线性组合能否表示该平面内任意向量？
+
+"线性相关"与"不能互相线性表出"分别在说什么？

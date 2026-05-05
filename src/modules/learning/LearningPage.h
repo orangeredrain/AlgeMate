@@ -3,14 +3,56 @@
 
 #include <QWidget>
 
+class QStackedWidget;
+
 namespace AlgeMate::Learning {
 
+class KnowledgePage;
+class PracticePage;
+class CalculationProblemPage;
+class ChapterPracticePage;
+class TopicPracticePage;
+class ExamPage;
+class WrongBookPage;
+class LearningCenterPage;
+
+/// 学习中心主界面
 class LearningPage : public QWidget {
     Q_OBJECT
 public:
     explicit LearningPage(QWidget* parent = nullptr);
+
+private:
+    void buildDashboard();
+
+    // 卡片点击 → 子页面导航
+    void showKnowledge();
+    void showPractice();
+    void showExam();
+    void showWrongBook();
+    void showLearningCenter();
+    void showCalculationProblem();
+    void showChapterPractice();
+    void showTopicPractice();
+
+    void goBack();  // 返回 Dashboard
+
+    QStackedWidget* m_stack = nullptr;
+
+    // Dashboard 页
+    QWidget* m_dashboard = nullptr;
+
+    // 子页面
+    KnowledgePage*           m_knowledgePage     = nullptr;
+    PracticePage*            m_practicePage      = nullptr;
+    CalculationProblemPage*  m_calcProbPage      = nullptr;
+    ChapterPracticePage*     m_chapterPracPage   = nullptr;
+    TopicPracticePage*       m_topicPracPage     = nullptr;
+    ExamPage*                m_examPage          = nullptr;
+    WrongBookPage*           m_wrongBookPage     = nullptr;
+    LearningCenterPage*      m_learningCenterPage = nullptr;
 };
 
-}
+} // namespace AlgeMate::Learning
 
-#endif
+#endif // ALGEMATE_LEARNINGPAGE_H

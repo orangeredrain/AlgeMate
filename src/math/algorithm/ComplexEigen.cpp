@@ -2,12 +2,78 @@
 #include "LinearAlgebra.h"
 #include "PolynomialAlg.h"
 
+#include <cmath>
+#include <complex>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace algemate::math {
 
 using Poly = Polynomial<Fraction>;
+
+namespace {
+
+using Cmplx = std::complex<double>;
+
+// Horner 求值
+Cmplx evalPoly(const std::vector<Cmplx>& c, Cmplx x) {
+    Cmplx r(0.0, 0.0);
+    for (int i = static_cast<int>(c.size()) - 1; i >= 0; --i)
+        r = r * x + c[i];
+    return r;
+}
+
+// Durand-Kerner 同时求全部复根
+std::vector<Cmplx> durandKerner(const std::vector<Cmplx>& coeffs) {
+    int n = static_cast<int>(coeffs.size()) - 1;
+    if (n <= 0) return {};
+    if (n == 1) return {-coeffs[0] / coeffs[1]};
+    std::vector<Cmplx> roots(n);
+    for (int i = 0; i < n; ++i) {
+        double angle = 2.0 * 3.141592653589793 * i / n + 0.4;
+        roots[i] = Cmplx(0.4 * std::cos(angle), 0.9 * std::sin(angle));
+    }
+    for (int iter = 0; iter < 200; ++iter) {
+        double maxDelta = 0.0;
+        for (int i = 0; i < n; ++i) {
+            Cmplx p = evalPoly(coeffs, roots[i]);
+            Cmplx denom(1.0, 0.0);
+            for (int j = 0; j < n; ++j)
+                if (j != i) denom *= (roots[i] - roots[j]);
+            if (std::abs(denom) < 1e-60) { roots[i] += Cmplx(1e-8, 1e-8); continue; }
+            Cmplx delta = p / denom;
+            if (std::abs(delta) > 1e6) delta = delta * (1e6 / std::abs(delta));
+            roots[i] -= delta;
+            maxDelta = std::max(maxDelta, std::abs(delta));
+        }
+        if (maxDelta < 1e-12) break;
+    }
+    return roots;
+}
+
+// Polynomial<Fraction> → std::complex<double> 系数 (低位优先)
+std::vector<Cmplx> polyToCoeffs(const Poly& p) {
+    std::vector<Cmplx> c;
+    for (const auto& coeff : p.coeffs())
+        c.push_back(Cmplx(coeff.toDouble(), 0.0));
+    return c;
+}
+
+// 对多项式做数值求根, 返回 Complex 列表
+std::vector<Complex> numericalRootsOf(const Poly& f, int mult) {
+    if (f.degree() <= 0) return {};
+    auto coeffs = polyToCoeffs(f);
+    auto roots = durandKerner(coeffs);
+    std::vector<Complex> out;
+    for (const auto& r : roots) {
+        for (int k = 0; k < mult; ++k)
+            out.push_back(Complex::fromDouble(r.real(), r.imag()));
+    }
+    return out;
+}
+
+} // anonymous namespace
 
 Matrix<Complex> toComplex(const Matrix<Fraction>& A) {
     Matrix<Complex> B(A.rows(), A.cols());
@@ -141,8 +207,10 @@ ComplexEigenResult complexEigenvalues(const Matrix<Fraction>& A) {
             out.eigenvalues.push_back({ pr.second, mult });
             continue;
         }
-        // 三次及以上: 保留为未分裂因子
-        out.unsolvedFactors.emplace_back(f.monic(), mult);
+        // 三次及以上: 数值求解全部复根 (Durand-Kerner)
+        auto numRoots = numericalRootsOf(f.monic(), mult);
+        for (const auto& r : numRoots)
+            out.eigenvalues.push_back({ r, mult });
     }
     return out;
 }

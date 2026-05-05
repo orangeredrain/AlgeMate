@@ -130,6 +130,51 @@ QPushButton[primary="true"]:pressed {
     background-color: #7666E8;
 }
 
+/* ================= Learning 模块 ================= */
+QTreeWidget#KnowledgeTree {
+    background-color: #28263F;
+    border: 1px solid #3A3754;
+    border-radius: 14px;
+    padding: 8px;
+    font-size: 14px;
+    color: #E6E7F0;
+}
+QTreeWidget#KnowledgeTree::item {
+    height: 38px;
+    padding-left: 10px;
+    border-radius: 8px;
+}
+QTreeWidget#KnowledgeTree::item:selected {
+    background-color: #3B3462;
+    color: #B8ACFF;
+    font-weight: 600;
+}
+QTreeWidget#KnowledgeTree::item:hover {
+    background-color: #312F4A;
+}
+QTextBrowser#KnowledgeContent {
+    background-color: #28263F;
+    border: 1px solid #3A3754;
+    border-radius: 14px;
+    padding: 14px 18px;
+    color: #E6E7F0;
+}
+QPushButton#LearnBackBtn {
+    background-color: #312F4A;
+    border: 1px solid #3A3754;
+    border-radius: 10px;
+    padding: 8px 22px;
+    min-height: 36px;
+    color: #D8DAE8;
+    font-size: 14px;
+    font-weight: 500;
+}
+QPushButton#LearnBackBtn:hover {
+    background-color: #3B3462;
+    border-color: #8B7BFF;
+    color: #B8ACFF;
+}
+
 QPushButton[iconBtn="true"] {
     background-color: #312F4A;
     border: 1px solid transparent;

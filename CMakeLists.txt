@@ -70,9 +70,10 @@ add_subdirectory(${ALGEMATE_SRC_DIR}/math)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/home)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/calculator)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/ai_solver)
-add_subdirectory(${ALGEMATE_MODULES_DIR}/knowledge)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/learning)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/settings)
+add_subdirectory(${ALGEMATE_MODULES_DIR}/test_center)
+add_subdirectory(${ALGEMATE_SRC_DIR}/latex)
 
 # ---------- 核心壳目标 ----------
 qt_add_executable(AlgeMate
@@ -110,9 +111,10 @@ target_link_libraries(AlgeMate
         algemate_home
         algemate_calculator
         algemate_ai_solver
-        algemate_knowledge
         algemate_learning
         algemate_settings
+        algemate_test_center
+        algemate_latex
 )
 
 target_compile_definitions(AlgeMate PRIVATE

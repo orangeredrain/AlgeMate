@@ -32,18 +32,36 @@ SettingsPage::SettingsPage(QWidget* parent) : QWidget(parent) {
         auto* row = new QHBoxLayout;
         row->setSpacing(12);
         auto* lbl = new QLabel(QStringLiteral("主题模式："));
+
         auto* btnLight = new QPushButton(QStringLiteral("☀  亮色"));
         auto* btnDark  = new QPushButton(QStringLiteral("☾  暗色"));
-        btnLight->setProperty("primary", true);
+        btnLight->setCheckable(true);
+        btnDark->setCheckable(true);
+        btnLight->setAutoExclusive(true);
+        btnDark->setAutoExclusive(true);
+        btnLight->setCursor(Qt::PointingHandCursor);
+        btnDark->setCursor(Qt::PointingHandCursor);
+
+        auto sync = [=]() {
+            bool dark = ThemeManager::instance().currentTheme() == ThemeManager::Theme::Dark;
+            btnLight->setChecked(!dark);
+            btnDark->setChecked(dark);
+        };
+        sync();
+
+        connect(btnLight, &QPushButton::clicked, []{
+            ThemeManager::instance().applyTheme(ThemeManager::Theme::Light);
+        });
+        connect(btnDark, &QPushButton::clicked, []{
+            ThemeManager::instance().applyTheme(ThemeManager::Theme::Dark);
+        });
+        connect(&ThemeManager::instance(), &ThemeManager::themeChanged,
+                this, [sync](ThemeManager::Theme) { sync(); });
+
         row->addWidget(lbl);
         row->addWidget(btnLight);
         row->addWidget(btnDark);
         row->addStretch();
-
-        QObject::connect(btnLight, &QPushButton::clicked,
-            []{ ThemeManager::instance().applyTheme(ThemeManager::Theme::Light); });
-        QObject::connect(btnDark, &QPushButton::clicked,
-            []{ ThemeManager::instance().applyTheme(ThemeManager::Theme::Dark); });
 
         lay->addWidget(head);
         lay->addLayout(row);

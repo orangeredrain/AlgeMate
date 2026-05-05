@@ -8,9 +8,9 @@
 #include "modules/home/HomePage.h"
 #include "modules/calculator/CalculatorPage.h"
 #include "modules/ai_solver/AiSolverPage.h"
-#include "modules/knowledge/KnowledgePage.h"
 #include "modules/learning/LearningPage.h"
 #include "modules/settings/SettingsPage.h"
+#include "modules/test_center/TestCenterPage.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -63,8 +63,8 @@ void MainWindow::registerModules() {
         { QStringLiteral("🏠"), QStringLiteral("首页"),         home },
         { QStringLiteral("🧮"), QStringLiteral("计算助手"),     new Calculator::CalculatorPage(this) },
         { QStringLiteral("🤖"), QStringLiteral("AI 智能解题"), new AiSolver::AiSolverPage(this) },
-        { QStringLiteral("📘"), QStringLiteral("知识点学习"),   new Knowledge::KnowledgePage(this) },
         { QStringLiteral("📈"), QStringLiteral("学习中心"),     new Learning::LearningPage(this) },
+        { QStringLiteral("🧪"), QStringLiteral("测试中心"),     new TestCenter::TestCenterPage(this) },
         { QStringLiteral("⚙"),  QStringLiteral("设置中心"),     new Settings::SettingsPage(this) },
     };
 

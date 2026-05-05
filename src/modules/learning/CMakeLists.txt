@@ -1,6 +1,17 @@
 qt_add_library(algemate_learning STATIC
+    ClickableCard.h
     LearningPage.h
     LearningPage.cpp
+    KnowledgePage.h
+    KnowledgePage.cpp
+    PracticePage.h
+    PracticePage.cpp
+    ExamPage.h
+    ExamPage.cpp
+    WrongBookPage.h
+    WrongBookPage.cpp
+    LearningCenterPage.h
+    LearningCenterPage.cpp
 )
 
 target_link_libraries(algemate_learning
@@ -8,6 +19,7 @@ target_link_libraries(algemate_learning
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        algemate_latex
 )
 
 target_include_directories(algemate_learning
