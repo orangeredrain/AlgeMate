@@ -423,8 +423,8 @@ void NonhomoLinearSystemPage::onSolve()
     Matrix<Fraction> gamma0 = computeParticularSolution(R, n);
 
     parts << paraHtml(QStringLiteral(
-        "第一步求方程组的一个特解 γ<sub>0</sub>．"
-        "为此先求出它的一般公式："), th);
+        "第一步求方程组的一个特解 $\\gamma_0$．"
+        "为此先求出它的一般公式："), th, doc);
 
     // General solution formula
     {
@@ -474,7 +474,7 @@ void NonhomoLinearSystemPage::onSolve()
     }
 
     parts << paraHtml(QStringLiteral(
-        "由上述一般解得到方程组的一个特解为"), th);
+        "由上述一般解得到方程组的一个特解为"), th, doc);
 
     parts << formulaHtml(QStringLiteral("\\gamma_0 = ") + matLtx(gamma0), th, doc);
 
@@ -483,14 +483,14 @@ void NonhomoLinearSystemPage::onSolve()
         QString freeList;
         for (std::size_t i = 0; i < freeCols.size(); ++i) {
             if (i > 0) freeList += QStringLiteral(", ");
-            freeList += QStringLiteral("x<sub>%1</sub>").arg(freeCols[i] + 1);
+            freeList += QStringLiteral("$x_{%1}$").arg(freeCols[i] + 1);
         }
         parts << paraHtml(QStringLiteral(
             "其中 %1 是自由未知量．"
             "第二步求导出组的一个基础解系．"
             "由于方程组 (7) 与它的导出组的系数矩阵相同，"
             "因此把方程组 (7) 的一般解公式 (8) 的常数项去掉，"
-            "就得到导出组的一般解．").arg(freeList), th);
+            "就得到导出组的一般解．").arg(freeList), th, doc);
     }
 
     // Basis vectors
@@ -510,7 +510,7 @@ void NonhomoLinearSystemPage::onSolve()
 
     // Solution set U
     parts << paraHtml(QStringLiteral(
-        "第三步写出非齐次线性方程组 (7) 的解集："), th);
+        "第三步写出非齐次线性方程组 (7) 的解集："), th, doc);
 
     {
         QString setLtx = QStringLiteral("U = \\left\\{ \\gamma_0 + ");

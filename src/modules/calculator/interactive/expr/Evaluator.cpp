@@ -33,7 +33,7 @@ using algemate::math::Matrix;
 using algemate::math::Polynomial;
 using algemate::math::PolynomialZp;
 
-// ======================== 类型转换辅助 ========================
+// 类型转换辅助
 
 static Matrix<Fraction> toFractionMatrix(const MatrixA& M, const char* op) {
     Matrix<Fraction> F(M.rows(), M.cols());
@@ -56,13 +56,7 @@ static MatrixA toAlgRealMatrix(const Matrix<Fraction>& F) {
     return M;
 }
 
-// ======================== AlgReal 版 Gauss 消元 ========================
-//  全部用 AlgReal 上的加减乘除 + isZero() 判零.
-//  支持包含 sqrt, nthRoot 等代数元素的矩阵.
 
-// 稳定性工具: 矩阵是否含代数数 (非有理) 元素
-//   det/rank/inv/rref 等基础运算遇到代数数矩阵 → 降级数值路径,
-//   避免 AlgReal Gauss 消元中的 squarefreePart/resultant 指数爆炸.
 static bool hasAlgebraicElem_(const MatrixA& M) {
     for (std::size_t i = 0; i < M.rows(); ++i)
         for (std::size_t j = 0; j < M.cols(); ++j)
@@ -86,7 +80,7 @@ static MatrixA fromDoubleMatrix_(const algemate::math::Matrix<double>& D) {
     return M;
 }
 
-// double 版 Gauss 消元 (用于代数数矩阵降级时): 部分主元, swaps 记录交换次数
+// double 版 Gauss 消元
 static algemate::math::Matrix<double> gaussEliminateDouble_(algemate::math::Matrix<double> M,
                                                            bool fullReduce, int* swaps = nullptr) {
     const std::size_t R = M.rows();
@@ -137,7 +131,7 @@ static algemate::math::Matrix<double> gaussEliminateDouble_(algemate::math::Matr
     return M;
 }
 
-// RREF: 返回行最简阶梯形, swaps 记录行交换次数 (用于 det 符号)
+// RREF: 返回行最简阶梯形, swaps 记录行交换次数
 static MatrixA gaussEliminateAlg(MatrixA M, bool fullReduce, int* swaps = nullptr) {
     const std::size_t R = M.rows();
     const std::size_t C = M.cols();
@@ -387,7 +381,7 @@ static bool isPolyFn_(const std::string& fn) {
         || fn == "roots";
 }
 
-// ======================== Evaluator ========================
+// Evaluator
 
 std::vector<QString> Evaluator::supportedFunctions() {
     return {
@@ -698,7 +692,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             throw std::runtime_error(fn + " 需要 " + std::to_string(k) + " 个参数");
     };
 
-    // ---- 标量函数 ----
+    // 标量函数
     // sqrt / root 走精确代数数路径: sqrt(2) 返回真正的 √2 (而非有理近似),
     //   保证 minpoly(sqrt(2)+sqrt(3)) = x^4 - 10x^2 + 1 精确正确.
     //   复数参数仍走数值路径 (Complex 未实现符号开方).
@@ -1260,7 +1254,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value::makeText(QString::fromStdString(result));
     }
 
-    // ---- 最小多项式 ----
+    // 最小多项式
     //   minpoly(α): 代数数 α 在 Q 上的最小多项式 (AlgReal::minPoly)
     //   minpoly(A): 方阵 A 的最小多项式 (= 最大不变因子, Frobenius)
     if (fn == "minpoly" || fn == "minimalpolynomial") {
@@ -1333,7 +1327,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value(Scalar(Fraction(irr ? 1 : 0)));
     }
 
-    // ---- 无平方部分 ----
+    // 无平方部分
     if (fn == "squarefree" || fn == "sqfree") {
         need(1);
         auto f = valueToPoly(args[0], fn.c_str());

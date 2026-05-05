@@ -16,7 +16,7 @@ namespace algemate::math::mpoly {
 
 using Fraction = algemate::math::Fraction;
 
-// ---- 解析器: "x1^2*x2^2+x1^2*x3^2+x2^2*x3^2" → MPolynomial ----
+// 解析器
 inline MPolynomial parseSymmetricPoly(const std::string& s, int n) {
     MPolynomial result;
     std::string t = s;
@@ -30,7 +30,6 @@ inline MPolynomial parseSymmetricPoly(const std::string& s, int n) {
         else if (t[i] == '-') { ++i; sign = -1; }
         if (i >= t.size()) break;
 
-        // Parse coefficient: leading digits before 'x' (optional)
         Fraction coef(sign);
         if (std::isdigit(t[i])) {
             std::size_t start = i;
@@ -44,14 +43,13 @@ inline MPolynomial parseSymmetricPoly(const std::string& s, int n) {
             if (sign < 0) coef = -coef;
         }
 
-        // Parse variables: sequence of xN or xN^E, separated by '*'
         std::vector<int> exps(n, 0);
         bool hasVar = false;
         while (i < t.size() && t[i] == 'x') {
-            ++i; // skip 'x'
+            ++i;
             std::size_t start = i;
             while (i < t.size() && std::isdigit(t[i])) ++i;
-            if (i == start) break; // no digit after 'x'
+            if (i == start) break;
             int idx = std::stoi(t.substr(start, i - start)) - 1;
             if (idx < 0 || idx >= n) break;
             int exp = 1;
@@ -62,29 +60,25 @@ inline MPolynomial parseSymmetricPoly(const std::string& s, int n) {
             }
             exps[idx] += exp;
             hasVar = true;
-            // skip '*'
             if (i < t.size() && t[i] == '*') ++i;
         }
 
         if (!hasVar) {
-            // Malformed input or pure constant — skip to next term
             if (coef.isZero()) break;
-            // Pure constant term
             result = result + MPolynomial(coef, Monomial(std::vector<int>(n, 0)));
         } else {
             result = result + MPolynomial(coef, Monomial(std::move(exps)));
         }
-        // Skip any trailing garbage until next '+' or '-' or end
         while (i < t.size() && t[i] != '+' && t[i] != '-') ++i;
     }
     return result;
 }
 
-// ---- 对称性检测 + 自动补全 ----
+// 对称性检测, 自动补全
 // 返回: 0=不对称, 1=已对称, 2=已自动补全
 inline int ensureSymmetric(MPolynomial& poly, int n, std::string& note) {
     // 收集所有项及其系数
-    std::map<std::multiset<int>, Fraction> orbitCoef; // sorted exponents → coefficient
+    std::map<std::multiset<int>, Fraction> orbitCoef;
 
     for (const auto& [m, c] : poly.terms()) {
         std::multiset<int> key(m.exps_.begin(), m.exps_.end());
@@ -128,7 +122,7 @@ inline int ensureSymmetric(MPolynomial& poly, int n, std::string& note) {
     return 1;
 }
 
-// ---- 字典序降次法: f(x) → g(σ) ----
+// 字典序降次法: f(x) → g(σ)
 struct ReductionStep {
     MPolynomial f;            // 当前多项式 (x_i 表示)
     std::vector<int> leadExp; // 首项指数组
@@ -144,17 +138,13 @@ inline std::vector<ReductionStep> reduceSymmetric(const MPolynomial& f, int n) {
         ReductionStep step;
         step.f = current;
 
-        // 首项 (字典序最大)
         const auto& lm = current.leadingMonomial();
         step.leadExp = std::vector<int>(n, 0);
         for (std::size_t i = 0; i < lm.vars() && i < static_cast<std::size_t>(n); ++i)
             step.leadExp[i] = lm[i];
-        // 指数应非增 (对称多项式首项)
         std::vector<int> lead(step.leadExp);
         std::sort(lead.begin(), lead.end(), std::greater<int>());
 
-        // 构建 φ = σ_1^{a_1-a_2} σ_2^{a_2-a_3} ... σ_n^{a_n}
-        // 其中 a_i 是首项的指数 (降序)
         MPolynomial phi(Fraction(1));
         std::ostringstream phiLatex;
         bool first = true;
@@ -164,7 +154,6 @@ inline std::vector<ReductionStep> reduceSymmetric(const MPolynomial& f, int n) {
                 if (!first) phiLatex << " ";
                 phiLatex << "\\sigma_{" << (i + 1) << "}^{" << exp << "}";
                 first = false;
-                // Build σ_i monomial: size n, position i has exponent 1
                 std::vector<int> sigmaExp(n, 0);
                 sigmaExp[i] = 1;
                 Monomial sigmaM(std::move(sigmaExp));
@@ -172,22 +161,10 @@ inline std::vector<ReductionStep> reduceSymmetric(const MPolynomial& f, int n) {
                     phi = phi * MPolynomial(Fraction(1), sigmaM);
             }
         }
-        // Actually, the above phi construction is for display. For computation, I compute phi in terms of x_i.
-        // But phi is an expression in σ_i, not x_i. The subtraction needs to be in x_i space.
-        // So I need to compute the x_i expansion of the σ monomial.
-
-        // For the step display, I'll compute it symbolically.
-        // The actual computation: compute the value of φ in x_i, then subtract.
-
-        // Let me compute φ_x = expand σ_1^{a_1-a_2} ... σ_n^{a_n} into x_i
-        // σ_k = sum of all products of k distinct x_i
         MPolynomial phiX(Fraction(1));
         for (int i = 0; i < n; ++i) {
             int exp = lead[i] - (i + 1 < n ? lead[i + 1] : 0);
             if (exp > 0) {
-                // Build σ_{i+1} as sum of all products of i+1 distinct x_j
-                // This is expensive for large n, but n is small in practice
-                // Generate all combinations of i+1 indices from n
                 MPolynomial sigmaI;
                 std::vector<int> mask(n, 0);
                 for (int j = 0; j <= i; ++j) mask[n - 1 - j] = 1;
@@ -203,7 +180,6 @@ inline std::vector<ReductionStep> reduceSymmetric(const MPolynomial& f, int n) {
             }
         }
 
-        // Build φ LaTeX with leading coefficient
         Fraction lc = current.leadingCoefficient();
         std::ostringstream fullPhi;
         if (lc == Fraction(-1))
@@ -246,7 +222,7 @@ inline std::string patternToLatex(const std::string& pattern) {
     return r;
 }
 
-// ---- 待定系数法: 一般 n 元对称多项式 → σ 表达式 ----
+// 待定系数法
 struct GeneralResult {
     std::vector<std::vector<int>> patterns;  // 所有可能的指数组
     std::vector<Fraction> coefficients;       // 对应系数
@@ -259,7 +235,6 @@ inline MPolynomial expandPattern(const std::string& pattern, int n) {
     auto poly = parseSymmetricPoly(pattern, n);
     if (poly.isZero()) return poly;
 
-    // 取首项指数, 生成所有置换
     const auto& lm = poly.leadingMonomial();
     std::vector<int> lead;
     for (std::size_t i = 0; i < static_cast<std::size_t>(n); ++i)
@@ -277,8 +252,7 @@ inline MPolynomial expandPattern(const std::string& pattern, int n) {
     return result;
 }
 
-// Enumerate all non-increasing exponent vectors with total degree d,
-// lexicographically ≤ leadPattern
+
 inline std::vector<std::vector<int>> enumPatterns(int n, int d, const std::vector<int>& lead) {
     std::vector<std::vector<int>> result;
     std::vector<int> cur(n, 0);
@@ -309,7 +283,6 @@ inline std::vector<std::vector<int>> enumPatterns(int n, int d, const std::vecto
 }
 
 // 待定系数法
-// Helper: binomial coefficient C(n,k) = n!/(k!(n-k)!)
 inline long long binom(int n, int k) {
     if (k < 0 || k > n) return 0;
     if (k == 0 || k == n) return 1;
@@ -319,21 +292,17 @@ inline long long binom(int n, int k) {
     return r;
 }
 
-// Evaluate symmetric sum Σ x^e at x = (1^k, 0^{n-k})
-// lead: sorted non-increasing exponent pattern (padded with zeros)
-// Returns the number of terms evaluating to 1
+
 inline Fraction evalSymmetricSum(const std::vector<int>& lead, int k) {
-    int m = 0; // number of non-zero exponents
+    int m = 0;
     for (int v : lead) if (v > 0) ++m;
     if (k < m) return Fraction(0);
 
-    // Count multiplicities of exponent values
     std::map<int, int> mult;
     for (int v : lead) if (v > 0) ++mult[v];
 
-    // Number of assignments = k! / ((k-m)! * Π mult_i!)
     long long num = 1;
-    for (int i = 0; i < m; ++i) num *= (k - i);  // k! / (k-m)!
+    for (int i = 0; i < m; ++i) num *= (k - i);
     for (auto& [_, cnt] : mult)
         for (int i = 2; i <= cnt; ++i) num /= i;
     return Fraction(num);
@@ -359,7 +328,6 @@ inline GeneralResult generalSymmetricReduction(const std::string& pattern, int n
     r.coefficients.resize(s);
     r.sigmaExprs.resize(s);
 
-    // Build σ expression strings
     for (int pi = 0; pi < s; ++pi) {
         std::ostringstream os;
         bool first = true;
@@ -374,14 +342,13 @@ inline GeneralResult generalSymmetricReduction(const std::string& pattern, int n
         r.sigmaExprs[pi] = os.str();
     }
 
-    // Set up linear system with s equations (k = m, m+1, ..., m+s-1)
     int m = 0;
     for (int v : lead) if (v > 0) ++m;
     std::vector<std::vector<Fraction>> A(s, std::vector<Fraction>(s));
     std::vector<Fraction> b(s);
 
     for (int eq = 0; eq < s; ++eq) {
-        int ones = m + eq; // k = m, m+1, ..., m+s-1
+        int ones = m + eq;
         b[eq] = evalSymmetricSum(lead, ones);
 
         for (int pi = 0; pi < s; ++pi) {
@@ -399,7 +366,6 @@ inline GeneralResult generalSymmetricReduction(const std::string& pattern, int n
         }
     }
 
-    // Gaussian elimination
     for (int col = 0; col < s; ++col) {
         int pivot = col;
         while (pivot < s && A[pivot][col].isZero()) ++pivot;
@@ -418,7 +384,6 @@ inline GeneralResult generalSymmetricReduction(const std::string& pattern, int n
     }
     for (int i = 0; i < s; ++i) r.coefficients[i] = b[i];
 
-    // Build final expression
     std::ostringstream finalExpr;
     bool first = true;
     for (int pi = 0; pi < s; ++pi) {

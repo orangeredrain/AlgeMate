@@ -27,15 +27,13 @@ public:
     MPolynomial operator*(const MPolynomial& rhs) const;
     MPolynomial operator*(const Fraction& c) const;
 
-    // 首项 (字典序最大)
+    // 首项
     const Monomial& leadingMonomial() const { return terms_.begin()->first; }
     const Fraction& leadingCoefficient() const { return terms_.begin()->second; }
 
     const std::map<Monomial, Fraction, std::less<>>& terms() const { return terms_; }
 
 private:
-    // map 的 key 是 Monomial, 用 operator< (字典序) 排序
-    // 首项在 begin(), 对应字典序最大
     std::map<Monomial, Fraction, std::less<>> terms_;
 };
 

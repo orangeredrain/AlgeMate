@@ -56,7 +56,7 @@ std::vector<std::vector<MatC>> buildChainsForEigenvalue(
     // dims[k] = dim(ker(M^k))
     std::vector<int> dims(s + 1);
     for (int k = 0; k <= s; ++k) dims[k] = static_cast<int>(nulls[k].cols());
-    // r[k] = dims[k] - dims[k-1], 表示"长度 >= k 的链数"
+    // r[k] = dims[k] - dims[k-1], 
     std::vector<int> r(s + 2, 0);
     for (int k = 1; k <= s; ++k) r[k] = dims[k] - dims[k - 1];
 

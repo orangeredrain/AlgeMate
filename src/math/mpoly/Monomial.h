@@ -18,11 +18,11 @@ public:
     std::size_t vars() const { return exps_.size(); }
     int operator[](std::size_t i) const { return i < exps_.size() ? exps_[i] : 0; }
 
-    // 字典序 (lex): 从左到右, 第一个不同的指数大的排前面
+    // 字典序
     bool operator<(const Monomial& rhs) const;
-    // 乘法: 指数相加
+    // 乘法
     Monomial operator*(const Monomial& rhs) const;
-    // 比较: 同一次数时判断指数是否全等
+    // 比较
     bool operator==(const Monomial& rhs) const;
     bool isOne() const;  // 全零指数
     int totalDegree() const;
@@ -34,7 +34,7 @@ inline bool Monomial::operator<(const Monomial& rhs) const {
     std::size_t n = std::max(exps_.size(), rhs.exps_.size());
     for (std::size_t i = 0; i < n; ++i) {
         int a = (*this)[i], b = rhs[i];
-        if (a != b) return a > b;  // 字典序: 大的在前
+        if (a != b) return a > b;  // 字典序
     }
     return false;
 }

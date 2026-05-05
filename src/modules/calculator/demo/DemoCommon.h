@@ -5,8 +5,10 @@
 #define ALGEMATE_DEMO_COMMON_H
 
 #include "math/core/BigInt.h"
+#include "math/core/Complex.h"
 #include "math/core/Fraction.h"
 #include "math/core/Matrix.h"
+#include "math/core/Polynomial.h"
 #include "math/trace/Step.h"
 #include "math/trace/StepSequence.h"
 #include "modules/calculator/interactive/expr/RenderSettings.h"
@@ -230,6 +232,66 @@ inline QString fracDivSqrtLtx(const algemate::math::Fraction& a,
     return sign + QStringLiteral("\\frac{%1}{%2}")
         .arg(QString::fromStdString(numCoeff.toString()),
              QString::fromStdString(denom.toString()));
+}
+
+// Polynomial<Fraction> → LaTeX（以 λ 为变量）
+// 高位优先输出: a_n λ^n + ... + a_1 λ + a_0
+inline QString polyLtx(const algemate::math::Polynomial<algemate::math::Fraction>& p) {
+    using algemate::math::Fraction;
+    if (p.isZero()) return QStringLiteral("0");
+    if (p.degree() == 0) return fracLtx(p.coeffs()[0]);
+
+    QString result;
+    bool first = true;
+    for (int d = p.degree(); d >= 0; --d) {
+        Fraction c = p[static_cast<std::size_t>(d)];
+        if (c.isZero()) continue;
+        bool neg = c.sign() < 0;
+        Fraction ac = c.abs();
+
+        if (first) {
+            if (neg) result += QStringLiteral("-");
+        } else {
+            result += neg ? QStringLiteral(" - ") : QStringLiteral(" + ");
+        }
+
+        if (d == 0) {
+            result += fracLtx(ac);
+        } else {
+            if (!ac.isOne()) result += fracLtx(ac);
+            result += QStringLiteral("\\lambda");
+            if (d > 1) result += QStringLiteral("^{%1}").arg(d);
+        }
+        first = false;
+    }
+    return result;
+}
+
+// Complex → LaTeX（利用 Complex::toLatex()，纯实数不显示虚部）
+inline QString complexLtx(const algemate::math::Complex& z) {
+    if (z.isReal())
+        return QString::fromStdString(z.real().toLatex());
+    return QString::fromStdString(z.toLatex());
+}
+
+// Matrix<Complex> → parenthesised LaTeX
+inline QString matComplexLtx(const algemate::math::Matrix<algemate::math::Complex>& M) {
+    const auto R = M.rows(), C = M.cols();
+    if (R == 0 || C == 0) return QStringLiteral("()");
+    const bool ghost = (C == 1);
+    QString cols = ghost ? QStringLiteral("cr")
+                         : QString(static_cast<int>(C), QLatin1Char('c'));
+    QString body;
+    for (std::size_t i = 0; i < R; ++i) {
+        for (std::size_t j = 0; j < C; ++j) {
+            if (j) body += QStringLiteral(" & ");
+            body += complexLtx(M(i, j));
+        }
+        if (ghost) body += QStringLiteral(" & ");
+        if (i + 1 < R) body += QStringLiteral(" \\\\\\\\ ");
+    }
+    return QStringLiteral("\\left(\\begin{array}{%1}%2\\end{array}\\right)")
+        .arg(cols, body);
 }
 
 // Matrix<Fraction> → parenthesised LaTeX (array 环境)

@@ -349,7 +349,7 @@ void HomoLinearSystemPage::onSolve()
         parts << paraHtml(QStringLiteral(
             "方程组的秩等于未知量"
             "个数，因此方程组仅有"
-            "零解。"), th);
+            "零解。"), th, doc);
         parts << formulaHtml(QStringLiteral("W = \\left\\{ \\mathbf{0} \\right\\}"), th, doc);
         resultBrowser_->setHtml(
             QStringLiteral("<div style=\"padding:4px; line-height:2.2;\">%1</div>")
@@ -358,7 +358,7 @@ void HomoLinearSystemPage::onSolve()
     }
 
     // General solution
-    parts << paraHtml(QStringLiteral("于是方程组的一般解为"), th);
+    parts << paraHtml(QStringLiteral("于是方程组的一般解为"), th, doc);
 
     {
         QString body;
@@ -402,12 +402,12 @@ void HomoLinearSystemPage::onSolve()
         QString freeList;
         for (std::size_t i = 0; i < freeCols.size(); ++i) {
             if (i > 0) freeList += QStringLiteral(", ");
-            freeList += QStringLiteral("x<sub>%1</sub>").arg(freeCols[i] + 1);
+            freeList += QStringLiteral("$x_{%1}$").arg(freeCols[i] + 1);
         }
         parts << paraHtml(QStringLiteral(
             "其中 %1 是自由未知量。"
             "因此方程组的一个基础"
-            "解系为").arg(freeList), th);
+            "解系为").arg(freeList), th, doc);
     }
 
     // Basis vectors
@@ -427,8 +427,7 @@ void HomoLinearSystemPage::onSolve()
 
     // Solution set W
     parts << paraHtml(QStringLiteral(
-        "从而方程组的解集 "
-        "<i>W</i> 为"), th);
+        "从而方程组的解集 $W$ 为"), th, doc);
 
     {
         QString setLtx = QStringLiteral("W = \\left\\{ ");

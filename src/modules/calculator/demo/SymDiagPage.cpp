@@ -33,28 +33,6 @@ namespace AlgeMate::Calculator::Demo {
 
 // ---- helpers ----
 
-// Polynomial → LaTeX (λ variable)
-static QString polyLtx(const Polynomial<Fraction>& p) {
-    const auto& c = p.coeffs();
-    if (c.empty()) return QStringLiteral("0");
-    QString out; bool first = true;
-    for (int i = static_cast<int>(c.size()) - 1; i >= 0; --i) {
-        if (c[i].isZero()) continue;
-        bool neg = c[i].sign() < 0;
-        Fraction ac = c[i].abs();
-        if (first) { if (neg) out += QStringLiteral("-"); }
-        else       { out += neg ? QStringLiteral(" - ") : QStringLiteral(" + "); }
-        if (i == 0) out += fracLtx(ac);
-        else {
-            if (!ac.isOne()) out += fracLtx(ac);
-            out += QStringLiteral("\\lambda");
-            if (i > 1) out += QStringLiteral("^{%1}").arg(i);
-        }
-        first = false;
-    }
-    return first ? QStringLiteral("0") : out;
-}
-
 // λI - A determinant (vmatrix)
 static QString detLtx(const Matrix<Fraction>& A) {
     const auto n = A.rows();

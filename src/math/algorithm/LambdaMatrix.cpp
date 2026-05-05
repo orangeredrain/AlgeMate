@@ -260,4 +260,100 @@ std::vector<ElementaryDivisor> elementaryDivisorsOf(const Matrix<Fraction>& A) {
     return elementaryDivisors(lambdaMinus(A));
 }
 
+std::vector<ElementaryDivisor> elementaryDivisorsOfPoly(const Polynomial<Fraction>& monicPoly) {
+    return factorMonic_(monicPoly);
+}
+
+JordanCanonicalResult jordanFromElementaryDivisors(const std::vector<ElementaryDivisor>& divisors) {
+    std::vector<JordanBlockDesc> blocks;
+
+    for (const auto& ed : divisors) {
+        const Poly& prime = ed.prime;
+        int power = ed.power;
+        int deg = prime.degree();
+
+        if (deg == 1) {
+            // prime = λ - a, 首一, 常数项 = -a → a = -常数项
+            Fraction a = Fraction(0) - prime.coeffs()[0];
+            blocks.push_back({Complex(a), power});
+        } else if (deg == 2) {
+            // prime = λ² + pλ + q, 首一
+            Fraction p = prime.coeffs()[1];
+            Fraction q = prime.coeffs()[0];
+            Fraction disc = p * p - Fraction(4) * q;
+
+            AlgReal negPOver2 = AlgReal(Fraction(0) - p) / AlgReal(Fraction(2));
+            AlgReal sqrtAbs = AlgReal::sqrt(disc >= Fraction(0) ? disc : Fraction(0) - disc);
+            AlgReal halfSqrt = sqrtAbs / AlgReal(Fraction(2));
+
+            if (disc >= Fraction(0)) {
+                // 两实根: (-p ± √Δ) / 2
+                Complex root1(negPOver2 + halfSqrt, AlgReal(Fraction(0)));
+                Complex root2(negPOver2 - halfSqrt, AlgReal(Fraction(0)));
+                blocks.push_back({root1, power});
+                blocks.push_back({root2, power});
+            } else {
+                // 共轭复根: (-p ± i√|Δ|) / 2
+                Complex root1(negPOver2, halfSqrt);
+                Complex root2(negPOver2, AlgReal(Fraction(0)) - halfSqrt);
+                blocks.push_back({root1, power});
+                blocks.push_back({root2, power});
+            }
+        }
+        // deg > 2 的情况在 factorMonic_ 中不会出现
+    }
+
+    // 计算总阶数并组装 Jordan 矩阵
+    std::size_t total = 0;
+    for (const auto& b : blocks) total += static_cast<std::size_t>(b.size);
+
+    Matrix<Complex> J(total, total);
+    std::size_t off = 0;
+    for (const auto& b : blocks) {
+        for (int i = 0; i < b.size; ++i) {
+            J(off + i, off + i) = b.eigenvalue;
+            if (i + 1 < b.size) {
+                J(off + i, off + i + 1) = Complex(Fraction(1));
+            }
+        }
+        off += static_cast<std::size_t>(b.size);
+    }
+
+    JordanCanonicalResult result;
+    result.J = std::move(J);
+    result.blocks = std::move(blocks);
+    return result;
+}
+
+JordanCanonicalResult jordanCanonicalFormOf(const Matrix<Fraction>& A) {
+    return jordanFromElementaryDivisors(elementaryDivisorsOf(A));
+}
+
+JordanCanonicalResult jordanFromBlocks(const std::vector<std::pair<Complex, int>>& blocksIn) {
+    std::vector<JordanBlockDesc> blocks;
+    blocks.reserve(blocksIn.size());
+    std::size_t total = 0;
+    for (const auto& [ev, sz] : blocksIn) {
+        blocks.push_back({ev, sz});
+        total += static_cast<std::size_t>(sz);
+    }
+
+    Matrix<Complex> J(total, total);
+    std::size_t off = 0;
+    for (const auto& b : blocks) {
+        for (int i = 0; i < b.size; ++i) {
+            J(off + i, off + i) = b.eigenvalue;
+            if (i + 1 < b.size) {
+                J(off + i, off + i + 1) = Complex(Fraction(1));
+            }
+        }
+        off += static_cast<std::size_t>(b.size);
+    }
+
+    JordanCanonicalResult result;
+    result.J = std::move(J);
+    result.blocks = std::move(blocks);
+    return result;
+}
+
 } // namespace algemate::math

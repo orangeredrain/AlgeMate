@@ -29,10 +29,10 @@ namespace AlgeMate::Calculator {
 
 namespace {
 struct GreekItem {
-    const char* ch;     // UTF-8 小写 Unicode (插入用)
+    const char* ch;     // UTF-8 小写 Unicode
     const char* label;  // LaTeX 宏
 };
-// 22 个小写希腊字母 (标准 LaTeX 宏, 去掉 \omicron 与 \phi)
+// 22 个小写希腊字母 (标准 LaTeX 宏)
 static const GreekItem kGreeks[] = {
     {"\xce\xb1", "\\alpha"   },
     {"\xce\xb2", "\\beta"    },
@@ -110,11 +110,11 @@ CalculatorPage::CalculatorPage(QWidget* parent) : QWidget(parent) {
     root->setContentsMargins(24, 24, 24, 24);
     root->setSpacing(16);
 
-    // ===== 顶部行 =====
+    // 顶部行
     auto* topRow = new QHBoxLayout;
     topRow->setSpacing(16);
 
-    // ---- 左侧: 标题 + 副标题 + Tab 切换 ----
+    // 左侧: 标题 + 副标题 + Tab 切换
     auto* leftCol = new QVBoxLayout;
     leftCol->setSpacing(8);
 
@@ -157,7 +157,7 @@ CalculatorPage::CalculatorPage(QWidget* parent) : QWidget(parent) {
     leftCol->addWidget(subtitle);
     leftCol->addWidget(tabBar);
 
-    // ---- 右侧: 希腊字母符号面板 (2 行 × 11 列 = 22 个小写, 按钮显示 LaTeX 渲染的希腊字形) ----
+    // 右侧: 希腊字母符号面板 (2 行 × 11 列 = 22 个小写, 按钮显示 LaTeX 渲染的希腊字形)
     auto* symbolPanel = new QWidget;
     symbolPanel->setObjectName(QStringLiteral("CalcSymbolPanel"));
     auto* symGrid = new QGridLayout(symbolPanel);
@@ -198,7 +198,7 @@ CalculatorPage::CalculatorPage(QWidget* parent) : QWidget(parent) {
 
     symbolPanel->setLayout(symGrid);
 
-    // ---- 根号面板 (放在希腊字母面板右侧): 根号 / n 次根号 ----
+    // 根号面板 (放在希腊字母面板右侧): 根号 / n 次根号
     auto* opsPanel = new QWidget;
     opsPanel->setObjectName(QStringLiteral("CalcOpsPanel"));
     auto* opsGrid = new QGridLayout(opsPanel);
@@ -235,7 +235,7 @@ CalculatorPage::CalculatorPage(QWidget* parent) : QWidget(parent) {
     topRow->addWidget(symbolPanel, 0, Qt::AlignTop | Qt::AlignRight);
     topRow->addWidget(opsPanel,    0, Qt::AlignTop | Qt::AlignRight);
 
-    // ===== 内容区 =====
+    // 内容区
     auto* stack = new QStackedWidget;
     stack->setObjectName(QStringLiteral("CalcStack"));
     stack->addWidget(interactivePage);

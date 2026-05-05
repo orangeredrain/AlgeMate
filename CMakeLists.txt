@@ -40,7 +40,7 @@ else()
 endif()
 
 # ---------- Qt 6 ----------
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui Svg Xml)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui Svg Xml OpenGL OpenGLWidgets)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -55,7 +55,7 @@ set(JKQtPlotter_BUILD_EXAMPLES    OFF CACHE BOOL "" FORCE)
 set(JKQtPlotter_BUILD_TOOLS       OFF CACHE BOOL "" FORCE)
 set(JKQtPlotter_BUILD_DECORATE_LIBNAMES_WITH_BUILDTYPE OFF CACHE BOOL "" FORCE)
 set(JKQtPlotter_BUILD_WITH_PRECOMPILED_HEADERS OFF CACHE BOOL "" FORCE)
-set(JKQtPlotter_BUILD_ONLY_MATHTEXT ON CACHE BOOL "" FORCE)  # 只要 JKQTMathText, 不编 plotter 子库
+set(JKQtPlotter_BUILD_ONLY_MATHTEXT ON CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/JKQtPlotter-master)
 
 # ---------- 目录组织 ----------

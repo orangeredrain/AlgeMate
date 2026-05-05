@@ -25,26 +25,19 @@ class QStandardItemModel;
 
 namespace AlgeMate::Calculator::Interactive {
 
-// 输入框: Enter = 提交, Shift+Enter = 换行; 支持函数/变量智能补全
+// 输入框: Enter = 提交, Shift+Enter = 换行
 class InputEditor : public QPlainTextEdit {
     Q_OBJECT
 public:
     explicit InputEditor(QWidget* parent = nullptr);
 
-    // 设置补全词库 (函数名 / 变量名); 函数名选中时自动追加 '('
     void setCompletionData(const QStringList& functions, const QStringList& variables);
 
-    // 开关补全 (关闭时隐藏 popup 且不再触发)
     void setCompletionEnabled(bool on);
     bool completionEnabled() const { return completionEnabled_; }
 
-    // 为补全 popup 应用主题配色
     void applyCompleterTheme(const RenderTheme& th);
 
-    // 插入带占位符的模板:
-    //   prefix + placeholders[0] + ", " + placeholders[1] + ... + suffix
-    //   placeholders 为空 → 光标定位到 prefix 与 suffix 之间
-    //   否则 → 默认选中第一个占位符, Tab 跳到下一个, 箭头/Esc 退出
     void insertSnippet(const QString& prefix,
                        const QStringList& placeholders,
                        const QString& suffix);
@@ -79,12 +72,11 @@ class InteractivePage : public QWidget {
 public:
     explicit InteractivePage(QWidget* parent = nullptr);
 
-    // 由外部工具栏 (希腊字母 / 根号等) 调用, 将 text 插入到当前输入光标处
     void insertAtCursor(const QString& text);
 
-    // 根号模板: 插入 sqrt() 光标自动置于括号中间
+    // 插入 sqrt() 光标自动置于括号中间
     void insertSqrtTemplate();
-    // n 次根号模板: 插入 root(n, x) 默认选中 n, Tab 跳到 x
+    // 插入 root(n, x) 默认选中 n, Tab 跳到 x
     void insertRootTemplate();
 
 private slots:
@@ -121,7 +113,7 @@ private:
     void applyHistoryPalette();
     void redrawHistory();
 
-    // 保存每个 cell 的源数据, 切主题时整体重绘 (矩阵 pixmap 主题随快照)
+    // 保存每个 cell 的源数据, 切主题时整体重绘
     std::vector<std::pair<QString, EvalResult>> cells_;
 };
 

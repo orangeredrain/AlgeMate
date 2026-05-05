@@ -114,7 +114,7 @@ std::vector<Fraction> applyB_(const Matrix<Fraction>& B, const std::vector<Fract
     return out;
 }
 
-// K-独立性检测: 给定已张成的 ℚ 子空间 spanned (nd × k), 检查把 (v, x·v, ..., x^{d-1} v)
+// K-独立性检测: 给定已张成的 Q 子空间 spanned (nd × k), 检查把 (v, x·v, ..., x^{d-1} v)
 // 全部加入是否严格增维 d 个. 若是, 表明 v 产生的 K-模在已有 K-模外, 可作为 top 向量.
 bool isKIndependent_(const Matrix<Fraction>& spanned,
                      const std::vector<Fraction>& v,

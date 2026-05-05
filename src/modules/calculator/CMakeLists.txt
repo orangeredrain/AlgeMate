@@ -23,6 +23,8 @@ qt_add_library(algemate_calculator STATIC
     # 可视化
     visualize/VisualizePage.h
     visualize/VisualizePage.cpp
+    visualize/QuadricWidget.h
+    visualize/QuadricWidget.cpp
     # 算法演示
     demo/DemoCommon.h
     demo/EigenPage.h
@@ -37,6 +39,8 @@ qt_add_library(algemate_calculator STATIC
     demo/HomoLinearSystemPage.cpp
     demo/InversePage.h
     demo/InversePage.cpp
+    demo/JordanFormPage.h
+    demo/JordanFormPage.cpp
     demo/SymDiagPage.h
     demo/SymDiagPage.cpp
     demo/NonhomoLinearSystemPage.h
@@ -55,6 +59,7 @@ target_link_libraries(algemate_calculator
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::OpenGLWidgets
         algemate_math
     PRIVATE
         JKQTMathTextLib

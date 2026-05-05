@@ -1,6 +1,7 @@
 #include "DemoPage.h"
 #include "EigenPage.h"
 #include "GSOPage.h"
+#include "JordanFormPage.h"
 #include "PolyGCDPage.h"
 #include "QuadFormPage.h"
 #include "SymReducePage.h"
@@ -104,6 +105,12 @@ DemoPage::DemoPage(QWidget* parent) : QWidget(parent) {
             this, [this]{ stack_->setCurrentIndex(0); });
     stack_->addWidget(symReducePage);
 
+    // ---- page 11: Jordan 标准形 ----
+    auto* jordanFormPage = new JordanFormPage;
+    connect(jordanFormPage, &JordanFormPage::backRequested,
+            this, [this]{ stack_->setCurrentIndex(0); });
+    stack_->addWidget(jordanFormPage);
+
     root->addWidget(stack_, 1);
 }
 
@@ -186,6 +193,12 @@ void DemoPage::buildCatalog() {
             QStringLiteral("对称多项式用初等对称多项式表出"),
             QStringLiteral("字典序降次法 / 待定系数法 → 表达为σ的多项式"),
             10);
+
+    addCard(grid, 5, 0,
+            QStringLiteral("$P^{-1}AP=J$"),
+            QStringLiteral("Jordan 标准形"),
+            QStringLiteral("λ-矩阵 → 行列式因子 → 不变因子 → 初等因子 → Jordan标准形"),
+            11);
 
     outer->addWidget(grid);
     outer->addStretch(1);

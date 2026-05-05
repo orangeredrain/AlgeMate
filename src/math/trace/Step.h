@@ -4,8 +4,8 @@
 * @file Step.h
 * @brief 算法执行的单步记录, 供过程可视化使用
 *
-* 每一步包含: 操作类型 kind, 行/列下标 i/j, 分数参数 k,
-* 操作完成后的矩阵快照 snapshot, 以及人类可读的中文描述 description
+* 每一步包含操作类型 kind, 行/列下标 i/j, 分数参数 k,
+* 操作完成后的矩阵快照 snapshot
 */
 
 #include "core/Fraction.h"
