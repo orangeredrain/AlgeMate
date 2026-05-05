@@ -7,6 +7,7 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
+#include <QFont>
 
 namespace AlgeMate::Knowledge {
 
@@ -24,8 +25,17 @@ KnowledgePage::KnowledgePage(QWidget* parent) : QWidget(parent) {
 
     auto* title = new QLabel(QStringLiteral("知识点学习"));
     title->setObjectName(QStringLiteral("PageTitle"));
+    title->setStyleSheet(
+        "font-size:28px;"
+        "font-weight:700;"
+        "color:#1F2430;"
+        );
     auto* subtitle = new QLabel(QStringLiteral("章节目录 · 图文讲解 · 经典例题"));
     subtitle->setObjectName(QStringLiteral("PageSubtitle"));
+    subtitle->setStyleSheet(
+        "font-size:14px;"
+        "color:#8A8FA3;"
+        );
 
     root->addWidget(title);
     root->addWidget(subtitle);
@@ -49,6 +59,7 @@ KnowledgePage::KnowledgePage(QWidget* parent) : QWidget(parent) {
                     return;
                 }
                 loadMarkdownFromResource(path);
+
             });
 
     // 默认选中第一个「带文档」的叶子，避免右侧空白
@@ -68,10 +79,45 @@ void KnowledgePage::composeContentArea(QSplitter* splitter) {
     chapterTree_->setHeaderHidden(true);
     chapterTree_->setMinimumWidth(240);
     chapterTree_->setAlternatingRowColors(true);
+    chapterTree_->setStyleSheet(R"(
+        QTreeWidget {
+            background: white;
+            border: none;
+            border-radius: 18px;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        QTreeWidget::item {
+            height: 36px;
+            padding-left: 8px;
+            border-radius: 8px;
+        }
+
+        QTreeWidget::item:selected {
+            background: #E9EEFF;
+            color: #3D5AFE;
+            font-weight: 600;
+        }
+
+        QTreeWidget::item:hover {
+            background: #F5F7FB;
+        }
+        )");
 
     // 右侧：图文区（后续公式可走 LaTeX 图或 WebEngine；当前用 setMarkdown MVP）
     contentView_ = new QTextBrowser(splitter);
     contentView_->setOpenExternalLinks(true);
+    contentView_->setStyleSheet(R"(
+        QTextBrowser {
+            background: white;
+            border: none;
+            border-radius: 18px;
+            padding: 24px;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+        )");
 
     splitter->addWidget(chapterTree_);
     splitter->addWidget(contentView_);
@@ -101,7 +147,7 @@ void KnowledgePage::buildChapterTree() {
         return leaf;
     };
 
-    // ---------- 静态目录（可按课程大纲继续扩充）----------
+    // ---------- 静态目录（按课程大纲继续扩充）----------
     QTreeWidgetItem* ch1 = addChapter(QStringLiteral("第 1 章 向量与线性方程组"));
     addSection(ch1, QStringLiteral("1.1 向量与线性组合"),
                QStringLiteral(":/knowledge/ch01_vectors.md"));
