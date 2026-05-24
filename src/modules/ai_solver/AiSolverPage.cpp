@@ -34,8 +34,15 @@ AiSolverPage::AiSolverPage(QWidget* parent) : QWidget(parent) {
     // 初始化对话历史
     QJsonObject systemMsg;
     systemMsg["role"] = "system";
-    systemMsg["content"] = QStringLiteral("你是一个专业的线性代数和数学学习助手。请用中文回答用户的问题，"
-                                          "提供清晰的解释、步骤和例子。");
+    systemMsg["content"] = QStringLiteral(
+        "你是专业数学助手。"
+        "所有回答必须使用 Markdown 格式。"
+        "数学公式必须使用 LaTeX。"
+        "行内公式使用 $...$ 。"
+        "块公式使用 $$...$$ 。"
+        "请使用中文回答。"
+        "提供清晰的解释、步骤和例子。"
+    );
     chatHistory_.append(systemMsg);
 
     qDebug() << "AiSolverPage initialized";
@@ -88,6 +95,12 @@ void AiSolverPage::setupUI() {
     mainLayout_->addWidget(statusLabel_);
 
     // ===== Messages Display =====
+    renderer_ = new Latex::LatexRenderer;
+    renderer_->addMathMacro(QStringLiteral("R"),
+                            QStringLiteral("\\mathbb{R}"));
+    renderer_->addMathMacro(QStringLiteral("C"),
+                            QStringLiteral("\\mathbb{C}"));
+
     resultEdit_ = new QTextEdit;
     resultEdit_->setReadOnly(true);
     resultEdit_->setObjectName(QStringLiteral("ResultEdit"));
@@ -305,6 +318,19 @@ void AiSolverPage::onReplyFinished() {
                 qDebug() << "Added assistant message to history";
             }
         }
+
+        // 获取当前 markdown
+        QString markdown = resultEdit_->toPlainText();
+
+        // latex + markdown 渲染
+        renderer_->clearCache();
+
+        QString html =
+            renderer_->render(markdown,
+                              resultEdit_->document());
+
+        // 显示 html
+        resultEdit_->setHtml(html);
 
         statusLabel_->setText(QStringLiteral("✅ 完成"));
         statusLabel_->setStyleSheet(QStringLiteral("color: green;"));

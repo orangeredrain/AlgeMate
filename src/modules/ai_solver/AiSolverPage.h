@@ -43,6 +43,7 @@ private:
     // UI Components
     QVBoxLayout*            mainLayout_       = nullptr;
     QTextEdit*              resultEdit_       = nullptr;
+    Latex::LatexRenderer*   renderer_         = nullptr;//newly added
     QLineEdit*              inputEdit_        = nullptr;
     QLineEdit*              apiKeyEdit_       = nullptr;
     QLabel*                 statusLabel_      = nullptr;
