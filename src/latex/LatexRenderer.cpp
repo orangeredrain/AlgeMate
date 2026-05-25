@@ -8,6 +8,7 @@
 #include <QScreen>
 #include <QTextDocument>
 #include <QUrl>
+#include <QRegularExpression>
 
 namespace AlgeMate::Latex {
 
@@ -199,6 +200,39 @@ static QString escapeText(const QString& s)
     return r;
 }
 
+// 内部: 简易 Markdown -> HTML
+static QString renderMarkdownText(QString s)
+{
+    // 先转义 HTML
+    s = s.toHtmlEscaped();
+
+    // ---------- 标题 ----------
+    // # xxx
+    QRegularExpression h1(R"((^|\n)# ([^\n]+))");
+    s.replace(h1, "\\1<span style=\"font-size:22px; font-weight:bold;\">\\2</span>");
+
+    // ## xxx
+    QRegularExpression h2(R"((^|\n)## ([^\n]+))");
+    s.replace(h2, "\\1<span style=\"font-size:18px; font-weight:bold;\">\\2</span>");
+
+    // ### xxx
+    QRegularExpression h3(R"((^|\n)### ([^\n]+))");
+    s.replace(h3,"\\1<span style=\"font-size:16px; font-weight:bold;\">\\2</span>");
+
+    // ---------- 加粗 ----------
+    QRegularExpression bold(R"(\*\*(.*?)\*\*)");
+    s.replace(bold, "<b>\\1</b>");
+
+    // ---------- 斜体 ----------
+    QRegularExpression italic(R"(\*(.*?)\*)");
+    s.replace(italic, "<i>\\1</i>");
+
+    // ---------- 换行 ----------
+    s.replace('\n', "<br/>");
+
+    return s;
+}
+
 // 内部: 匹配括号 / 花括号 (支持嵌套)
 
 static int findClosing(const QString& s, int openPos,
@@ -236,7 +270,7 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
 
     auto flushText = [&]() {
         if (!textBuf.isEmpty()) {
-            html += escapeText(textBuf);
+            html += renderMarkdownText(textBuf);
             textBuf.clear();
         }
     };
