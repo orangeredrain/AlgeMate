@@ -2,8 +2,14 @@
 #define ALGEMATE_PRACTICE_PAGE_H
 
 #include <QWidget>
+#include <QLabel>
+#include <QVector>
+#include <QString>
+
+#include "QuestionType.h"
 
 namespace AlgeMate::Learning {
+
 
 /// 练习模式入口: 显示 3 个子模式卡片.
 class PracticePage : public QWidget {
@@ -23,6 +29,7 @@ class CalculationProblemPage : public QWidget {
     Q_OBJECT
 public:
     explicit CalculationProblemPage(QWidget* parent = nullptr);
+
 signals:
     void backRequested();
 };
@@ -32,8 +39,28 @@ class ChapterPracticePage : public QWidget {
     Q_OBJECT
 public:
     explicit ChapterPracticePage(QWidget* parent = nullptr);
+
 signals:
     void backRequested();
+
+private slots:
+    void onSubmitAnswer();
+    void onNextQuestion();
+    void onPreviousQuestion();
+    void onLoadChapterQuestions();
+    void onAiGradeSubjective();
+
+private:
+    void loadQuestion(int index);
+    void updateUIForQuestion(const Question& q);
+    void displayResult(bool isCorrect, const QString& feedback);
+
+    QVector<Question> chapterQuestions;  // 从章节MD文件加载的题目
+    int currentQuestionIndex;
+    QWidget* answerWidget;
+    QLabel* questionLabel;              // 需要 #include <QLabel>
+    QLabel* feedbackLabel;              // 需要 #include <QLabel>
+    QLabel* progressLabel;              // 需要 #include <QLabel>
 };
 
 /// 专题模式练习
@@ -41,6 +68,7 @@ class TopicPracticePage : public QWidget {
     Q_OBJECT
 public:
     explicit TopicPracticePage(QWidget* parent = nullptr);
+
 signals:
     void backRequested();
 };

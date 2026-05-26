@@ -12,6 +12,9 @@ qt_add_library(algemate_learning STATIC
     WrongBookPage.cpp
     LearningCenterPage.h
     LearningCenterPage.cpp
+    ApiClient.h
+    ApiClient.cpp
+    QuestionType.h
 )
 
 target_link_libraries(algemate_learning
@@ -19,6 +22,7 @@ target_link_libraries(algemate_learning
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Network
         algemate_latex
 )
 

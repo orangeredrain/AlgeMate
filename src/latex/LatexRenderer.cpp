@@ -227,6 +227,14 @@ static QString renderMarkdownText(QString s)
     QRegularExpression italic(R"(\*(.*?)\*)");
     s.replace(italic, "<i>\\1</i>");
 
+    // ---------- 分割线 ----------
+    QRegularExpression hr(R"((^|\n)---(\n|$))");
+
+    s.replace(
+        hr,
+        "\\1<hr style=\"border:none; border-top:1px solid #999; margin:8px 0;\">\\2"
+        );
+
     // ---------- 换行 ----------
     s.replace('\n', "<br/>");
 
@@ -312,6 +320,40 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
                 html += mathToImg(latex, doc, m_fontSize, m_textColor,
                                   /*displayStyle=*/true);
             }
+            i = end + 2;
+            continue;
+        }
+
+        // 行内公式: \(...\)
+        if (src[i] == QLatin1Char('\\') &&
+            i + 1 < n &&
+            src[i + 1] == QLatin1Char('(')) {
+
+            flushText();
+
+            i += 2;
+
+            int end = src.indexOf(QStringLiteral("\\)"), i);
+
+            if (end < 0) {
+                textBuf += QStringLiteral("\\(");
+                continue;
+            }
+
+            QString latex = src.mid(i, end - i).trimmed();
+
+            if (!latex.isEmpty()) {
+                latex = expandMathMacros(latex, m_mathMacros);
+
+                html += mathToImg(
+                    latex,
+                    doc,
+                    m_fontSize,
+                    m_textColor,
+                    false
+                    );
+            }
+
             i = end + 2;
             continue;
         }
