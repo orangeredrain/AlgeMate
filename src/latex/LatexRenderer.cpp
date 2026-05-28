@@ -203,21 +203,17 @@ static QString escapeText(const QString& s)
 // 内部: 简易 Markdown -> HTML
 static QString renderMarkdownText(QString s)
 {
-    // 先转义 HTML
-    s = s.toHtmlEscaped();
+    // 【修改点】：直接删掉原本的 s = s.toHtmlEscaped();
 
     // ---------- 标题 ----------
-    // # xxx
     QRegularExpression h1(R"((^|\n)# ([^\n]+))");
-    s.replace(h1, "\\1<span style=\"font-size:22px; font-weight:bold;\">\\2</span>");
+    s.replace(h1, "\\1<h1 style=\"font-size:22px; font-weight:bold; margin:6px 0;\">\\2</h1>");
 
-    // ## xxx
     QRegularExpression h2(R"((^|\n)## ([^\n]+))");
-    s.replace(h2, "\\1<span style=\"font-size:18px; font-weight:bold;\">\\2</span>");
+    s.replace(h2, "\\1<h2 style=\"font-size:18px; font-weight:bold; margin:4px 0;\">\\2</h2>");
 
-    // ### xxx
     QRegularExpression h3(R"((^|\n)### ([^\n]+))");
-    s.replace(h3,"\\1<span style=\"font-size:16px; font-weight:bold;\">\\2</span>");
+    s.replace(h3, "\\1<h3 style=\"font-size:15px; font-weight:bold; margin:2px 0;\">\\2</h3>");
 
     // ---------- 加粗 ----------
     QRegularExpression bold(R"(\*\*(.*?)\*\*)");
@@ -229,11 +225,7 @@ static QString renderMarkdownText(QString s)
 
     // ---------- 分割线 ----------
     QRegularExpression hr(R"((^|\n)---(\n|$))");
-
-    s.replace(
-        hr,
-        "\\1<hr style=\"border:none; border-top:1px solid #999; margin:8px 0;\">\\2"
-        );
+    s.replace(hr, "\\1<hr style=\"border:none; border-top:1px solid #cbd5e0; margin:8px 0;\">\\2");
 
     // ---------- 换行 ----------
     s.replace('\n', "<br/>");

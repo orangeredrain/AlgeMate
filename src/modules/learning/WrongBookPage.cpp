@@ -15,6 +15,7 @@
 #include <QMessageBox>
 #include <QDateTime>
 #include <algorithm>
+#include <QGraphicsDropShadowEffect>
 
 namespace AlgeMate::Learning {
 
@@ -49,7 +50,8 @@ WrongDetailDialog::WrongDetailDialog(const Question& q, const QString& time, int
     qBrowser->setMinimumHeight(100);
     if (renderer) {
         renderer->clearCache();
-        qBrowser->setHtml(renderer->render(QStringLiteral("<h3>【核心题干】</h3>") + q.content, qBrowser->document()));
+        // 改用标准的三级 Markdown 标题进行传导渲染，界面字体柔和漂亮
+        qBrowser->setHtml(renderer->render(QStringLiteral("### 📌 【核心题干】\n") + q.content, qBrowser->document()));
     }
     lay->addWidget(qBrowser);
 
@@ -136,12 +138,14 @@ WrongBookPage::WrongBookPage(QWidget* parent)
     scrollArea->setFrameShape(QFrame::NoFrame);
 
     auto* container = new QWidget;
-    container->setStyleSheet("background-color: #f5f7fb;");
-
+    container->setStyleSheet(R"(background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #f8fafc,stop:1 #eef2ff);)");
     // 关键升级：更换为网格布局
     contentLayout = new QGridLayout(container);
     contentLayout->setContentsMargins(4, 4, 4, 4);
-    contentLayout->setSpacing(16);
+    contentLayout->setHorizontalSpacing(24);
+    contentLayout->setVerticalSpacing(24);
+    contentLayout->setColumnStretch(0, 1);
+    contentLayout->setColumnStretch(1, 1);
 
     scrollArea->setWidget(container);
     mainLayout->addLayout(top);
@@ -206,25 +210,62 @@ void WrongBookPage::loadWrongQuestions()
 void WrongBookPage::addWrongQuestionCard(const Question& q, const QString& time, int wrongCount, int index)
 {
     auto* card = new QFrame(this);
-    card->setMinimumSize(260, 170);
-    card->setMaximumSize(380, 200);
-    card->setStyleSheet("QFrame { background: white; border-radius: 12px; border: 1px solid #e2e8f0; } QFrame:hover { border-color: #cbd5e0; }");
+    card->setMinimumHeight(200);
+    card->setMaximumWidth(520);
+    card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    card->setStyleSheet(R"(
+    QFrame {
+        background: rgba(255,255,255,0.96);
+        border-radius: 22px;
+        border: 1px solid #e5e7eb;
+    }
+
+    QFrame:hover {
+        border: 1px solid #c7d2fe;
+        background: white;
+    }
+    )");
+    auto* shadow = new QGraphicsDropShadowEffect(card);
+    shadow->setBlurRadius(30);
+    shadow->setOffset(0, 8);
+    shadow->setColor(QColor(15, 23, 42, 20));
+    card->setGraphicsEffect(shadow);
 
     auto* lay = new QVBoxLayout(card);
     lay->setContentsMargins(16, 12, 16, 12); lay->setSpacing(8);
 
     auto* topRow = new QHBoxLayout;
     auto* typeLabel = new QLabel(QString("[%1]").arg((q.type == QuestionType::Single) ? "单选题" : ((q.type == QuestionType::Fill) ? "填空题" : "解答题")));
-    typeLabel->setStyleSheet("background: #fee2e2; color: #ef4444; border-radius: 4px; padding: 2px 6px; font-weight: bold; font-size: 11px;");
+    typeLabel->setStyleSheet(R"(
+    QLabel{
+        background:#eef2ff;
+        color:#4f46e5;
+        border-radius:10px;
+        padding:4px 10px;
+        font-weight:700;
+        font-size:11px;
+    }
+    )");
     auto* countLabel = new QLabel(QStringLiteral("🔥 错误 %1 次").arg(wrongCount));
-    countLabel->setStyleSheet("color: #718096; font-size: 11px;");
+    countLabel->setStyleSheet(R"(
+    QLabel{
+        color:#64748b;
+        font-size:12px;
+        font-weight:600;
+    }
+    )");
     topRow->addWidget(typeLabel); topRow->addStretch(); topRow->addWidget(countLabel);
     lay->addLayout(topRow);
 
     // 仅预览题干
     auto* qBrowser = new Latex::LatexTextBrowser(card);
     qBrowser->setFrameShape(QFrame::NoFrame);
-    qBrowser->setStyleSheet("background: transparent;");
+    qBrowser->setStyleSheet(R"(
+    background:#f8fafc;
+    border-radius:14px;
+    padding:12px;
+    )");
+    qBrowser->setMinimumHeight(95);
     qBrowser->setAttribute(Qt::WA_TransparentForMouseEvents, true);
 
     auto* renderer = static_cast<Latex::LatexRenderer*>(this->property("latex_renderer").value<void*>());
@@ -236,10 +277,47 @@ void WrongBookPage::addWrongQuestionCard(const Question& q, const QString& time,
     }
     lay->addWidget(qBrowser, 1);
 
-    auto* detailBtn = new QPushButton(QStringLiteral("查看名师解析报告 →"), card);
+    //时间信息
+    auto* timeLabel = new QLabel(QString("🕒 %1").arg(time), card);
+    timeLabel->setStyleSheet(R"(
+    QLabel{
+        color:#94a3b8;
+        font-size:11px;
+    }
+    )");
+    lay->addWidget(timeLabel);
+
+
+    auto* detailBtn = new QPushButton(QStringLiteral("查看解析 →"), card);
     detailBtn->setFixedHeight(30);
     detailBtn->setCursor(Qt::PointingHandCursor);
-    detailBtn->setStyleSheet("QPushButton { background: #f0fdf4; color: #16a34a; border-radius: 6px; font-size: 12px; font-weight: bold; border: none; } QPushButton:hover { background: #dcfce7; }");
+    detailBtn->setStyleSheet(R"(
+    QPushButton{
+        background:qlineargradient(
+            x1:0,y1:0,x2:1,y2:0,
+            stop:0 #f5f3ff,
+            stop:1 #ede9fe
+        );
+
+        color:#7c3aed;
+        border:1px solid #ddd6fe;
+        border-radius:14px;
+
+        font-size:13px;
+        font-weight:700;
+
+        padding:9px 12px;
+    }
+
+    QPushButton:hover{
+        background:#ede9fe;
+        border:1px solid #c4b5fd;
+    }
+
+    QPushButton:pressed{
+        background:#ddd6fe;
+    }
+    )");
     lay->addWidget(detailBtn);
 
     connect(detailBtn, &QPushButton::clicked, this, [this, q, time, wrongCount, renderer]() {
