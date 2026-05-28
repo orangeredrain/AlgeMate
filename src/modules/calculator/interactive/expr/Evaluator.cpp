@@ -80,6 +80,27 @@ static MatrixA fromDoubleMatrix_(const algemate::math::Matrix<double>& D) {
     return M;
 }
 
+// Faddeev-LeVerrier: 数值计算 double 矩阵的特征多项式系数
+// 返回 c[0]..c[n], 其中 c[n]=1, 多项式为 λ^n + c[n-1]λ^{n-1} + ... + c[0]
+static std::vector<double> charpolyDouble(const algemate::math::Matrix<double>& A) {
+    std::size_t n = A.rows();
+    algemate::math::Matrix<double> M = A;
+    std::vector<double> c(n + 1);
+    c[n] = 1.0;
+    for (std::size_t k = 1; k <= n; ++k) {
+        double trace = 0.0;
+        for (std::size_t i = 0; i < n; ++i)
+            trace += M(i, i);
+        c[n - k] = -trace / static_cast<double>(k);
+        if (k < n) {
+            for (std::size_t i = 0; i < n; ++i)
+                M(i, i) += c[n - k];
+            M = A * M;
+        }
+    }
+    return c;
+}
+
 // double 版 Gauss 消元
 static algemate::math::Matrix<double> gaussEliminateDouble_(algemate::math::Matrix<double> M,
                                                            bool fullReduce, int* swaps = nullptr) {
@@ -844,9 +865,70 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value(invAlg(args[0].asMatrix()));
     }
 
+    // ---- ceigs/complexeigs: 支持代数数矩阵 (自动转 double 数值计算) ----
+    if (fn == "ceigs" || fn == "complexeigs") {
+        need(1);
+        if (!args[0].isMatrix())
+            throw std::runtime_error(fn + " 需要矩阵参数");
+        const MatrixA& M = args[0].asMatrix();
+        if (!M.isSquare()) throw std::runtime_error(fn + " 要求方阵");
+
+        auto numericalize = [](double x) {
+            return Scalar(AlgReal::fromDouble(x, 1000000000));
+        };
+
+        if (hasAlgebraicElem_(M)) {
+            // 代数数矩阵: 转 double → charpoly → Durand-Kerner 求全部复根
+            auto D = toDoubleMatrix_(M);
+            auto coeffs = charpolyDouble(D);
+            std::size_t deg = coeffs.size() - 1;
+            if (deg == 0)
+                return Value::makeRootList({}, QString::fromUtf8("\xce\xbb"));
+            double lc = coeffs[deg];
+            if (std::abs(lc) < 1e-300)
+                throw std::runtime_error(fn + ": 特征多项式首项为零");
+            std::vector<std::complex<double>> c(deg + 1);
+            for (std::size_t i = 0; i <= deg; ++i)
+                c[i] = std::complex<double>(coeffs[i] / lc, 0.0);
+            auto roots = durandKernerRoots(std::move(c));
+            std::vector<std::pair<Scalar, Scalar>> out;
+            out.reserve(deg);
+            for (auto& r : roots) {
+                double thRe = std::max(1e-7, 1e-10 * std::abs(r.real()));
+                double thIm = std::max(1e-7, 1e-10 * std::abs(r.imag()));
+                Scalar reS = (std::abs(r.real()) < thRe) ? Scalar() : numericalize(r.real());
+                Scalar imS = (std::abs(r.imag()) < thIm) ? Scalar() : numericalize(r.imag());
+                out.emplace_back(reS, imS);
+            }
+            lastCallNote_ = QStringLiteral("数值解");
+            return Value::makeRootList(std::move(out), QString::fromUtf8("\xce\xbb"));
+        } else {
+            // 有理数矩阵: 精确复特征值算法
+            Matrix<Fraction> F = toFractionMatrix(M, fn.c_str());
+            auto res = algemate::math::complexEigenvalues(F);
+            std::vector<std::pair<Scalar, Scalar>> out;
+            for (const auto& ev : res.eigenvalues) {
+                double re = ev.value.real().toDouble();
+                double im = ev.value.imag().toDouble();
+                double thRe = std::max(1e-7, 1e-10 * std::abs(re));
+                double thIm = std::max(1e-7, 1e-10 * std::abs(im));
+                Scalar reS = (std::abs(re) < thRe) ? Scalar() : numericalize(re);
+                Scalar imS = (std::abs(im) < thIm) ? Scalar() : numericalize(im);
+                for (int k = 0; k < ev.multiplicity; ++k)
+                    out.emplace_back(reS, imS);
+            }
+            if (!res.unsolvedFactors.empty()) {
+                lastCallNote_ = QStringLiteral("数值解, 已展开重根; 未解出因式 %1 个")
+                    .arg(res.unsolvedFactors.size());
+            } else {
+                lastCallNote_ = QStringLiteral("数值解, 已展开重根");
+            }
+            return Value::makeRootList(std::move(out), QString::fromUtf8("\xce\xbb"));
+        }
+    }
+
     // ---- 以下函数仍需有理数矩阵 (特征多项式 / 实特征值求解) ----
     if (fn == "charpoly" || fn == "eigs" || fn == "eigenvalues"
-        || fn == "ceigs" || fn == "complexeigs"
         || fn == "nullspace") {
         need(1);
         if (!args[0].isMatrix())
@@ -894,32 +976,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                 lastCallNote_ = QStringLiteral("无实特征值; 如需全部复特征值请用 ceigs");
             else
                 lastCallNote_ = QStringLiteral("实特征值 (Durand-Kerner), 重根会被重复列出");
-            return Value::makeRootList(std::move(out), QString::fromUtf8("\xce\xbb"));
-        }
-        if (fn == "ceigs" || fn == "complexeigs") {
-            if (!F.isSquare()) throw std::runtime_error(fn + " 要求方阵");
-            auto res = algemate::math::complexEigenvalues(F);
-            // 数值化输出: 特征值统一写成 a + b i 形式; 精确代数数 → double → AlgReal (有理近似).
-            auto numericalize = [](double x) {
-                return Scalar(AlgReal::fromDouble(x, 1000000000));
-            };
-            std::vector<std::pair<Scalar, Scalar>> out;
-            for (const auto& ev : res.eigenvalues) {
-                double re = ev.value.real().toDouble();
-                double im = ev.value.imag().toDouble();
-                double thRe = std::max(1e-7, 1e-10 * std::abs(re));
-                double thIm = std::max(1e-7, 1e-10 * std::abs(im));
-                Scalar reS = (std::abs(re) < thRe) ? Scalar() : numericalize(re);
-                Scalar imS = (std::abs(im) < thIm) ? Scalar() : numericalize(im);
-                for (int k = 0; k < ev.multiplicity; ++k)
-                    out.emplace_back(reS, imS);
-            }
-            if (!res.unsolvedFactors.empty()) {
-                lastCallNote_ = QStringLiteral("数值解, 已展开重根; 未解出因式 %1 个")
-                    .arg(res.unsolvedFactors.size());
-            } else {
-                lastCallNote_ = QStringLiteral("数值解, 已展开重根");
-            }
             return Value::makeRootList(std::move(out), QString::fromUtf8("\xce\xbb"));
         }
         if (fn == "nullspace") {

@@ -73,6 +73,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
         { "🤖", "AI 智能解题",     "输入题目，让 AI 帮你分步讲解与求解",         "#FFE8D6", AiSolver,   0, 1 },
         { "📘", "知识点学习",     "章节目录、图文讲解、经典例题随手查",         "#DCF3EA", Knowledge,  1, 0 },
         { "📈", "学习中心",         "进度追踪、错题本、打卡与推荐练习",           "#E6E9FF", Learning,   1, 1 },
+        { "⚙",  "设置中心",         "个性化外观、账号、API 与快捷键",             "#F0F0F0", Settings,   2, 0 },
     };
     for (const auto& i : infos) {
         auto* card = makeQuickCard(QString::fromUtf8(i.emoji),

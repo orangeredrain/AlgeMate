@@ -59,11 +59,12 @@ void MainWindow::composeLayout() {
 void MainWindow::registerModules() {
     struct Item { QString icon; QString title; QWidget* page; };
     auto* home = new Home::HomePage(this);
+    auto* learningPage = new Learning::LearningPage(this);
     const QList<Item> items{
         { QStringLiteral("🏠"), QStringLiteral("首页"),         home },
         { QStringLiteral("🧮"), QStringLiteral("计算助手"),     new Calculator::CalculatorPage(this) },
         { QStringLiteral("🤖"), QStringLiteral("AI 智能解题"), new AiSolver::AiSolverPage(this) },
-        { QStringLiteral("📈"), QStringLiteral("学习中心"),     new Learning::LearningPage(this) },
+        { QStringLiteral("📈"), QStringLiteral("学习中心"),     learningPage },
         { QStringLiteral("🧪"), QStringLiteral("测试中心"),     new TestCenter::TestCenterPage(this) },
         { QStringLiteral("⚙"),  QStringLiteral("设置中心"),     new Settings::SettingsPage(this) },
     };
@@ -74,12 +75,23 @@ void MainWindow::registerModules() {
     }
     nav_->setCurrentIndex(0);
     stack_->setCurrentIndex(0);
+    learningPage_ = learningPage;
 
     connect(home, &Home::HomePage::requestNavigate,
             this, [this](int target) {
-                const int index = target + 1;
+                int index = 0;
+                switch (target) {
+                case Home::HomePage::Calculator: index = 1; break;
+                case Home::HomePage::AiSolver:   index = 2; break;
+                case Home::HomePage::Knowledge:  index = 3; break;
+                case Home::HomePage::Learning:   index = 3; break;
+                case Home::HomePage::Settings:   index = 5; break;
+                default: return;
+                }
                 nav_->setCurrentIndex(index);
                 stack_->setCurrentIndex(index);
+                if (target == Home::HomePage::Knowledge)
+                    learningPage_->showKnowledge();
             });
 }
 

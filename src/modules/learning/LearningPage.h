@@ -22,11 +22,10 @@ class LearningPage : public QWidget {
 public:
     explicit LearningPage(QWidget* parent = nullptr);
 
+    void showKnowledge();
+
 private:
     void buildDashboard();
-
-    // 卡片点击 → 子页面导航
-    void showKnowledge();
     void showPractice();
     void showExam();
     void showWrongBook();

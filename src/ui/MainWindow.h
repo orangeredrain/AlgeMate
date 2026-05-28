@@ -9,6 +9,8 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
+namespace AlgeMate::Learning { class LearningPage; }
+
 namespace AlgeMate {
 
 class TitleBar;
@@ -28,6 +30,7 @@ private:
     TitleBar*       titleBar_ = nullptr;
     NavigationBar*  nav_      = nullptr;
     QStackedWidget* stack_    = nullptr;
+    Learning::LearningPage* learningPage_ = nullptr;
 };
 
 }

@@ -17,6 +17,7 @@ public:
         AiSolver   = 1,
         Knowledge  = 2,
         Learning   = 3,
+        Settings   = 4,
     };
     Q_ENUM(NavTarget)
 
