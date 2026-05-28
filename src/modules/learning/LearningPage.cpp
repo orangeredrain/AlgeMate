@@ -13,6 +13,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QFrame>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 
 namespace AlgeMate::Learning {
 
@@ -117,9 +119,23 @@ LearningPage::LearningPage(QWidget* parent) : QWidget(parent)
     connect(m_practicePage, &PracticePage::topicPracticeRequested,
             this, &LearningPage::showTopicPractice);
 
-    // Knowledge → 章节练习
-    connect(m_knowledgePage, &KnowledgePage::enterChapterPractice,
-            this, &LearningPage::showChapterPractice);
+    // Knowledge → 章节练习（动态捕获当前浏览的微观小节并实现题库精准过滤）changed
+    connect(m_knowledgePage, &KnowledgePage::enterChapterPractice, this, [this]() {
+        // 1. 获取左侧目录树指针
+        if (auto* tree = m_knowledgePage->findChild<QTreeWidget*>(QStringLiteral("KnowledgeTree"))) {
+            if (auto* currentItem = tree->currentItem()) {
+                // 2. 提取节点中绑定的资源路径（例如：":/knowledge/ch01_1.md"）
+                QString fullPath = currentItem->data(0, Qt::UserRole + 1).toString();
+
+                if (!fullPath.isEmpty()) {
+                    // 3. 将路径传递给题库页面进行微观过滤
+                    m_chapterPracPage->loadQuestionsByMicroChapter(fullPath);
+                }
+            }
+        }
+        // 4. 执行原有的切页动作
+        showChapterPractice();
+    });
 }
 
 void LearningPage::buildDashboard()
@@ -201,10 +217,23 @@ void LearningPage::buildDashboard()
 void LearningPage::showKnowledge()        { m_stack->setCurrentIndex(1); }
 void LearningPage::showPractice()         { m_stack->setCurrentIndex(2); }
 void LearningPage::showCalculationProblem()  { m_stack->setCurrentIndex(3); }
-void LearningPage::showChapterPractice()     { m_stack->setCurrentIndex(4); }
+void LearningPage::showChapterPractice()
+{
+    // 保底逻辑：如果是直接从快捷入口点进来的，或者是从非知识点页面切过来的，
+    // 调用初始化钩子，让其重置为全量题库，避免因为上次残留的筛选导致题目数量过少。
+    if (m_chapterPracPage) {
+        m_chapterPracPage->onLoadChapterQuestions();
+    }
+    // 执行切页，切到 StackedWidget 的第 4 页（ChapterPracticePage）
+    m_stack->setCurrentIndex(4);
+}
 void LearningPage::showTopicPractice()       { m_stack->setCurrentIndex(5); }
 void LearningPage::showExam()             { m_stack->setCurrentIndex(6); }
-void LearningPage::showWrongBook()        { m_stack->setCurrentIndex(7); }
+void LearningPage::showWrongBook()
+{
+    m_wrongBookPage->reload(); // 重新读取错题
+    m_stack->setCurrentIndex(7);
+}
 void LearningPage::showLearningCenter()   { m_stack->setCurrentIndex(8); }
 void LearningPage::goBack()              { m_stack->setCurrentIndex(0); }
 

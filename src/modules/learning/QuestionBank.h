@@ -24,5 +24,11 @@ struct Question {
     bool isCorrect;                  // 是否正确
 };
 
+class QuestionBank {
+public:
+    static QVector<Question> getAllQuestions();
+    static QVector<Question> getQuestionsByChapter(const QString& chapterPath);
+};
+
 
 #endif // QUESTIONBANK_H

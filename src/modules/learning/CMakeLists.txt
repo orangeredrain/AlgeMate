@@ -15,6 +15,7 @@ qt_add_library(algemate_learning STATIC
     ApiClient.h
     ApiClient.cpp
     QuestionBank.h
+    QuestionBank.cpp
 )
 
 target_link_libraries(algemate_learning

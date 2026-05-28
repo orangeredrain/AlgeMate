@@ -43,12 +43,13 @@ public:
 signals:
     void backRequested();
 
-private slots:
+public slots: // 注意：改成 public slots 方便外部调用
     void onSubmitAnswer();
     void onNextQuestion();
     void onPreviousQuestion();
     void onLoadChapterQuestions();
     void onAiGradeSubjective();
+    void loadQuestionsByMicroChapter(const QString& microMarkdownName); // 新增这个方法
 
 private:
     void loadQuestion(int index);

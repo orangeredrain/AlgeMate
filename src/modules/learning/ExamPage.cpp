@@ -110,7 +110,7 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
         "📤 支持提前交卷\n"
         "📊 交卷后查看成绩与解析\n"
         "🤖 支持 AI 判卷与历史记录"
-    ));
+        ));
 
     infoLabel->setWordWrap(true);
 
@@ -207,7 +207,7 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
 
     // 题目内容
     auto* questionCard = new QFrame(this);
-        questionCard->setStyleSheet(R"(
+    questionCard->setStyleSheet(R"(
         QFrame {
             background: white;
             border-radius: 16px;
@@ -531,16 +531,16 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                     this,
                     [this, i]() {
 
-                Question& current =
-                    questions[currentQuestionIndex];
+                        Question& current =
+                            questions[currentQuestionIndex];
 
-                current.userAnswer = QString::number(i);
+                        current.userAnswer = QString::number(i);
 
-                current.isCorrect =
-                    (i == current.correctAnswer.toInt());
+                        // current.isCorrect =
+                        //     (i == current.correctAnswer.toInt());
 
-                updateNavButtons();
-            });
+                        updateNavButtons();
+                    });
 
             // 恢复之前的选择
             if (!q.userAnswer.isEmpty() && q.userAnswer.toInt() == i) {
@@ -572,20 +572,20 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                 this,
                 [this](const QString& text) {
 
-            Question& current =
-                questions[currentQuestionIndex];
+                    Question& current =
+                        questions[currentQuestionIndex];
 
-            current.userAnswer = text;
-            bool ok1, ok2;
-            double userValue =
-                text.toDouble(&ok1);
-            double correctValue =
-                current.correctAnswer.toDouble(&ok2);
-            current.isCorrect =
-                ok1 && ok2 &&
-                std::abs(userValue - correctValue) < 0.0001;
-            updateNavButtons();
-        });
+                    current.userAnswer = text;
+                    // bool ok1, ok2;
+                    // double userValue =
+                    //     text.toDouble(&ok1);
+                    // double correctValue =
+                    //     current.correctAnswer.toDouble(&ok2);
+                    // current.isCorrect =
+                    //     ok1 && ok2 &&
+                    //     std::abs(userValue - correctValue) < 0.0001;
+                    updateNavButtons();
+                });
     } else if (q.type == QuestionType::Subjective) {
         // 解答题：文本编辑框
         auto* textEdit = new QPlainTextEdit(answerWidget);
@@ -612,12 +612,12 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                 this,
                 [this, textEdit]() {
 
-            Question& current =
-                questions[currentQuestionIndex];
-            current.userAnswer =
-                textEdit->toPlainText();
-            updateNavButtons();
-        });
+                    Question& current =
+                        questions[currentQuestionIndex];
+                    current.userAnswer =
+                        textEdit->toPlainText();
+                    updateNavButtons();
+                });
     }
 
     answerLayout->addStretch();
@@ -773,6 +773,37 @@ void ExamProgressPage::onSubmitExam() {
     msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
 
     if (msgBox->exec() == QMessageBox::Yes) {
+        // ==================== 统一判卷 ====================
+
+        for (auto& q : questions) {
+
+            if (q.type == QuestionType::Single) {
+
+                q.isCorrect =
+                    (q.userAnswer == q.correctAnswer);
+
+            } else if (q.type == QuestionType::Fill) {
+
+                bool ok1, ok2;
+
+                double userValue =
+                    q.userAnswer.toDouble(&ok1);
+
+                double correctValue =
+                    q.correctAnswer.toDouble(&ok2);
+
+                q.isCorrect =
+                    ok1 && ok2 &&
+                    std::abs(userValue - correctValue) < 0.0001;
+
+            } else {
+
+                // 主观题先默认错误
+                // 后续可接 AI 判卷
+
+                q.isCorrect = false;
+            }
+        }
         QJsonArray historyArray;
 
         for (const auto& q : questions) {
