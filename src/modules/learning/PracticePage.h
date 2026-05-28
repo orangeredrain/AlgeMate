@@ -8,6 +8,9 @@
 
 #include "QuestionBank.h"
 
+class QSplitter;
+class QTreeWidget;
+
 namespace AlgeMate::Learning {
 
 
@@ -39,7 +42,8 @@ class ChapterPracticePage : public QWidget {
     Q_OBJECT
 public:
     explicit ChapterPracticePage(QWidget* parent = nullptr);
-
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 signals:
     void backRequested();
 
@@ -55,13 +59,19 @@ private:
     void loadQuestion(int index);
     void updateUIForQuestion(const Question& q);
     void displayResult(bool isCorrect, const QString& feedback);
+    void buildChapterTree(); // 新增目录树构建函数
 
-    QVector<Question> chapterQuestions;  // 从章节MD文件加载的题目
+    QVector<Question> chapterQuestions;
     int currentQuestionIndex;
     QWidget* answerWidget;
-    QLabel* questionLabel;              // 需要 #include <QLabel>
-    QLabel* feedbackLabel;              // 需要 #include <QLabel>
-    QLabel* progressLabel;              // 需要 #include <QLabel>
+    QLabel* questionLabel;
+    QLabel* feedbackLabel;
+    QLabel* progressLabel;
+
+    // 分栏导航和指示标头
+    class QSplitter* m_splitter     = nullptr;
+    class QTreeWidget* m_chapterTree  = nullptr;
+    QLabel* m_chapterTitleLabel = nullptr;
 };
 
 /// 专题模式练习

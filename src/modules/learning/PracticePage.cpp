@@ -28,6 +28,9 @@
 #include <QJsonArray>
 #include <QUrl>
 #include <cmath>
+#include <QSplitter>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 
 namespace AlgeMate::Learning {
 
@@ -149,14 +152,10 @@ CalculationProblemPage::CalculationProblemPage(QWidget* parent) : QWidget(parent
 ChapterPracticePage::ChapterPracticePage(QWidget* parent)
     : QWidget(parent), currentQuestionIndex(0), answerWidget(nullptr)
 {
-    // 初始化 LaTeX 渲染内核并配置数学宏
     auto* renderer = new Latex::LatexRenderer;
     renderer->addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
     renderer->addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
     renderer->addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
-    renderer->addMathMacro(QStringLiteral("Q"),  QStringLiteral("\\mathbb{Q}"));
-    renderer->addMathMacro(QStringLiteral("Z"),  QStringLiteral("\\mathbb{Z}"));
-    renderer->addMathMacro(QStringLiteral("N"),  QStringLiteral("\\mathbb{N}"));
     this->setProperty("latex_renderer", QVariant::fromValue(static_cast<void*>(renderer)));
 
     auto* mainLay = new QVBoxLayout(this);
@@ -167,96 +166,385 @@ ChapterPracticePage::ChapterPracticePage(QWidget* parent)
     auto* top = new QHBoxLayout;
     auto* back = makeBackBtn(this);
     connect(back, &QPushButton::clicked, this, &ChapterPracticePage::backRequested);
-    auto* t = new QLabel(QStringLiteral("对应章节练习"));
+
+    auto* t = new QLabel(QStringLiteral("对应章节练习"), this);
     t->setObjectName(QStringLiteral("PageTitle"));
-    t->setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50;");
+    // t->setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50;");
+
+    // 右侧小节实时动态标题指示灯
+    m_chapterTitleLabel = new QLabel(QStringLiteral("【当前章节：全量随堂练习】"), this);
+    m_chapterTitleLabel->setStyleSheet(
+        "font-size: 14px;"
+        "color: #6d5bd0;"
+        "font-weight: 700;"
+        "background: #f1ecff;"
+        "padding: 6px 14px;"
+        "border-radius: 999px;"
+        "margin-left: 12px;"
+    );
     top->addWidget(back);
     top->addWidget(t);
+    top->addWidget(m_chapterTitleLabel);
     top->addStretch();
     mainLay->addLayout(top);
 
-    // 2. 核心改动：引入全局滚动容器，包装所有答题核心组件
-    auto* mainScroll = new QScrollArea(this);
+    // 2. 引入左右分栏机制（完美复刻 KnowledgePage 架构）
+    m_splitter = new QSplitter(Qt::Horizontal, this);
+    m_splitter->setChildrenCollapsible(false);
+
+    // 左侧：树目录
+    m_chapterTree = new QTreeWidget(m_splitter);
+    m_chapterTree->setObjectName(QStringLiteral("PracticeChapterTree"));
+    m_chapterTree->setHeaderHidden(true);
+    m_chapterTree->setMinimumWidth(240);
+    m_chapterTree->setIndentation(15);
+    buildChapterTree();
+
+    // 右侧：核心答题卡片层
+    auto* rightContainer = new QWidget(m_splitter);
+    auto* rightLayout = new QVBoxLayout(rightContainer);
+    rightLayout->setContentsMargins(0, 0, 0, 0);
+    rightLayout->setSpacing(12);
+
+    auto* mainScroll = new QScrollArea(rightContainer);
     mainScroll->setWidgetResizable(true);
     mainScroll->setFrameShape(QFrame::NoFrame);
-    mainScroll->setStyleSheet("QScrollArea { background-color: transparent; }");
 
     auto* scrollContainer = new QWidget(this);
-    scrollContainer->setStyleSheet("background-color: transparent;");
+    scrollContainer->setStyleSheet(
+        "background: #f8fafc;"
+        "border-radius: 16px;"
+    );
     auto* scrollLay = new QVBoxLayout(scrollContainer);
     scrollLay->setContentsMargins(0, 4, 0, 4);
     scrollLay->setSpacing(16);
 
-    // 进度控制面板
     progressLabel = new QLabel(scrollContainer);
-    progressLabel->setStyleSheet(
-        "color: #4a5568; font-size: 13px; background-color: #edf2f7; "
-        "padding: 8px 12px; border-radius: 6px; font-weight: 500;"
-        );
+    progressLabel->setStyleSheet("color: #4a5568; font-size: 13px; background-color: #edf2f7; padding: 8px 12px; border-radius: 6px; font-weight: 500;");
     scrollLay->addWidget(progressLabel);
 
-    // 题目显示（升级为只读的 LatexTextBrowser，直接支持题目内 LaTeX 渲染！）
     auto* qBrowser = new Latex::LatexTextBrowser(scrollContainer);
     qBrowser->setObjectName(QStringLiteral("QuestionTextBrowser"));
     qBrowser->setFrameShape(QFrame::NoFrame);
-    qBrowser->setOpenExternalLinks(true);
-    qBrowser->setMinimumHeight(100);
-    qBrowser->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;");
-    // 将原指针强转存储以便后面直接刷新使用
+    qBrowser->setMinimumHeight(160);
+    qBrowser->setStyleSheet(
+        "background: white;"
+        "border: 1px solid #e5e7eb;"
+        "border-radius: 16px;"
+        "padding: 20px;"
+    );
+    // qBrowser->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;");
     questionLabel = reinterpret_cast<QLabel*>(qBrowser);
     scrollLay->addWidget(qBrowser, 0);
 
-    // 动态交互答案区域卡片
     answerWidget = new QWidget(scrollContainer);
     auto* answerLayout = new QVBoxLayout(answerWidget);
     answerLayout->setContentsMargins(0, 0, 0, 0);
     scrollLay->addWidget(answerWidget, 0);
 
-    // 升级为专业的 LatexTextBrowser
     auto* advancedFeedback = new Latex::LatexTextBrowser(scrollContainer);
-    advancedFeedback->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    advancedFeedback->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     advancedFeedback->setObjectName(QStringLiteral("AdvancedFeedbackView"));
-    advancedFeedback->setOpenExternalLinks(true);
     advancedFeedback->setMinimumHeight(160);
-    advancedFeedback->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    advancedFeedback->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    // 关键修正：让反馈框自适应内容高度，拒绝内部二次憋死产生独立滚动条！
     advancedFeedback->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     advancedFeedback->hide();
     feedbackLabel = reinterpret_cast<QLabel*>(advancedFeedback);
     scrollLay->addWidget(advancedFeedback, 0);
 
-    scrollLay->addStretch(1); // 撑开内部
+    scrollLay->addStretch(1);
     mainScroll->setWidget(scrollContainer);
-    mainLay->addWidget(mainScroll, 1);
+    rightLayout->addWidget(mainScroll, 1);
 
-    // 3. 固定底栏：操作操作区
+    // 按钮区
     auto* bottomLayout = new QHBoxLayout;
     auto* prevBtn = new QPushButton(QStringLiteral("← 上一题"), this);
     auto* submitBtn = new QPushButton(QStringLiteral("确认提交"), this);
     auto* nextBtn = new QPushButton(QStringLiteral("下一题 →"), this);
-
     QString baseBtnStyle = "QPushButton { padding: 8px 16px; font-size: 13px; border-radius: 6px; font-weight: 500; }";
-    prevBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #ffffff; border: 1px solid #cbd5e0; color: #4a5568; } QPushButton:hover { background-color: #f7fafc; }");
-    nextBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #ffffff; border: 1px solid #cbd5e0; color: #4a5568; } QPushButton:hover { background-color: #f7fafc; }");
-    submitBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #3182ce; border: none; color: white; padding: 10px 24px; font-size: 14px; } QPushButton:hover { background-color: #2b6cb0; }");
+    prevBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #ffffff; border: 1px solid #cbd5e0; color: #4a5568; }");
+    nextBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #ffffff; border: 1px solid #cbd5e0; color: #4a5568; }");
+    submitBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #3182ce; border: none; color: white; padding: 10px 24px; font-size: 14px; }");
 
     connect(prevBtn, &QPushButton::clicked, this, &ChapterPracticePage::onPreviousQuestion);
     connect(submitBtn, &QPushButton::clicked, this, &ChapterPracticePage::onSubmitAnswer);
     connect(nextBtn, &QPushButton::clicked, this, &ChapterPracticePage::onNextQuestion);
+    bottomLayout->addWidget(prevBtn); bottomLayout->addStretch(); bottomLayout->addWidget(submitBtn); bottomLayout->addWidget(nextBtn);
+    rightLayout->addLayout(bottomLayout);
 
-    bottomLayout->addWidget(prevBtn);
-    bottomLayout->addStretch();
-    bottomLayout->addWidget(submitBtn);
-    bottomLayout->addWidget(nextBtn);
-    mainLay->addLayout(bottomLayout);
+    m_splitter->addWidget(m_chapterTree);
+    m_splitter->addWidget(rightContainer);
+    m_splitter->setStretchFactor(0, 0);
+    m_splitter->setStretchFactor(1, 1);
+    mainLay->addWidget(m_splitter, 1);
+    this->setStyleSheet(R"(
+
+    /* 整体背景 */
+    ChapterPracticePage {
+        background-color: #f6f3ff;
+    }
+
+    /* 页面标题 */
+    QLabel#PageTitle {
+        font-size: 24px;
+        font-weight: 700;
+        color: #443c68;
+    }
+
+    /* 当前章节标签 */
+    QLabel {
+        font-family: "Microsoft YaHei";
+    }
+
+    /* 左侧目录树 */
+    QTreeWidget#PracticeChapterTree {
+        background: #ffffff;
+        border: 1px solid #e6e1f5;
+        border-radius: 14px;
+        padding: 10px;
+        font-size: 15px;
+        color: #4b445f;
+        outline: none;
+    }
+
+    /* 树节点 */
+    QTreeWidget#PracticeChapterTree::item {
+        height: 40px;
+        border-radius: 8px;
+        padding-left: 10px;
+        margin: 2px 0px;
+    }
+
+    /* hover */
+    QTreeWidget#PracticeChapterTree::item:hover {
+        background: #f1ecff;
+        color: #6d5bd0;
+    }
+
+    /* 选中 */
+    QTreeWidget#PracticeChapterTree::item:selected {
+        background: #e5dcff;
+        color: #5b4db2;
+        font-weight: 700;
+    }
+
+    /* 一级章节 */
+    QTreeWidget#PracticeChapterTree::branch:has-children {
+        font-weight: 700;
+        color: #443c68;
+    }
+
+    /* splitter */
+    QSplitter::handle {
+        background: transparent;
+        width: 8px;
+    }
+
+    QSplitter::handle:hover {
+        background: #ece6ff;
+    }
+
+    /* 进度栏 */
+    QLabel {
+        color: #5c5470;
+    }
+
+    /* 题目区 */
+    LatexTextBrowser#QuestionTextBrowser {
+        background: #ffffff;
+        border: 1px solid #ebe7f7;
+        border-radius: 18px;
+        padding: 20px;
+        font-size: 15px;
+        color: #3f3a52;
+    }
+
+    /* 反馈区 */
+    QTextBrowser#AdvancedFeedbackView {
+        border-radius: 18px;
+        padding: 18px;
+        font-size: 14px;
+    }
+
+    /* 输入框 */
+    QLineEdit {
+        height: 40px;
+        border: 1px solid #ddd6f3;
+        border-radius: 10px;
+        padding-left: 12px;
+        background: white;
+        font-size: 14px;
+        color: #443c68;
+    }
+
+    QLineEdit:focus {
+        border: 1px solid #9b87f5;
+    }
+
+    /* 主观题输入框 */
+    QPlainTextEdit {
+        border: 1px solid #ddd6f3;
+        border-radius: 12px;
+        padding: 10px;
+        background: white;
+        font-size: 14px;
+        color: #443c68;
+    }
+
+    QPlainTextEdit:focus {
+        border: 1px solid #9b87f5;
+    }
+
+    /* 普通按钮 */
+    QPushButton {
+        background: white;
+        border: 1px solid #ddd6f3;
+        border-radius: 10px;
+        padding: 8px 18px;
+        font-size: 14px;
+        color: #52486b;
+    }
+
+    QPushButton:hover {
+        background: #f3efff;
+    }
+
+    /* AI按钮 */
+    QPushButton#InnerAiGradeButton {
+        background: #9b87f5;
+        color: white;
+        border: none;
+        font-weight: 700;
+    }
+
+    QPushButton#InnerAiGradeButton:hover {
+        background: #8a74eb;
+    }
+
+    /* 滚动条 */
+    QScrollBar:vertical {
+        width: 10px;
+        background: transparent;
+    }
+
+    QScrollBar::handle:vertical {
+        background: #d6cdf7;
+        border-radius: 5px;
+    }
+
+    QScrollBar::handle:vertical:hover {
+        background: #bcaef5;
+    }
+
+    QScrollBar::add-line:vertical,
+    QScrollBar::sub-line:vertical {
+        height: 0px;
+    }
+
+    )");
+
+    // 左侧目录树节点点击联动逻辑
+    connect(m_chapterTree, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* current, QTreeWidgetItem*) {
+        if (!current) return;
+        QString path = current->data(0, Qt::UserRole + 1).toString();
+        if (!path.isEmpty()) {
+            m_chapterTitleLabel->setText(QStringLiteral("【当前章节：%1】").arg(current->text(0)));
+            loadQuestionsByMicroChapter(path); // 这里的联动加载在上一轮对话已给写完
+        }
+    });
 
     onLoadChapterQuestions();
-
     if (!chapterQuestions.isEmpty()) {
         loadQuestion(0);
     }
+}
+
+// 编写具体的目录树结构生成
+void ChapterPracticePage::buildChapterTree() {
+    m_chapterTree->clear();
+
+    auto addChapter = [this](const QString& title) {
+        auto* node = new QTreeWidgetItem(m_chapterTree);
+        node->setText(0, title);
+        node->setExpanded(true);
+        return node;
+    };
+
+    auto addSection = [](QTreeWidgetItem* chapter, const QString& title, const QString& resourcePath) {
+        auto* leaf = new QTreeWidgetItem(chapter);
+        leaf->setText(0, title);
+        // 保持和外部 Lambda 捕获解析一致，统一使用 Qt::UserRole + 1 存储路径
+        leaf->setData(0, Qt::UserRole + 1, resourcePath);
+        return leaf;
+    };
+
+    // ==================== 第 1 章 多项式 ====================
+    QTreeWidgetItem* ch1 = addChapter(QStringLiteral("第 1 章 多项式"));
+    addSection(ch1, QStringLiteral("1.1 整除与带余除法"), QStringLiteral(":/knowledge/ch01_1.md"));
+    addSection(ch1, QStringLiteral("1.2 最大公因式"), QStringLiteral(":/knowledge/ch01_2.md"));
+    addSection(ch1, QStringLiteral("1.3 不可约多项式与唯一分解定理"), QStringLiteral(":/knowledge/ch01_3.md"));
+    addSection(ch1, QStringLiteral("1.4 重因式"), QStringLiteral(":/knowledge/ch01_4.md"));
+    addSection(ch1, QStringLiteral("1.5 n元多项式环与对称多项式"), QStringLiteral(":/knowledge/ch01_5.md"));
+
+    // ==================== 第 2 章 行列式 ====================
+    QTreeWidgetItem* ch2 = addChapter(QStringLiteral("第 2 章 行列式"));
+    addSection(ch2, QStringLiteral("2.1 行列式的定义"), QStringLiteral(":/knowledge/ch02_1.md"));
+    addSection(ch2, QStringLiteral("2.2 克拉默法则与拉普拉斯定理"), QStringLiteral(":/knowledge/ch02_2.md"));
+
+    // ==================== 第 3 章 n维向量与向量空间 ====================
+    QTreeWidgetItem* ch3 = addChapter(QStringLiteral("第 3 章 n维向量与向量空间"));
+    addSection(ch3, QStringLiteral("3.1 n维向量与向量空间"), QStringLiteral(":/knowledge/ch03_1.md"));
+    addSection(ch3, QStringLiteral("3.2 极大线性无关组"), QStringLiteral(":/knowledge/ch03_2.md"));
+    addSection(ch3, QStringLiteral("3.3 向量组的秩"), QStringLiteral(":/knowledge/ch03_3.md"));
+    addSection(ch3, QStringLiteral("3.4 矩阵的秩"), QStringLiteral(":/knowledge/ch03_4.md"));
+    addSection(ch3, QStringLiteral("3.5 线性方程组的解"), QStringLiteral(":/knowledge/ch03_5.md"));
+
+    // ==================== 第 4 章 矩阵的运算 ====================
+    QTreeWidgetItem* ch4 = addChapter(QStringLiteral("第 4 章 矩阵的运算"));
+    addSection(ch4, QStringLiteral("4.1 矩阵的加法、数乘与乘法"), QStringLiteral(":/knowledge/ch04_1.md"));
+    addSection(ch4, QStringLiteral("4.2 可逆矩阵"), QStringLiteral(":/knowledge/ch04_2.md"));
+    addSection(ch4, QStringLiteral("4.3 分块矩阵"), QStringLiteral(":/knowledge/ch04_3.md"));
+
+    // ==================== 第 5 章 矩阵的相抵与相似 ====================
+    QTreeWidgetItem* ch5 = addChapter(QStringLiteral("第 5 章 矩阵的相抵与相似"));
+    addSection(ch5, QStringLiteral("5.1 矩阵的相抵"), QStringLiteral(":/knowledge/ch05_1.md"));
+    addSection(ch5, QStringLiteral("5.2 矩阵的相似"), QStringLiteral(":/knowledge/ch05_2.md"));
+    addSection(ch5, QStringLiteral("5.3 特征向量与矩阵可对角化"), QStringLiteral(":/knowledge/ch05_3.md"));
+    addSection(ch5, QStringLiteral("5.4 实对称矩阵的正交对角化"), QStringLiteral(":/knowledge/ch05_4.md"));
+
+    // ==================== 第 6 章 二次型 ====================
+    QTreeWidgetItem* ch6 = addChapter(QStringLiteral("第 6 章 二次型"));
+    addSection(ch6, QStringLiteral("6.1 二次型的定义、规范形"), QStringLiteral(":/knowledge/ch06_1.md"));
+    addSection(ch6, QStringLiteral("6.2 正定二次型与正定矩阵"), QStringLiteral(":/knowledge/ch06_2.md"));
+
+    // ==================== 第 7 章 线性空间 ====================
+    QTreeWidgetItem* ch7 = addChapter(QStringLiteral("第 7 章 线性空间"));
+    addSection(ch7, QStringLiteral("7.1 基与维数"), QStringLiteral(":/knowledge/ch07_1.md"));
+    addSection(ch7, QStringLiteral("7.2 子空间的交、和与直和"), QStringLiteral(":/knowledge/ch07_2.md"));
+    addSection(ch7, QStringLiteral("7.3 线性空间的同构"), QStringLiteral(":/knowledge/ch07_3.md"));
+    addSection(ch7, QStringLiteral("7.4 商空间"), QStringLiteral(":/knowledge/ch07_4.md"));
+
+    // ==================== 第 8 章 线性映射 ====================
+    QTreeWidgetItem* ch8 = addChapter(QStringLiteral("第 8 章 线性映射"));
+    addSection(ch8, QStringLiteral("8.1 线性映射的定义"), QStringLiteral(":/knowledge/ch08_1.md"));
+    addSection(ch8, QStringLiteral("8.2 核与像"), QStringLiteral(":/knowledge/ch08_2.md"));
+    addSection(ch8, QStringLiteral("8.3 线性映射的矩阵表示"), QStringLiteral(":/knowledge/ch08_3.md"));
+    addSection(ch8, QStringLiteral("8.4 不变子空间与 Cayley–Hamilton定理"), QStringLiteral(":/knowledge/ch08_4.md"));
+    addSection(ch8, QStringLiteral("8.5 Jordan标准形"), QStringLiteral(":/knowledge/ch08_5.md"));
+
+    // ==================== 第 9 章 lambda-矩阵 ====================
+    QTreeWidgetItem* ch9 = addChapter(QStringLiteral("第 9 章 lambda-矩阵"));
+    addSection(ch9, QStringLiteral("9.1 lambda-矩阵的定义"), QStringLiteral(":/knowledge/ch09_1.md"));
+    addSection(ch9, QStringLiteral("9.2 Smith 标准形"), QStringLiteral(":/knowledge/ch09_2.md"));
+    addSection(ch9, QStringLiteral("9.3 不变因子与 Jordan 标准形"), QStringLiteral(":/knowledge/ch09_3.md"));
+
+    // ==================== 第 10 章 具有度量的线性空间 ====================
+    QTreeWidgetItem* ch10 = addChapter(QStringLiteral("第 10 章 具有度量的线性空间"));
+    addSection(ch10, QStringLiteral("10.1 内积与欧几里得空间"), QStringLiteral(":/knowledge/ch10_1.md"));
+    addSection(ch10, QStringLiteral("10.2 正交变换与对称变换"), QStringLiteral(":/knowledge/ch10_2.md"));
+    addSection(ch10, QStringLiteral("10.3 酉空间与 Hermite 矩阵"), QStringLiteral(":/knowledge/ch10_3.md"));
+    addSection(ch10, QStringLiteral("10.4 最小二乘法"), QStringLiteral(":/knowledge/ch10_4.md"));
+
+    // 默认展开到小节层级
+    m_chapterTree->expandToDepth(1);
 }
 
 void ChapterPracticePage::onLoadChapterQuestions() {
@@ -346,20 +634,209 @@ void ChapterPracticePage::updateUIForQuestion(const Question& q) {
     answerLayout->setSpacing(12);
 
     if (q.type == QuestionType::Single) {
+
         auto* buttonGroup = new QButtonGroup(answerWidget);
+        auto* renderer =
+            static_cast<Latex::LatexRenderer*>(
+                this->property("latex_renderer").value<void*>());
+
         for (int i = 0; i < q.choices.size(); ++i) {
-            auto* radio = new QRadioButton(q.choices[i], answerWidget);
+
+            // =========================
+            // 外层卡片
+            // =========================
+            auto* optionCard = new QWidget(answerWidget);
+            optionCard->setObjectName(QStringLiteral("OptionCard"));
+
+            auto* cardLayout = new QHBoxLayout(optionCard);
+            cardLayout->setContentsMargins(16, 14, 16, 14);
+            cardLayout->setSpacing(14);
+
+            // =========================
+            // 单选按钮
+            // =========================
+            QString optionLetter = QString(QChar('A' + i));
+
+            auto* radio = new QRadioButton(
+                optionLetter,
+                optionCard);
             radio->setObjectName(QStringLiteral("choice_%1").arg(i));
-            radio->setStyleSheet("QRadioButton { font-size: 13px; color: #4a5568; padding: 4px; }");
+
             buttonGroup->addButton(radio, i);
-            answerLayout->addWidget(radio);
 
-            if (!q.userAnswer.isEmpty() && q.userAnswer.toInt() == i) {
-                radio->setChecked(true);
+            radio->setStyleSheet(R"(
+
+                QRadioButton {
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #6d5bd0;
+                    spacing: 12px;
+                }
+
+                QRadioButton::indicator {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 10px;
+                    border: 2px solid #b8abd9;
+                    background: white;
+                }
+
+                QRadioButton::indicator:hover {
+                    border: 2px solid #9b87f5;
+                }
+
+                QRadioButton::indicator:checked {
+                    background: #9b87f5;
+                    border: 2px solid #9b87f5;
+                }
+
+            )");
+
+            // =========================
+            // Latex 选项内容
+            // =========================
+            auto* optBrowser =
+                new Latex::LatexTextBrowser(optionCard);
+            optBrowser->setAttribute(Qt::WA_TransparentForMouseEvents);//让整个区域都能点击
+
+            optBrowser->setFrameShape(QFrame::NoFrame);
+
+            optBrowser->setVerticalScrollBarPolicy(
+                Qt::ScrollBarAlwaysOff);
+
+            optBrowser->setHorizontalScrollBarPolicy(
+                Qt::ScrollBarAlwaysOff);
+
+            optBrowser->setStyleSheet(
+                "background: transparent;"
+                "font-size: 15px;"
+                "color: #443c68;"
+                );
+
+            optBrowser->setSizePolicy(
+                QSizePolicy::Expanding,
+                QSizePolicy::Preferred);
+
+            optBrowser->setMinimumHeight(40);
+
+            if (renderer) {
+                renderer->clearCache();
+
+                optBrowser->setHtml(
+                    renderer->render(
+                        q.choices[i],
+                        optBrowser->document()));
             }
-        }
+            else {
+                optBrowser->setText(q.choices[i]);
+            }
 
-    } else if (q.type == QuestionType::Fill) {
+            // =========================
+            // 卡片布局
+            // =========================
+            cardLayout->addWidget(radio, 0, Qt::AlignCenter);
+
+            cardLayout->addWidget(optBrowser, 1);
+
+            // =========================
+            // 卡片样式
+            // =========================
+            optionCard->setStyleSheet(R"(
+
+            QWidget#OptionCard {
+
+                background: white;
+
+                border: 1px solid #e6e1f5;
+
+                border-radius: 16px;
+            }
+
+            QWidget#OptionCard:hover {
+
+                background: #f8f5ff;
+
+                border: 1px solid #c8baf5;
+            }
+
+        )");
+
+            // =========================
+            // 点击整个卡片即可选中
+            // =========================
+            optionCard->installEventFilter(this);
+
+            // 保存 index
+            optionCard->setProperty("choiceIndex", i);
+
+            answerLayout->addWidget(optionCard);
+
+            // 恢复历史选择
+            if (!q.userAnswer.isEmpty()
+                && q.userAnswer.toInt() == i) {
+
+                radio->setChecked(true);
+
+                optionCard->setStyleSheet(R"(
+
+                QWidget#OptionCard {
+                    background: #f1ecff;
+                    border: 2px solid #9b87f5;
+                    border-radius: 16px;
+                }
+
+            )");
+            }
+
+            // 单选切换高亮
+            connect(
+                radio,
+                &QRadioButton::toggled,
+                this,
+                [optionCard](bool checked) {
+
+                    if (checked) {
+
+                        optionCard->setStyleSheet(R"(
+
+                        QWidget#OptionCard {
+
+                            background: #f1ecff;
+
+                            border: 2px solid #9b87f5;
+
+                            border-radius: 16px;
+                        }
+
+                    )");
+
+                    } else {
+
+                        optionCard->setStyleSheet(R"(
+
+                        QWidget#OptionCard {
+
+                            background: white;
+
+                            border: 1px solid #e6e1f5;
+
+                            border-radius: 16px;
+                        }
+
+                        QWidget#OptionCard:hover {
+
+                            background: #f8f5ff;
+
+                            border: 1px solid #c8baf5;
+                        }
+
+                    )");
+                    }
+                });
+        }
+    }
+
+    else if (q.type == QuestionType::Fill) {
         auto* lineEdit = new QLineEdit(answerWidget);
         lineEdit->setObjectName(QStringLiteral("fillAnswer"));
         lineEdit->setPlaceholderText(QStringLiteral(" 请在此输入最终数值答案..."));
@@ -463,7 +940,7 @@ void ChapterPracticePage::onSubmitAnswer() {
                                  QStringLiteral("主观阐述题请直接点击输入框下方的 [🤖 DeepSeek AI 智能判卷] 按钮获取详细的分步点评。"));
     }
 
-    // 【关键修复点】：不在此处调用重置整个题目的 loadQuestion，而是就地独立更新顶部数据面板，保证反馈框能够完美留存显现
+    // 【关键】：不在此处调用重置整个题目的 loadQuestion，而是就地独立更新顶部数据面板，保证反馈框能够完美留存显现
     progressLabel->setText(
         QStringLiteral(" 📝 当前进度：第 %1 题 / 共 %2 题   |   本题得分：%3分   |   尝试次数：%4 次")
             .arg(currentQuestionIndex + 1)
@@ -504,7 +981,7 @@ void ChapterPracticePage::onAiGradeSubjective() {
         return;
     }
 
-    displayResult(true, QStringLiteral("⏳ DeepSeek AI 导师正在仔细审阅您的解题步骤，数学公式解析中，请稍候..."));
+    displayResult(true, QStringLiteral("⏳ DeepSeek AI 导师正在仔细审阅您的解题步骤，请稍候..."));
 
     if (auto* btn = answerWidget->findChild<QPushButton*>(QStringLiteral("InnerAiGradeButton"))) {
         btn->setEnabled(false);
@@ -637,6 +1114,33 @@ void ChapterPracticePage::onPreviousQuestion() {
     } else {
         QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("已经是第一道题目。"));
     }
+}
+
+bool ChapterPracticePage::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::MouseButtonPress) {
+
+        QWidget* widget = qobject_cast<QWidget*>(watched);
+
+        if (widget &&
+            widget->property("choiceIndex").isValid()) {
+
+            int index =
+                widget->property("choiceIndex").toInt();
+
+            auto* radio =
+                widget->findChild<QRadioButton*>(
+                    QStringLiteral("choice_%1").arg(index));
+
+            if (radio) {
+                radio->setChecked(true);
+            }
+
+            return true;
+        }
+    }
+
+    return QWidget::eventFilter(watched, event);
 }
 
 // ==================== TopicPracticePage ====================
