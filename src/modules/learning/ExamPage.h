@@ -8,7 +8,8 @@
 #include <QVector>
 #include <QMap>
 #include <memory>
-#include "QuestionType.h"
+#include <QPushButton>
+#include "QuestionBank.h"
 
 namespace AlgeMate::Learning {
 
@@ -46,6 +47,11 @@ private slots:
 private:
     void loadQuestion(int index);
     void updateUIForQuestion(const Question& q);
+    void updateNavButtons();
+
+    //错题本
+    void saveWrongQuestions();
+
     void handleSingleChoiceAnswer(int choiceIndex);
     void handleFillAnswer(double value);
     void handleSubjectiveAnswer(const QString& answer);
@@ -57,6 +63,7 @@ private:
     QLabel* questionLabel;
     QLabel* scoreLabel;
     QWidget* answerWidget;  // 根据题目类型动态创建
+    QVector<QPushButton*> navButtons;
 };
 
 // 考试结果页面

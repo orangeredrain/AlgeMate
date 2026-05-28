@@ -1,5 +1,5 @@
-#ifndef QUESTIONTYPE_H
-#define QUESTIONTYPE_H
+#ifndef QUESTIONBANK_H
+#define QUESTIONBANK_H
 #include <QLabel>
 #include <QString>
 
@@ -25,4 +25,4 @@ struct Question {
 };
 
 
-#endif // QUESTIONTYPE_H
+#endif // QUESTIONBANK_H

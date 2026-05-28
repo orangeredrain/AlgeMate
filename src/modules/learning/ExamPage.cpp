@@ -15,13 +15,25 @@
 #include <QProgressBar>
 #include <QMessageBox>
 #include <cmath>
+#include <QGridLayout>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QDateTime>
 
 namespace AlgeMate::Learning {
 
 // ==================== ExamSettingPage ====================
 
 ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
+
     auto* lay = new QVBoxLayout(this);
+    setStyleSheet(R"(
+        QWidget {
+            background-color: #f3f6fb;
+            font-family: "Microsoft YaHei";
+        }
+    )");
     lay->setContentsMargins(24, 16, 24, 24);
     lay->setSpacing(20);
 
@@ -30,19 +42,58 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
     back->setObjectName(QStringLiteral("LearnBackBtn"));
     connect(back, &QPushButton::clicked, this, &ExamSettingPage::backRequested);
 
-    auto* title = new QLabel(QStringLiteral("考试模式"));
-    title->setObjectName(QStringLiteral("PageTitle"));
+    auto* title = new QLabel(QStringLiteral("数学模拟考试"));
+
+    title->setStyleSheet(R"(
+        font-size: 30px;
+        font-weight: 700;
+        color: #111827;
+    )");
     top->addWidget(back);
     top->addWidget(title);
     top->addStretch();
 
     // 考试设置区域
-    auto* settingLayout = new QVBoxLayout;
-    settingLayout->setSpacing(15);
-    settingLayout->setContentsMargins(20, 20, 20, 20);
+    auto* centerLayout = new QHBoxLayout;
+    centerLayout->addStretch();
+    auto* card = new QFrame(this);
+    card->setFixedWidth(520);
+    card->setStyleSheet(R"(
+        QFrame {
+            background: white;
+            border-radius: 24px;
+            border: 1px solid #e5e7eb;
+        }
+    )");
+
+    auto* cardLayout = new QVBoxLayout(card);
+
+    cardLayout->setContentsMargins(40,40,40,40);
+    cardLayout->setSpacing(24);
 
     auto* timeLabel = new QLabel(QStringLiteral("考试时间（分钟）："));
+    timeLabel->setText("⏱ 考试时长");
+    timeLabel->setStyleSheet(R"(
+        font-size: 16px;
+        font-weight: 600;
+        color: #374151;
+    )");
     timeSpinBox = new QSpinBox(this);
+    timeSpinBox->setStyleSheet(R"(
+        QSpinBox {
+            border: 2px solid #d1d5db;
+            border-radius: 12px;
+            padding: 10px;
+            font-size: 16px;
+            min-width: 120px;
+            background: white;
+        }
+
+        QSpinBox:focus {
+            border: 2px solid #2563eb;
+        }
+    )");
+
     timeSpinBox->setMinimum(5);
     timeSpinBox->setMaximum(300);
     timeSpinBox->setValue(60);
@@ -54,26 +105,60 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
     timeLayout->addStretch();
 
     auto* infoLabel = new QLabel(QStringLiteral(
-        "• 选择考试时间后点击开始考试\n"
-        "• 考试过程中可以随时提前交卷\n"
-        "• 交卷后才能查看分数和答案\n"
-        "• 支持单选题、填空题、解答题"
-        ));
-    infoLabel->setStyleSheet("color: #666; font-size: 12px;");
+        "📝 选择考试时间后开始考试\n"
+        "⏱ 考试过程中自动计时\n"
+        "📤 支持提前交卷\n"
+        "📊 交卷后查看成绩与解析\n"
+        "🤖 支持 AI 判卷与历史记录"
+    ));
+
+    infoLabel->setWordWrap(true);
+
+    infoLabel->setStyleSheet(R"(
+        QLabel {
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 20px;
+            font-size: 15px;
+            line-height: 1.8;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
+        }
+    )");
 
     auto* startBtn = new QPushButton(QStringLiteral("开始考试"), this);
-    startBtn->setMinimumHeight(40);
+    startBtn->setMinimumHeight(56);
+
+    startBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #2563eb;
+            color: white;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        QPushButton:hover {
+            background: #1d4ed8;
+        }
+
+        QPushButton:pressed {
+            background: #1e40af;
+        }
+    )");
     connect(startBtn, &QPushButton::clicked, this, [this]() {
         emit examStarted(timeSpinBox->value());
     });
 
-    settingLayout->addLayout(timeLayout);
-    settingLayout->addStretch();
-    settingLayout->addWidget(infoLabel);
-    settingLayout->addWidget(startBtn);
+    cardLayout->addLayout(timeLayout);
+    cardLayout->addWidget(infoLabel);
+    cardLayout->addStretch();
+    cardLayout->addWidget(startBtn);
+    centerLayout->addWidget(card);
+    centerLayout->addStretch();
 
     lay->addLayout(top);
-    lay->addLayout(settingLayout, 1);
+    lay->addLayout(centerLayout, 1);
 }
 
 // ==================== ExamProgressPage ====================
@@ -82,6 +167,12 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     : QWidget(parent), questions(questions), currentQuestionIndex(0), remainingSeconds(timeMinutes * 60) {
 
     auto* lay = new QVBoxLayout(this);
+    setStyleSheet(R"(
+        QWidget {
+            background-color: #f5f7fb;
+            font-family: "Microsoft YaHei";
+        }
+    )");
     lay->setContentsMargins(24, 16, 24, 24);
     lay->setSpacing(14);
 
@@ -92,7 +183,14 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     connect(back, &QPushButton::clicked, this, &ExamProgressPage::backRequested);
 
     timerLabel = new QLabel(QStringLiteral("剩余时间: 60:00"), this);
-    timerLabel->setStyleSheet("font-weight: bold; color: #e74c3c; font-size: 14px;");
+    timerLabel->setStyleSheet(R"(
+        background: #fee2e2;
+        color: #dc2626;
+        border-radius: 10px;
+        padding: 8px 14px;
+        font-size: 15px;
+        font-weight: bold;
+    )");
 
     top->addWidget(back);
     top->addStretch();
@@ -108,42 +206,151 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     infoLayout->addWidget(totalLabel);
 
     // 题目内容
+    auto* questionCard = new QFrame(this);
+        questionCard->setStyleSheet(R"(
+        QFrame {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+        }
+    )");
+
+    auto* questionCardLayout = new QVBoxLayout(questionCard);
+    questionCardLayout->setContentsMargins(24,24,24,24);
+
     questionLabel = new QLabel(this);
     questionLabel->setWordWrap(true);
-    questionLabel->setStyleSheet("font-size: 13px; line-height: 1.6;");
+    questionLabel->setStyleSheet(R"(
+        font-size: 18px;
+        line-height: 1.8;
+        color: #111827;
+    )");
 
     auto* scrollArea = new QScrollArea(this);
-    scrollArea->setWidget(questionLabel);
+    questionCardLayout->addWidget(questionLabel);
+    scrollArea->setWidget(questionCard);
     scrollArea->setWidgetResizable(true);
 
     // 答案区域（动态创建）
     answerWidget = new QWidget(this);
 
+    //导航栏
+    auto* mainContentLayout = new QHBoxLayout;
+    auto* navWidget = new QWidget(this);
+    navWidget->setFixedWidth(190);
+
+    navWidget->setStyleSheet(R"(
+        QWidget {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+        }
+    )");
+
+    auto* navLayout = new QVBoxLayout(navWidget);
+    auto* grid = new QGridLayout;
+    auto* navTitle = new QLabel(QStringLiteral("题目"), this);
+
+    navTitle->setStyleSheet(R"(
+        font-size: 18px;
+        font-weight: 700;
+        color: #111827;
+        padding-bottom: 8px;
+    )");
+
+    navTitle->setAlignment(Qt::AlignCenter);
+
+    navLayout->addWidget(navTitle);
+    navLayout->setContentsMargins(12,12,12,12);
+    navLayout->setSpacing(10);
+
+    for (int i = 0; i < questions.size(); ++i) {
+
+        auto* btn = new QPushButton(
+            QString::number(i + 1),
+            this);
+
+        btn->setFixedSize(42,42);
+
+        btn->setStyleSheet(R"(
+        QPushButton {
+            background: #f3f4f6;
+            border-radius: 22px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        QPushButton:hover {
+            background: #dbeafe;
+        }
+    )");
+
+        connect(btn, &QPushButton::clicked,
+                this,
+                [this, i]() {
+                    loadQuestion(i);
+                });
+
+        grid->addWidget(btn, i / 3, i % 3);
+        navButtons.append(btn);
+    }
+    navLayout->addLayout(grid);
+    navLayout->addStretch();
+
     // 底部按钮
     auto* bottomLayout = new QHBoxLayout;
     auto* prevBtn = new QPushButton(QStringLiteral("上一题"), this);
-    auto* submitBtn = new QPushButton(QStringLiteral("提交答案"), this);
+    // auto* submitBtn = new QPushButton(QStringLiteral("提交答案"), this);
     auto* nextBtn = new QPushButton(QStringLiteral("下一题"), this);
     auto* examSubmitBtn = new QPushButton(QStringLiteral("交卷"), this);
+    QString btnStyle = R"(
+        QPushButton {
+            background: #2563eb;
+            color: white;
+            border-radius: 10px;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        QPushButton:hover {
+            background: #1d4ed8;
+        }
+    )";
+    prevBtn->setStyleSheet(btnStyle);
+    // submitBtn->setStyleSheet(btnStyle);
+    nextBtn->setStyleSheet(btnStyle);
     examSubmitBtn->setStyleSheet("background-color: #e74c3c; color: white;");
 
     connect(prevBtn, &QPushButton::clicked, this, &ExamProgressPage::onPreviousQuestion);
-    connect(submitBtn, &QPushButton::clicked, this, &ExamProgressPage::onSubmitAnswer);
+    // connect(submitBtn, &QPushButton::clicked, this, &ExamProgressPage::onSubmitAnswer);
     connect(nextBtn, &QPushButton::clicked, this, &ExamProgressPage::onNextQuestion);
     connect(examSubmitBtn, &QPushButton::clicked, this, &ExamProgressPage::onSubmitExam);
 
     bottomLayout->addWidget(prevBtn);
     bottomLayout->addStretch();
-    bottomLayout->addWidget(submitBtn);
+    // bottomLayout->addWidget(submitBtn);
     bottomLayout->addWidget(nextBtn);
     bottomLayout->addStretch();
     bottomLayout->addWidget(examSubmitBtn);
 
+    auto* rightLayout = new QVBoxLayout;
+    rightLayout->setSpacing(14);
+
+    rightLayout->addWidget(scrollArea, 1);
+    rightLayout->addWidget(answerWidget);
+    rightLayout->addLayout(bottomLayout);
+
+    mainContentLayout->setSpacing(20);
+    mainContentLayout->addWidget(navWidget);
+    mainContentLayout->addLayout(rightLayout, 1);
+
     lay->addLayout(top);
     lay->addLayout(infoLayout);
-    lay->addWidget(scrollArea);
-    lay->addWidget(answerWidget);
-    lay->addLayout(bottomLayout);
+    lay->addLayout(mainContentLayout, 1);
+    // lay->addWidget(scrollArea);
+    // lay->addWidget(answerWidget);
+    // lay->addLayout(bottomLayout);
 
     // 设置计时器
     auto* timer = new QTimer(this);
@@ -171,13 +378,105 @@ void ExamProgressPage::loadQuestion(int index) {
         }
     }
     scoreLabel->setText(
-        QStringLiteral("第 %1 题 | 当前得分: %2/%3")
+        QStringLiteral("第 %1 / %2 题")
             .arg(index + 1)
-            .arg(earnedScore)
-            .arg(totalScore)
+            .arg(questions.size())
         );
 
+    // for (int i = 0; i < navButtons.size(); ++i) {
+    //     QString style;
+    //     if (i == currentQuestionIndex) {
+    //         style = R"(
+    //         QPushButton {
+    //             background: #2563eb;
+    //             color: white;
+    //             border-radius: 24px;
+    //             font-size: 16px;
+    //             font-weight: bold;
+    //         }
+    //     )";
+
+    //     } else if (!questions[i].userAnswer.isEmpty()) {
+    //         style = R"(
+    //         QPushButton {
+    //             background: #10b981;
+    //             color: white;
+    //             border-radius: 24px;
+    //             font-size: 16px;
+    //             font-weight: bold;
+    //         }
+    //     )";
+    //     } else {
+    //         style = R"(
+    //         QPushButton {
+    //             background: #f3f4f6;
+    //             color: #374151;
+    //             border-radius: 24px;
+    //             font-size: 16px;
+    //             font-weight: bold;
+    //         }
+    //         QPushButton:hover {
+    //             background: #dbeafe;
+    //         }
+    //     )";
+    //     }
+
+    //     navButtons[i]->setStyleSheet(style);
+    // }
+
+    updateNavButtons();
     updateUIForQuestion(q);
+}
+
+void ExamProgressPage::updateNavButtons() {
+
+    for (int i = 0; i < navButtons.size(); ++i) {
+
+        QString style;
+
+        if (i == currentQuestionIndex) {
+
+            style = R"(
+            QPushButton {
+                background: #2563eb;
+                color: white;
+                border-radius: 18px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+        )";
+
+        } else if (!questions[i].userAnswer.isEmpty()) {
+
+            style = R"(
+            QPushButton {
+                background: #10b981;
+                color: white;
+                border-radius: 18px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+        )";
+
+        } else {
+
+            style = R"(
+            QPushButton {
+                background: #f3f4f6;
+                color: #374151;
+                border-radius: 18px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+
+            QPushButton:hover {
+                background: #dbeafe;
+            }
+        )";
+        }
+
+        navButtons[i]->setStyleSheet(style);
+    }
 }
 
 void ExamProgressPage::updateUIForQuestion(const Question& q) {
@@ -203,9 +502,45 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
         auto* buttonGroup = new QButtonGroup(answerWidget);
         for (int i = 0; i < q.choices.size(); ++i) {
             auto* radio = new QRadioButton(q.choices[i], answerWidget);
+            radio->setStyleSheet(R"(
+                QRadioButton {
+                    background: white;
+                    border: 2px solid #d1d5db;
+                    border-radius: 12px;
+                    padding: 14px;
+                    font-size: 15px;
+                }
+
+                QRadioButton:hover {
+                    border: 2px solid #60a5fa;
+                    background: #f0f7ff;
+                }
+
+                QRadioButton:checked {
+                    border: 2px solid #2563eb;
+                    background: #dbeafe;
+                    font-weight: bold;
+                }
+            )");
             radio->setObjectName(QStringLiteral("choice_%1").arg(i));
             buttonGroup->addButton(radio, i);
             answerLayout->addWidget(radio);
+
+            connect(radio,
+                    &QRadioButton::clicked,
+                    this,
+                    [this, i]() {
+
+                Question& current =
+                    questions[currentQuestionIndex];
+
+                current.userAnswer = QString::number(i);
+
+                current.isCorrect =
+                    (i == current.correctAnswer.toInt());
+
+                updateNavButtons();
+            });
 
             // 恢复之前的选择
             if (!q.userAnswer.isEmpty() && q.userAnswer.toInt() == i) {
@@ -215,18 +550,74 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
     } else if (q.type == QuestionType::Fill) {
         // 填空题：输入框
         auto* lineEdit = new QLineEdit(answerWidget);
+        lineEdit->setStyleSheet(R"(
+            QLineEdit {
+                background: white;
+                border: 2px solid #d1d5db;
+                border-radius: 10px;
+                padding: 12px;
+                font-size: 15px;
+            }
+
+            QLineEdit:focus {
+                border: 2px solid #2563eb;
+            }
+        )");
         lineEdit->setObjectName(QStringLiteral("fillAnswer"));
         lineEdit->setPlaceholderText(QStringLiteral("请输入数字答案"));
         lineEdit->setText(q.userAnswer);
         answerLayout->addWidget(lineEdit);
+        connect(lineEdit,
+                &QLineEdit::textChanged,
+                this,
+                [this](const QString& text) {
+
+            Question& current =
+                questions[currentQuestionIndex];
+
+            current.userAnswer = text;
+            bool ok1, ok2;
+            double userValue =
+                text.toDouble(&ok1);
+            double correctValue =
+                current.correctAnswer.toDouble(&ok2);
+            current.isCorrect =
+                ok1 && ok2 &&
+                std::abs(userValue - correctValue) < 0.0001;
+            updateNavButtons();
+        });
     } else if (q.type == QuestionType::Subjective) {
         // 解答题：文本编辑框
         auto* textEdit = new QPlainTextEdit(answerWidget);
+        textEdit->setStyleSheet(R"(
+            QPlainTextEdit {
+                background: white;
+                border: 2px solid #d1d5db;
+                border-radius: 12px;
+                padding: 12px;
+                font-size: 15px;
+            }
+
+            QPlainTextEdit:focus {
+                border: 2px solid #2563eb;
+            }
+        )");
         textEdit->setObjectName(QStringLiteral("subjectiveAnswer"));
         textEdit->setPlaceholderText(QStringLiteral("请输入您的解答"));
         textEdit->setMinimumHeight(120);
         textEdit->setPlainText(q.userAnswer);
         answerLayout->addWidget(textEdit);
+        connect(textEdit,
+                &QPlainTextEdit::textChanged,
+                this,
+                [this, textEdit]() {
+
+            Question& current =
+                questions[currentQuestionIndex];
+            current.userAnswer =
+                textEdit->toPlainText();
+            updateNavButtons();
+        });
     }
 
     answerLayout->addStretch();
@@ -287,7 +678,8 @@ void ExamProgressPage::onSubmitAnswer() {
 
     q.attempts++;
     QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("答案已提交"));
-}
+    loadQuestion(currentQuestionIndex);
+} //是否可以删除呢
 
 void ExamProgressPage::onNextQuestion() {
     if (currentQuestionIndex < questions.size() - 1) {
@@ -305,12 +697,136 @@ void ExamProgressPage::onPreviousQuestion() {
     }
 }
 
+void ExamProgressPage::saveWrongQuestions()
+{
+    QFile file("wrong_questions.json");
+
+    QJsonArray allWrongQuestions;
+
+    // 读取旧错题
+    if (file.exists()) {
+
+        if (file.open(QIODevice::ReadOnly)) {
+
+            QJsonDocument oldDoc =
+                QJsonDocument::fromJson(file.readAll());
+
+            allWrongQuestions = oldDoc.array();
+
+            file.close();
+        }
+    }
+
+    // 保存新错题
+    for (const auto& q : questions) {
+
+        if (q.isCorrect) {
+            continue;
+        }
+
+        QJsonObject obj;
+
+        obj["content"] = q.content;
+        obj["userAnswer"] = q.userAnswer;
+        obj["correctAnswer"] = q.correctAnswer;
+        obj["score"] = q.score;
+        obj["time"] =
+            QDateTime::currentDateTime()
+                .toString("yyyy-MM-dd hh:mm:ss");
+
+        obj["wrongCount"] = 1;
+
+        if (q.type == QuestionType::Single) {
+            obj["type"] = "single";
+        } else if (q.type == QuestionType::Fill) {
+            obj["type"] = "fill";
+        } else {
+            obj["type"] = "subjective";
+        }
+
+        QJsonArray choicesArray;
+
+        for (const auto& c : q.choices) {
+            choicesArray.append(c);
+        }
+
+        obj["choices"] = choicesArray;
+
+        allWrongQuestions.append(obj);
+    }
+
+    if (!file.open(QIODevice::WriteOnly)) {
+        return;
+    }
+
+    file.write(
+        QJsonDocument(allWrongQuestions)
+            .toJson());
+
+    file.close();
+}
+
+
 void ExamProgressPage::onSubmitExam() {
     auto* msgBox = new QMessageBox(this);
     msgBox->setText(QStringLiteral("确定要交卷吗？交卷后将无法修改答案。"));
     msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
 
     if (msgBox->exec() == QMessageBox::Yes) {
+        QJsonArray historyArray;
+
+        for (const auto& q : questions) {
+
+            QJsonObject obj;
+
+            obj["content"] = q.content;
+            obj["userAnswer"] = q.userAnswer;
+            obj["correctAnswer"] = q.correctAnswer;
+            obj["isCorrect"] = q.isCorrect;
+            obj["score"] = q.score;
+
+            historyArray.append(obj);
+        }
+
+        QJsonObject examObj;
+
+        examObj["time"] =
+            QDateTime::currentDateTime()
+                .toString("yyyy-MM-dd hh:mm:ss");
+
+        examObj["questions"] = historyArray;
+
+        QFile file("exam_history.json");
+
+        QJsonArray allHistory;
+
+        if (file.exists()) {
+            if (!file.open(QIODevice::ReadOnly)) {
+                return;
+            }
+
+            QJsonDocument oldDoc =
+                QJsonDocument::fromJson(file.readAll());
+
+            allHistory =
+                oldDoc.array();
+
+            file.close();
+        }
+
+        allHistory.append(examObj);
+
+        if(!file.open(QIODevice::WriteOnly)){
+            return;
+        }
+
+        file.write(
+            QJsonDocument(allHistory)
+                .toJson()
+            );
+
+        file.close();
+        saveWrongQuestions();
         emit examFinished(questions);
     }
 }
@@ -338,6 +854,22 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     : QWidget(parent) {
 
     auto* lay = new QVBoxLayout(this);
+    auto* scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    auto* container = new QWidget;
+    auto* contentLayout = new QVBoxLayout(container);
+    contentLayout->setContentsMargins(24,16,24,24);
+    contentLayout->setSpacing(20);
+    scrollArea->setWidget(container);
+    lay->addWidget(scrollArea);
+
+
+    setStyleSheet(R"(
+        QWidget {
+            background-color: #f3f6fb;
+            font-family: "Microsoft YaHei";
+        }
+    )");
     lay->setContentsMargins(24, 16, 24, 24);
     lay->setSpacing(14);
 
@@ -352,7 +884,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     top->addWidget(title);
     top->addStretch();
 
-    lay->addLayout(top);
+    contentLayout->addLayout(top);
 
     // 计算总分和得分
     int totalScore = 0;
@@ -365,25 +897,59 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     }
 
     // 显示总体成绩
-    auto* scoreLayout = new QVBoxLayout;
+    auto* scoreCard = new QFrame(container);
+    scoreCard->setStyleSheet(R"(
+        QFrame {
+            background: white;
+            border-radius: 24px;
+            border: 1px solid #e5e7eb;
+        }
+    )");
+    auto* scoreLayout = new QVBoxLayout(scoreCard);
+    scoreLayout->setContentsMargins(40,40,40,40);
+    scoreLayout->setSpacing(14);
+
     auto* scoreLabel = new QLabel(
         QStringLiteral("总分：%1/%2").arg(earnedScore).arg(totalScore), this);
-    scoreLabel->setStyleSheet("font-size: 24px; font-weight: bold; color: #2ecc71;");
+    scoreLabel->setStyleSheet(R"(
+        font-size: 32px;
+        font-weight: 800;
+        color: #2563eb;
+    )");
     scoreLabel->setAlignment(Qt::AlignCenter);
 
     double percentage = (totalScore > 0) ? (earnedScore * 100.0 / totalScore) : 0;
+    QString level;
+    if (percentage >= 90)
+        level = "Excellent!";
+    else if (percentage >= 75)
+        level = "Good!";
+    else if (percentage >= 60)
+        level = "Pass";
+    else
+        level = "Needs Improvement";
     auto* percentLabel = new QLabel(
         QStringLiteral("正确率：%1%").arg(static_cast<int>(percentage)), this);
-    percentLabel->setStyleSheet("font-size: 16px; color: #3498db;");
+    percentLabel->setStyleSheet(R"(font-size: 22px;font-weight: 600;color: #6b7280;)");
     percentLabel->setAlignment(Qt::AlignCenter);
 
     scoreLayout->addWidget(scoreLabel);
     scoreLayout->addWidget(percentLabel);
+    auto* levelLabel = new QLabel(level, this);
 
-    lay->addLayout(scoreLayout);
+    levelLabel->setAlignment(Qt::AlignCenter);
+
+    levelLabel->setStyleSheet(R"(
+        font-size: 28px;
+        font-weight: bold;
+        color: #10b981;
+    )");
+
+    scoreLayout->addWidget(levelLabel);
+
+    contentLayout->addWidget(scoreCard);
 
     // 显示每道题的结果
-    auto* resultsArea = new QScrollArea(this);
     auto* resultsWidget = new QWidget;
     auto* resultsLayout = new QVBoxLayout(resultsWidget);
 
@@ -410,7 +976,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
                 .arg(q.score)
                 .arg(q.isCorrect ? QStringLiteral("✓ 正确") : QStringLiteral("✗ 错误")), this);
         titleLabel->setStyleSheet(
-            q.isCorrect ? "color: #2ecc71; font-weight: bold;" : "color: #e74c3c; font-weight: bold;");
+            q.isCorrect? "color: #10b981; font-weight: bold; font-size: 15px;": "color: #ef4444; font-weight: bold; font-size: 15px;");
         titleLabel->setWordWrap(true);
 
         auto* contentLabel = new QLabel(QStringLiteral("题目：%1").arg(q.content), this);
@@ -432,20 +998,22 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
         itemLayout->addWidget(answerLabel);
         itemLayout->addWidget(correctLabel);
 
-        auto* itemFrame = new QFrame(this);
+        auto* itemFrame = new QFrame(container);
         itemFrame->setLayout(itemLayout);
-        itemFrame->setStyleSheet("border: 1px solid #ddd; border-radius: 4px;");
+        itemFrame->setStyleSheet(R"(
+            QFrame {
+                background: white;
+                border-radius: 18px;
+                border: 1px solid #e5e7eb;
+                padding: 8px;
+            }
+        )");
 
         resultsLayout->addWidget(itemFrame);
     }
-
     resultsLayout->addStretch();
-    resultsArea->setWidget(resultsWidget);
-    resultsArea->setWidgetResizable(true);
-
-    lay->addWidget(resultsArea, 1);
+    contentLayout->addWidget(resultsWidget);
 }
-
 // ==================== ExamPage ====================
 
 ExamPage::ExamPage(QWidget* parent) : QWidget(parent), currentPage(nullptr) {

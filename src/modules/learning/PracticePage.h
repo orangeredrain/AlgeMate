@@ -6,7 +6,7 @@
 #include <QVector>
 #include <QString>
 
-#include "QuestionType.h"
+#include "QuestionBank.h"
 
 namespace AlgeMate::Learning {
 
