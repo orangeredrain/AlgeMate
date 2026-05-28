@@ -700,40 +700,33 @@ void ExamProgressPage::onPreviousQuestion() {
 void ExamProgressPage::saveWrongQuestions()
 {
     QFile file("wrong_questions.json");
-
     QJsonArray allWrongQuestions;
 
     // 读取旧错题
     if (file.exists()) {
-
         if (file.open(QIODevice::ReadOnly)) {
-
-            QJsonDocument oldDoc =
-                QJsonDocument::fromJson(file.readAll());
-
+            QJsonDocument oldDoc = QJsonDocument::fromJson(file.readAll());
             allWrongQuestions = oldDoc.array();
-
             file.close();
         }
     }
 
     // 保存新错题
     for (const auto& q : questions) {
-
         if (q.isCorrect) {
             continue;
         }
 
         QJsonObject obj;
 
+        // ⚡ 核心修复：必须保存题目的真实 ID，否则默认为0会触发全删 Bug！
+        obj["id"] = q.id;
+
         obj["content"] = q.content;
         obj["userAnswer"] = q.userAnswer;
         obj["correctAnswer"] = q.correctAnswer;
         obj["score"] = q.score;
-        obj["time"] =
-            QDateTime::currentDateTime()
-                .toString("yyyy-MM-dd hh:mm:ss");
-
+        obj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
         obj["wrongCount"] = 1;
 
         if (q.type == QuestionType::Single) {
@@ -745,27 +738,18 @@ void ExamProgressPage::saveWrongQuestions()
         }
 
         QJsonArray choicesArray;
-
         for (const auto& c : q.choices) {
             choicesArray.append(c);
         }
-
         obj["choices"] = choicesArray;
 
         allWrongQuestions.append(obj);
     }
 
-    if (!file.open(QIODevice::WriteOnly)) {
-        return;
-    }
-
-    file.write(
-        QJsonDocument(allWrongQuestions)
-            .toJson());
-
+    if (!file.open(QIODevice::WriteOnly)) return;
+    file.write(QJsonDocument(allWrongQuestions).toJson());
     file.close();
 }
-
 
 void ExamProgressPage::onSubmitExam() {
     auto* msgBox = new QMessageBox(this);
@@ -773,90 +757,50 @@ void ExamProgressPage::onSubmitExam() {
     msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
 
     if (msgBox->exec() == QMessageBox::Yes) {
-        // ==================== 统一判卷 ====================
-
         for (auto& q : questions) {
-
             if (q.type == QuestionType::Single) {
-
-                q.isCorrect =
-                    (q.userAnswer == q.correctAnswer);
-
+                q.isCorrect = (q.userAnswer == q.correctAnswer);
             } else if (q.type == QuestionType::Fill) {
-
                 bool ok1, ok2;
-
-                double userValue =
-                    q.userAnswer.toDouble(&ok1);
-
-                double correctValue =
-                    q.correctAnswer.toDouble(&ok2);
-
-                q.isCorrect =
-                    ok1 && ok2 &&
-                    std::abs(userValue - correctValue) < 0.0001;
-
+                double userValue = q.userAnswer.toDouble(&ok1);
+                double correctValue = q.correctAnswer.toDouble(&ok2);
+                q.isCorrect = ok1 && ok2 && std::abs(userValue - correctValue) < 0.0001;
             } else {
-
-                // 主观题先默认错误
-                // 后续可接 AI 判卷
-
                 q.isCorrect = false;
             }
         }
         QJsonArray historyArray;
-
         for (const auto& q : questions) {
-
             QJsonObject obj;
-
+            obj["id"] = q.id; // ⚡ 顺手修复：历史记录也带上ID
             obj["content"] = q.content;
             obj["userAnswer"] = q.userAnswer;
             obj["correctAnswer"] = q.correctAnswer;
             obj["isCorrect"] = q.isCorrect;
             obj["score"] = q.score;
-
             historyArray.append(obj);
         }
 
         QJsonObject examObj;
-
-        examObj["time"] =
-            QDateTime::currentDateTime()
-                .toString("yyyy-MM-dd hh:mm:ss");
-
+        examObj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
         examObj["questions"] = historyArray;
 
         QFile file("exam_history.json");
-
         QJsonArray allHistory;
-
         if (file.exists()) {
-            if (!file.open(QIODevice::ReadOnly)) {
-                return;
+            if (file.open(QIODevice::ReadOnly)) {
+                QJsonDocument oldDoc = QJsonDocument::fromJson(file.readAll());
+                allHistory = oldDoc.array();
+                file.close();
             }
-
-            QJsonDocument oldDoc =
-                QJsonDocument::fromJson(file.readAll());
-
-            allHistory =
-                oldDoc.array();
-
-            file.close();
         }
 
         allHistory.append(examObj);
-
-        if(!file.open(QIODevice::WriteOnly)){
-            return;
+        if(file.open(QIODevice::WriteOnly)){
+            file.write(QJsonDocument(allHistory).toJson());
+            file.close();
         }
 
-        file.write(
-            QJsonDocument(allHistory)
-                .toJson()
-            );
-
-        file.close();
         saveWrongQuestions();
         emit examFinished(questions);
     }
@@ -1002,9 +946,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
 
         auto* titleLabel = new QLabel(
             QStringLiteral("[%1] 第 %2 题 (%3分) - %4")
-                .arg(typeStr)
-                .arg(i + 1)
-                .arg(q.score)
+                .arg(typeStr).arg(i + 1).arg(q.score)
                 .arg(q.isCorrect ? QStringLiteral("✓ 正确") : QStringLiteral("✗ 错误")), this);
         titleLabel->setStyleSheet(
             q.isCorrect? "color: #10b981; font-weight: bold; font-size: 15px;": "color: #ef4444; font-weight: bold; font-size: 15px;");
@@ -1014,13 +956,23 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
         contentLabel->setWordWrap(true);
         contentLabel->setStyleSheet("color: #555; font-size: 12px;");
 
-        auto* answerLabel = new QLabel(
-            QStringLiteral("您的答案：%1").arg(q.userAnswer.isEmpty() ? QStringLiteral("未作答") : q.userAnswer), this);
+        // ⚡ 核心修复：把 0/1 的索引翻译成 A/B/C/D
+        QString displayUserAns = q.userAnswer;
+        QString displayCorrectAns = q.correctAnswer;
+        if (q.type == QuestionType::Single) {
+            bool okU, okC;
+            int uIdx = displayUserAns.toInt(&okU);
+            int cIdx = displayCorrectAns.toInt(&okC);
+            if (okU && !displayUserAns.isEmpty()) displayUserAns = QString(QChar('A' + uIdx));
+            if (okC && !displayCorrectAns.isEmpty()) displayCorrectAns = QString(QChar('A' + cIdx));
+        }
+        if (displayUserAns.isEmpty()) displayUserAns = QStringLiteral("未作答");
+
+        auto* answerLabel = new QLabel(QStringLiteral("您的答案：%1").arg(displayUserAns), this);
         answerLabel->setWordWrap(true);
         answerLabel->setStyleSheet("color: #3498db; font-size: 12px;");
 
-        auto* correctLabel = new QLabel(
-            QStringLiteral("正确答案：%1").arg(q.correctAnswer), this);
+        auto* correctLabel = new QLabel(QStringLiteral("正确答案：%1").arg(displayCorrectAns), this);
         correctLabel->setWordWrap(true);
         correctLabel->setStyleSheet("color: #27ae60; font-size: 12px;");
 
@@ -1033,10 +985,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
         itemFrame->setLayout(itemLayout);
         itemFrame->setStyleSheet(R"(
             QFrame {
-                background: white;
-                border-radius: 18px;
-                border: 1px solid #e5e7eb;
-                padding: 8px;
+                background: white; border-radius: 18px; border: 1px solid #e5e7eb; padding: 8px;
             }
         )");
 

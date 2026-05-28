@@ -907,8 +907,12 @@ void ChapterPracticePage::onSubmitAnswer() {
         QString correctChar = QString(QChar('A' + q.correctAnswer.toInt()));
         displayResult(q.isCorrect, q.isCorrect ? QStringLiteral("🎉 恭喜你，回答正确！")
                                                : QStringLiteral("❌ 回答错误。正确答案是【%1】").arg(correctChar));
+        if (!q.isCorrect) {
+            saveToWrongBook(q);
+        }
 
-    } else if (q.type == QuestionType::Fill) {
+    }
+    else if (q.type == QuestionType::Fill) {
         auto* lineEdit = answerWidget->findChild<QLineEdit*>(QStringLiteral("fillAnswer"));
         if (!lineEdit || lineEdit->text().trimmed().isEmpty()) {
             QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请输入数值答案"));
@@ -928,6 +932,9 @@ void ChapterPracticePage::onSubmitAnswer() {
 
         displayResult(q.isCorrect, q.isCorrect ? QStringLiteral("🎉 答对了！计算能力非常出色！")
                                                : QStringLiteral("❌ 答案不正确。参考标准答案是: %1").arg(q.correctAnswer));
+        if (!q.isCorrect) {
+            saveToWrongBook(q);
+        }
 
     } else if (q.type == QuestionType::Subjective) {
         auto* textEdit = answerWidget->findChild<QPlainTextEdit*>(QStringLiteral("subjectiveAnswer"));
@@ -1055,6 +1062,9 @@ void ChapterPracticePage::onAiGradeSubjective() {
         q.attempts++;
 
         displayResult(scorePass, QStringLiteral("### 🤖 DeepSeek 智能导师评阅报告\n---\n") + aiEvaluation);
+        if (!scorePass) {
+            saveToWrongBook(q);//存入错题本
+        }
 
         // 增量刷新顶部面板的统计次数
         progressLabel->setText(
@@ -1166,6 +1176,70 @@ TopicPracticePage::TopicPracticePage(QWidget* parent) : QWidget(parent)
 
     lay->addLayout(top);
     lay->addWidget(ph, 1);
+}
+
+// ==================== 自动化错题入库业务核心 ====================
+void ChapterPracticePage::saveToWrongBook(const Question& q)
+{
+    const QString fileName = QStringLiteral("wrong_questions.json");
+    QJsonArray wrongArray;
+
+    // 1. 尝试读取现有错题本，如果文件存在则解析出旧数组
+    QFile file(fileName);
+    if (file.exists() && file.open(QIODevice::ReadOnly)) {
+        wrongArray = QJsonDocument::fromJson(file.readAll()).array();
+        file.close();
+    }
+
+    // 2. 检查当前错题 id 是否已经在错题本中
+    bool alreadyExists = false;
+    QJsonArray updatedArray;
+
+    for (const auto& val : wrongArray) {
+        QJsonObject obj = val.toObject();
+        if (obj[QStringLiteral("id")].toInt() == q.id) {
+            alreadyExists = true;
+            // 题已存在，做增量更新：累计错误次数 +1，更新最新错误时间及回答
+            obj[QStringLiteral("wrongCount")] = obj[QStringLiteral("wrongCount")].toInt() + 1;
+            obj[QStringLiteral("time")]       = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+            obj[QStringLiteral("userAnswer")] = q.userAnswer;
+            updatedArray.append(obj);
+        } else {
+            updatedArray.append(val);
+        }
+    }
+
+    // 3. 如果是首次加入的新错题，严格按照 WrongBookPage 要求的格式进行字段打包
+    if (!alreadyExists) {
+        QJsonObject newWrong;
+        newWrong[QStringLiteral("id")]            = q.id;
+        newWrong[QStringLiteral("content")]       = q.content;
+        newWrong[QStringLiteral("userAnswer")]    = q.userAnswer;
+        newWrong[QStringLiteral("correctAnswer")] = q.correctAnswer;
+        newWrong[QStringLiteral("score")]         = q.score;
+        newWrong[QStringLiteral("wrongCount")]    = 1; // 首次加入，初始错误次数为 1
+        newWrong[QStringLiteral("time")]          = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+
+        // 题型格式映射化处理
+        if (q.type == QuestionType::Single)       newWrong[QStringLiteral("type")] = QStringLiteral("single");
+        else if (q.type == QuestionType::Fill)    newWrong[QStringLiteral("type")] = QStringLiteral("fill");
+        else                                      newWrong[QStringLiteral("type")] = QStringLiteral("subjective");
+
+        // 压入单选题选项
+        QJsonArray choicesArr;
+        for (const auto& choice : q.choices) {
+            choicesArr.append(choice);
+        }
+        newWrong[QStringLiteral("choices")] = choicesArr;
+
+        updatedArray.append(newWrong);
+    }
+
+    // 4. 将安全更新后的数据同步写回 JSON 错题数据库文件
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(QJsonDocument(updatedArray).toJson(QJsonDocument::Indented));
+        file.close();
+    }
 }
 
 } // namespace AlgeMate::Learning

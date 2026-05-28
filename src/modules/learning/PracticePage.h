@@ -59,7 +59,8 @@ private:
     void loadQuestion(int index);
     void updateUIForQuestion(const Question& q);
     void displayResult(bool isCorrect, const QString& feedback);
-    void buildChapterTree(); // 新增目录树构建函数
+    void buildChapterTree(); // 目录树构建函数
+    void saveToWrongBook(const Question& q); // 保存错题到本地的私有方法
 
     QVector<Question> chapterQuestions;
     int currentQuestionIndex;
