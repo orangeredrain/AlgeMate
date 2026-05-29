@@ -12,8 +12,8 @@ qt_add_library(algemate_learning STATIC
     WrongBookPage.cpp
     LearningCenterPage.h
     LearningCenterPage.cpp
-    ApiClient.h
-    ApiClient.cpp
+    # ApiClient(no_use).h
+    # ApiClient(no_use).cpp
     QuestionBank.h
     QuestionBank.cpp
 )
@@ -25,6 +25,7 @@ target_link_libraries(algemate_learning
         Qt6::Widgets
         Qt6::Network
         algemate_latex
+        algemate_math
 )
 
 target_include_directories(algemate_learning

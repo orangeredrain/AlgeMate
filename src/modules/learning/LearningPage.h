@@ -11,7 +11,7 @@ class KnowledgePage;
 class PracticePage;
 class CalculationProblemPage;
 class ChapterPracticePage;
-class TopicPracticePage;
+// class TopicPracticePage;
 class ExamPage;
 class WrongBookPage;
 class LearningCenterPage;
@@ -33,7 +33,7 @@ private:
     void showLearningCenter();
     void showCalculationProblem();
     void showChapterPractice();
-    void showTopicPractice();
+    // void showTopicPractice();
 
     void goBack();  // 返回 Dashboard
 
@@ -47,7 +47,7 @@ private:
     PracticePage*            m_practicePage      = nullptr;
     CalculationProblemPage*  m_calcProbPage      = nullptr;
     ChapterPracticePage*     m_chapterPracPage   = nullptr;
-    TopicPracticePage*       m_topicPracPage     = nullptr;
+    // TopicPracticePage*       m_topicPracPage     = nullptr;
     ExamPage*                m_examPage          = nullptr;
     WrongBookPage*           m_wrongBookPage     = nullptr;
     LearningCenterPage*      m_learningCenterPage = nullptr;

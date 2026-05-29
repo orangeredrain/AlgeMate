@@ -5,6 +5,9 @@
 #include <QLabel>
 #include <QVector>
 #include <QString>
+#include <QPushButton>
+#include <QGridLayout>
+#include <QStackedWidget>
 
 #include "QuestionBank.h"
 
@@ -24,7 +27,7 @@ signals:
     void backRequested();
     void calculationProblemRequested();
     void chapterPracticeRequested();
-    void topicPracticeRequested();
+    // void topicPracticeRequested();
 };
 
 /// 计算题练习
@@ -35,6 +38,40 @@ public:
 
 signals:
     void backRequested();
+
+private slots:
+    void onCardClicked(int type);        // 点击卡片进入对应题型
+    void onReturnToCatalog();            // 从做题页返回目录
+    void onGenerateCurrentType();        // 重新生成当前题型
+    void onSubmitAnswer();
+    void onAiGradeSubjective();
+
+private:
+    void buildCatalog();
+    void buildProblemView();
+    void addCard(QGridLayout* grid, int row, int col, const QString& icon,
+                 const QString& title, const QString& desc, int type);
+
+    void generateQuestionByType(int type);
+    void updateUIForQuestion();
+    void displayResult(bool isCorrect, const QString& feedback);
+    void saveToWrongBook(const Question& q);
+
+    QStackedWidget* m_stack = nullptr;
+    QWidget* m_catalogWidget = nullptr;
+    QWidget* m_problemWidget = nullptr;
+    QLabel* m_problemTitleLabel = nullptr;
+
+    int m_currentType = 0; // 当前选中的题型：0=秩, 1=迹, 2=行列式, 3=基础解系
+    Question currentQuestion;
+    int totalAttempted = 0;
+    int totalCorrect = 0;
+
+    QLabel* progressLabel = nullptr;
+    QWidget* answerWidget = nullptr;
+    QLabel* questionLabel = nullptr;
+    QLabel* feedbackLabel = nullptr;
+    QPushButton* submitBtn = nullptr;
 };
 
 /// 对应章节练习
@@ -53,7 +90,8 @@ public slots: // 注意：改成 public slots 方便外部调用
     void onPreviousQuestion();
     void onLoadChapterQuestions();
     void onAiGradeSubjective();
-    void loadQuestionsByMicroChapter(const QString& microMarkdownName); // 新增这个方法
+    void loadQuestionsByMicroChapter(const QString& microMarkdownName);
+    void selectChapterByResourcePath(const QString& path);
 
 private:
     void loadQuestion(int index);
@@ -75,15 +113,15 @@ private:
     QLabel* m_chapterTitleLabel = nullptr;
 };
 
-/// 专题模式练习
-class TopicPracticePage : public QWidget {
-    Q_OBJECT
-public:
-    explicit TopicPracticePage(QWidget* parent = nullptr);
+// /// 专题模式练习
+// class TopicPracticePage : public QWidget {
+//     Q_OBJECT
+// public:
+//     explicit TopicPracticePage(QWidget* parent = nullptr);
 
-signals:
-    void backRequested();
-};
+// signals:
+//     void backRequested();
+// };
 
 } // namespace AlgeMate::Learning
 

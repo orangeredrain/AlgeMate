@@ -115,7 +115,7 @@ void AiSolverPage::setupUI() {
     // 1. DeepSeek 行
     auto* dsLayout = new QHBoxLayout;
     auto* dsLabel = new QLabel(QStringLiteral("DeepSeek API Key:"));
-    dsLabel->setFixedWidth(150);
+    dsLabel->setFixedWidth(130);
     dsLabel->setStyleSheet(QStringLiteral("font-weight: bold; color: #6b7280;"));
     apiKeyEdit_ = new QLineEdit;
     apiKeyEdit_->setPlaceholderText(QStringLiteral("输入 DeepSeek API Key (用于纯文本)..."));
@@ -129,7 +129,7 @@ void AiSolverPage::setupUI() {
     // 2. 豆包 行
     auto* dbLayout = new QHBoxLayout;
     auto* dbLabel = new QLabel(QStringLiteral("豆包 API Key:"));
-    dbLabel->setFixedWidth(150);
+    dbLabel->setFixedWidth(130);
     dbLabel->setStyleSheet(QStringLiteral("font-weight: bold; color: #6b7280;"));
     doubaoApiKeyEdit_ = new QLineEdit;
     doubaoApiKeyEdit_->setPlaceholderText(QStringLiteral("输入豆包 API Key (用于图片 OCR 解析)..."));

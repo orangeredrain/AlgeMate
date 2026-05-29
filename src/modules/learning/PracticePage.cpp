@@ -32,6 +32,14 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 
+//calculationPage need
+#include "math/core/Matrix.h"
+#include "math/core/Fraction.h"
+#include "math/algorithm/LinearAlgebra.h"
+#include <QRandomGenerator>
+#include <QDateTime>
+#include <QStackedWidget>
+
 namespace AlgeMate::Learning {
 
 // ==================== 辅助函数 ====================
@@ -61,7 +69,7 @@ static ClickableCard* makeCardItem(const QString& icon, const QString& title,
                                    const QString& desc, QWidget* parent)
 {
     auto* card = new ClickableCard(parent);
-    card->setMinimumHeight(130);
+    card->setFixedHeight(145);
     auto* lay = new QVBoxLayout(card);
     lay->setContentsMargins(24, 20, 24, 18);
     lay->setSpacing(6);
@@ -71,7 +79,7 @@ static ClickableCard* makeCardItem(const QString& icon, const QString& title,
     auto* t  = new QLabel(title);
     t->setStyleSheet("font-size:17px; font-weight:700; background:transparent;");
     auto* d  = new QLabel(desc);
-    d->setStyleSheet("font-size:13px; background:transparent; color: #666;");
+    d->setStyleSheet("font-size:13px; background:transparent;");
     d->setWordWrap(true);
 
     lay->addWidget(ic);
@@ -81,7 +89,7 @@ static ClickableCard* makeCardItem(const QString& icon, const QString& title,
     return card;
 }
 
-// ==================== PracticePage ====================
+// PracticePage
 
 PracticePage::PracticePage(QWidget* parent) : QWidget(parent)
 {
@@ -94,7 +102,6 @@ PracticePage::PracticePage(QWidget* parent) : QWidget(parent)
     connect(back, &QPushButton::clicked, this, &PracticePage::backRequested);
     auto* title = new QLabel(QStringLiteral("练习模式"));
     title->setObjectName(QStringLiteral("PageTitle"));
-    title->setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50;");
     top->addWidget(back);
     top->addWidget(title);
     top->addStretch();
@@ -106,45 +113,584 @@ PracticePage::PracticePage(QWidget* parent) : QWidget(parent)
                                QStringLiteral("随机生成计算题\n实时输入矩阵并计算"), this);
     auto* card2 = makeCardItem(QStringLiteral("📖"), QStringLiteral("对应章节练习"),
                                QStringLiteral("按当前章节针对性训练\n与知识点章节绑定"), this);
-    auto* card3 = makeCardItem(QStringLiteral("🎯"), QStringLiteral("专题模式"),
-                               QStringLiteral("跨章节综合训练\n特征值 · 线性空间 · 综合矩阵"), this);
+    // auto* card3 = makeCardItem(QStringLiteral("🎯"), QStringLiteral("专题模式"),
+    //                            QStringLiteral("跨章节综合训练\n特征值 · 线性空间 · 综合矩阵"), this);
 
     connect(card1, &ClickableCard::clicked, this, &PracticePage::calculationProblemRequested);
     connect(card2, &ClickableCard::clicked, this, &PracticePage::chapterPracticeRequested);
-    connect(card3, &ClickableCard::clicked, this, &PracticePage::topicPracticeRequested);
+    // connect(card3, &ClickableCard::clicked, this, &PracticePage::topicPracticeRequested);
 
     grid->addWidget(card1, 0, 0);
     grid->addWidget(card2, 0, 1);
-    grid->addWidget(card3, 1, 0);
+    // grid->addWidget(card3, 1, 0);
 
     root->addLayout(top);
     root->addLayout(grid);
     root->addStretch();
 }
 
+// // ==================== CalculationProblemPage ====================
+
+// CalculationProblemPage::CalculationProblemPage(QWidget* parent) : QWidget(parent)
+// {
+//     auto* lay = new QVBoxLayout(this);
+//     lay->setContentsMargins(24, 16, 24, 24);
+//     lay->setSpacing(14);
+
+//     auto* top = new QHBoxLayout;
+//     auto* back = makeBackBtn(this);
+//     connect(back, &QPushButton::clicked, this, &CalculationProblemPage::backRequested);
+//     auto* t = new QLabel(QStringLiteral("计算题练习"));
+//     t->setObjectName(QStringLiteral("PageTitle"));
+//     top->addWidget(back);
+//     top->addWidget(t);
+//     top->addStretch();
+
+//     auto* ph = new QLabel(QStringLiteral("（计算题功能开发中...）"));
+//     ph->setAlignment(Qt::AlignCenter);
+//     ph->setObjectName(QStringLiteral("PlaceholderLabel"));
+
+//     lay->addLayout(top);
+//     lay->addWidget(ph, 1);
+// }
+
 // ==================== CalculationProblemPage ====================
-
-CalculationProblemPage::CalculationProblemPage(QWidget* parent) : QWidget(parent)
+CalculationProblemPage::CalculationProblemPage(QWidget* parent)
+    : QWidget(parent), totalAttempted(0), totalCorrect(0)
 {
-    auto* lay = new QVBoxLayout(this);
-    lay->setContentsMargins(24, 16, 24, 24);
-    lay->setSpacing(14);
+    auto* renderer = new Latex::LatexRenderer;
+    renderer->addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
+    renderer->addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
+    renderer->addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
+    this->setProperty("latex_renderer", QVariant::fromValue(static_cast<void*>(renderer)));
 
+    auto* mainLay = new QVBoxLayout(this);
+    mainLay->setContentsMargins(0, 0, 0, 0);
+    mainLay->setSpacing(0);
+
+    m_stack = new QStackedWidget(this);
+
+    buildCatalog();      // 索引 0: 目录视图
+    buildProblemView();  // 索引 1: 做题视图
+
+    m_stack->addWidget(m_catalogWidget);
+    m_stack->addWidget(m_problemWidget);
+    m_stack->setCurrentIndex(0);
+
+    mainLay->addWidget(m_stack);
+}
+
+void CalculationProblemPage::buildCatalog() {
+    m_catalogWidget = new QWidget;
+    auto* lay = new QVBoxLayout(m_catalogWidget);
+    lay->setContentsMargins(24, 16, 24, 24);
+    lay->setSpacing(16);
+
+    // 目录顶栏
     auto* top = new QHBoxLayout;
     auto* back = makeBackBtn(this);
     connect(back, &QPushButton::clicked, this, &CalculationProblemPage::backRequested);
-    auto* t = new QLabel(QStringLiteral("计算题练习"));
-    t->setObjectName(QStringLiteral("PageTitle"));
+    auto* title = new QLabel(QStringLiteral("计算题全栈专项训练"));
+    title->setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50;");
     top->addWidget(back);
-    top->addWidget(t);
+    top->addWidget(title);
     top->addStretch();
-
-    auto* ph = new QLabel(QStringLiteral("（计算题功能开发中...）"));
-    ph->setAlignment(Qt::AlignCenter);
-    ph->setObjectName(QStringLiteral("PlaceholderLabel"));
-
     lay->addLayout(top);
-    lay->addWidget(ph, 1);
+
+    auto* scrollArea = new QScrollArea;
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setStyleSheet("background: transparent;");
+
+    auto* gridContainer = new QWidget;
+    gridContainer->setStyleSheet("background: transparent;");
+    auto* gridLay = new QGridLayout(gridContainer);
+    gridLay->setSpacing(16);
+    gridLay->setContentsMargins(0, 0, 0, 0);
+
+    // 【修改点】：直接使用 Unicode 数学字符，不再依赖 LaTeX 图片渲染
+    struct TaskType { QString icon; QString title; QString desc; };
+    QVector<TaskType> tasks = {
+        {"rank(A)", "矩阵秩与迹", "求矩阵的秩、迹与行列式的值"},
+        {"A⁻¹", "矩阵求逆", "求解可逆矩阵的逆矩阵 A⁻¹"},
+        {"Ax=0", "齐次方程组", "求解线性方程组的基础解系"},
+        {"Ax=b", "非齐次方程组", "求非齐次方程组的特解与通解"},
+        {"αᵢ", "极大线性无关组", "求向量组的秩与极大线性无关组"},
+        {"βᵢ", "Gram-Schmidt", "将已知向量组正交化与单位化"},
+        {"λ", "特征值与特征向量", "求解矩阵特征多项式与特征空间"},
+        {"QᵀAQ", "对称阵正交对角化", "求正交阵使得实对称阵对角化"},
+        {"f(x)", "实二次型化标准形", "利用非退化线性替换化简二次型"},
+        {"J", "Jordan 标准形", "求解特征矩阵与 Jordan 链"},
+        {"(f, g)", "多项式最大公因式", "通过辗转相除法求多项式公因式"}
+    };
+
+    for (int i = 0; i < tasks.size(); ++i) {
+        int row = i / 3;
+        int col = i % 3;
+        addCard(gridLay, row, col, tasks[i].icon, tasks[i].title, tasks[i].desc, i);
+    }
+
+    scrollArea->setWidget(gridContainer);
+    lay->addWidget(scrollArea, 1);
+}
+
+void CalculationProblemPage::addCard(QGridLayout* grid, int row, int col, const QString& icon,
+                                     const QString& title, const QString& desc, int type) {
+    auto* card = new ClickableCard(m_catalogWidget);
+    card->setMinimumHeight(140);
+    auto* lay = new QVBoxLayout(card);
+    lay->setContentsMargins(20, 20, 20, 20);
+    lay->setSpacing(8);
+
+    // 直接使用 QLabel 渲染 Unicode 文本图标，指定 Serif 字体使其看起来像数学公式
+    auto* iconLbl = new QLabel(icon);
+    iconLbl->setStyleSheet("font-size: 24px; font-weight: bold; color: #6d5bd0; font-family: 'Cambria Math', 'Times New Roman', serif;");
+
+    auto* titleLbl = new QLabel(title);
+    titleLbl->setStyleSheet("font-size: 16px; font-weight: 700; color: #443c68; background: transparent;");
+
+    auto* descLbl = new QLabel(desc);
+    descLbl->setWordWrap(true);
+    descLbl->setStyleSheet("font-size: 13px; color: #8A8FA3; background: transparent;");
+
+    lay->addWidget(iconLbl);
+    lay->addWidget(titleLbl);
+    lay->addWidget(descLbl);
+    lay->addStretch(1);
+
+    connect(card, &ClickableCard::clicked, this, [this, type]() { onCardClicked(type); });
+    grid->addWidget(card, row, col);
+}
+
+void CalculationProblemPage::buildProblemView() {
+    m_problemWidget = new QWidget;
+    auto* mainLay = new QVBoxLayout(m_problemWidget);
+    mainLay->setContentsMargins(24, 16, 24, 24);
+    mainLay->setSpacing(12);
+
+    // 做题页顶栏
+    auto* top = new QHBoxLayout;
+    auto* backBtn = new QPushButton(QStringLiteral("← 返回题型列表"), this);
+    backBtn->setStyleSheet("QPushButton { background: transparent; border: 1px solid #dcdfe6; color: #606266; padding: 6px 12px; border-radius: 4px; font-size: 13px; } QPushButton:hover { background: #f5f7fa; color: #409eff; }");
+    connect(backBtn, &QPushButton::clicked, this, &CalculationProblemPage::onReturnToCatalog);
+
+    m_problemTitleLabel = new QLabel(QStringLiteral("专项训练"));
+    m_problemTitleLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin-left: 10px;");
+
+    top->addWidget(backBtn);
+    top->addWidget(m_problemTitleLabel);
+    top->addStretch();
+    mainLay->addLayout(top);
+
+    // 核心卡片承载区
+    auto* scrollContainer = new QWidget;
+    scrollContainer->setStyleSheet("background: #f8fafc; border-radius: 16px;");
+    auto* scrollLay = new QVBoxLayout(scrollContainer);
+    scrollLay->setContentsMargins(0, 4, 0, 4);
+    scrollLay->setSpacing(16);
+
+    progressLabel = new QLabel;
+    progressLabel->setStyleSheet("color: #4a5568; font-size: 13px; background-color: #edf2f7; padding: 8px 12px; border-radius: 6px; font-weight: 500;");
+    scrollLay->addWidget(progressLabel);
+
+    auto* qBrowser = new Latex::LatexTextBrowser;
+    qBrowser->setObjectName(QStringLiteral("QuestionTextBrowser"));
+    qBrowser->setFrameShape(QFrame::NoFrame);
+    qBrowser->setMinimumHeight(90);
+    qBrowser->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    questionLabel = reinterpret_cast<QLabel*>(qBrowser);
+    scrollLay->addWidget(qBrowser, 0);
+
+    answerWidget = new QWidget;
+    auto* answerLayout = new QVBoxLayout(answerWidget);
+    answerLayout->setContentsMargins(0, 0, 0, 0);
+    scrollLay->addWidget(answerWidget, 0);
+
+    auto* advancedFeedback = new Latex::LatexTextBrowser;
+    advancedFeedback->setObjectName(QStringLiteral("AdvancedFeedbackView"));
+    advancedFeedback->setMinimumHeight(160);
+    advancedFeedback->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    advancedFeedback->hide();
+    feedbackLabel = reinterpret_cast<QLabel*>(advancedFeedback);
+    scrollLay->addWidget(advancedFeedback, 0);
+
+    scrollLay->addStretch(1);
+
+    auto* mainScroll = new QScrollArea;
+    mainScroll->setWidgetResizable(true);
+    mainScroll->setFrameShape(QFrame::NoFrame);
+    mainScroll->setWidget(scrollContainer);
+    mainLay->addWidget(mainScroll, 1);
+
+    // 底部操作区
+    auto* bottomLayout = new QHBoxLayout;
+    auto* generateBtn = new QPushButton(QStringLiteral("🔄 生成新题"), this);
+    submitBtn = new QPushButton(QStringLiteral("确认提交"), this);
+
+    QString baseBtnStyle = "QPushButton { padding: 8px 16px; font-size: 13px; border-radius: 6px; font-weight: 500; }";
+    generateBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #ffffff; border: 1px solid #cbd5e0; color: #4a5568; }");
+    submitBtn->setStyleSheet(baseBtnStyle + "QPushButton { background-color: #3182ce; border: none; color: white; padding: 10px 24px; font-size: 14px; }");
+
+    connect(generateBtn, &QPushButton::clicked, this, &CalculationProblemPage::onGenerateCurrentType);
+    connect(submitBtn, &QPushButton::clicked, this, &CalculationProblemPage::onSubmitAnswer);
+
+    bottomLayout->addWidget(generateBtn);
+    bottomLayout->addStretch();
+    bottomLayout->addWidget(submitBtn);
+    mainLay->addLayout(bottomLayout);
+
+    // 样式表复用
+    m_problemWidget->setStyleSheet(R"(
+        LatexTextBrowser#QuestionTextBrowser { background: #ffffff; border: 1px solid #ebe7f7; border-radius: 18px; padding: 20px; font-size: 15px; color: #3f3a52; }
+        QTextBrowser#AdvancedFeedbackView { border-radius: 18px; padding: 18px; font-size: 14px; }
+        QLineEdit { height: 40px; border: 1px solid #ddd6f3; border-radius: 10px; padding-left: 12px; background: white; font-size: 14px; color: #443c68; }
+        QLineEdit:focus { border: 1px solid #9b87f5; }
+        QPlainTextEdit { border: 1px solid #ddd6f3; border-radius: 12px; padding: 10px; background: white; font-size: 14px; color: #443c68; line-height: 1.4; }
+        QPlainTextEdit:focus { border: 1px solid #9b87f5; }
+        QPushButton#InnerAiGradeButton { background: #9b87f5; color: white; border: none; font-weight: 700; border-radius: 6px; padding: 8px 16px; font-size: 13px; }
+        QPushButton#InnerAiGradeButton:hover { background: #8a74eb; }
+    )");
+}
+
+void CalculationProblemPage::onCardClicked(int type) {
+    m_currentType = type;
+    totalAttempted = 0;
+    totalCorrect = 0;
+
+    QString typeName;
+    switch(type) {
+    case 0: typeName = "求矩阵的秩"; break;
+    case 1: typeName = "求矩阵的迹"; break;
+    case 2: typeName = "求行列式的值"; break;
+    case 3: typeName = "求基础解系"; break;
+    }
+    m_problemTitleLabel->setText(QStringLiteral("专项训练：") + typeName);
+
+    m_stack->setCurrentIndex(1);
+    onGenerateCurrentType();
+}
+
+void CalculationProblemPage::onReturnToCatalog() {
+    m_stack->setCurrentIndex(0);
+}
+
+void CalculationProblemPage::onGenerateCurrentType() {
+    generateQuestionByType(m_currentType);
+}
+
+void CalculationProblemPage::generateQuestionByType(int type) {
+    totalAttempted++;
+    feedbackLabel->hide();
+
+    currentQuestion.id = QRandomGenerator::global()->generate();
+    currentQuestion.attempts = 0;
+    currentQuestion.score = 10;
+    currentQuestion.userAnswer.clear();
+    currentQuestion.isCorrect = false;
+
+    // 辅助闭包：快速生成格式化矩阵字符串
+    auto getMatStr = [](const algemate::math::Matrix<algemate::math::Fraction>& M) {
+        QString s;
+        for (size_t i = 0; i < M.rows(); ++i) {
+            for (size_t j = 0; j < M.cols(); ++j) {
+                if (j > 0) s += " & ";
+                s += QString::fromStdString(M(i, j).toLatex());
+            }
+            if (i + 1 < M.rows()) s += " \\\\ ";
+        }
+        return s;
+    };
+
+    // 辅助闭包：随机生成小型整数矩阵（防止计算量爆炸）
+    auto randMat = [](int r, int c, int min = -2, int max = 3) {
+        algemate::math::Matrix<algemate::math::Fraction> M(r, c);
+        for(int i=0; i<r; ++i)
+            for(int j=0; j<c; ++j)
+                M(i,j) = algemate::math::Fraction(QRandomGenerator::global()->bounded(min, max+1));
+        return M;
+    };
+
+    // 默认主观题配置（除非被后续覆盖为 Fill）
+    currentQuestion.type = QuestionType::Subjective;
+    submitBtn->hide();
+
+    switch(type) {
+    case 0: { // 秩与迹（基础客观题）
+        currentQuestion.type = QuestionType::Fill;
+        auto A = randMat(3, 4);
+        currentQuestion.content = QStringLiteral("求矩阵 $A$ 的秩（Rank）：\n$$A = \\begin{pmatrix} %1 \\end{pmatrix}$$").arg(getMatStr(A));
+        currentQuestion.correctAnswer = QString::number(algemate::math::rank(A));
+        submitBtn->show();
+        break;
+    }
+    case 1: { // 矩阵求逆（主观作答，AI判卷）
+        currentQuestion.type = QuestionType::Subjective;
+        algemate::math::Matrix<algemate::math::Fraction> A;
+        bool invertible = false;
+        // 确保随机出的矩阵可逆
+        while (!invertible) {
+            A = randMat(3, 3, -2, 2);
+            if (!algemate::math::det(A).isZero()) invertible = true;
+        }
+        currentQuestion.content = QStringLiteral("求该方阵的逆矩阵 $A^{-1}$：\n$$A = \\begin{pmatrix} %1 \\end{pmatrix}$$").arg(getMatStr(A));
+        currentQuestion.correctAnswer = QStringLiteral("底层标准参考逆矩阵：\n$$A^{-1} = \\begin{pmatrix} %1 \\end{pmatrix}$$").arg(getMatStr(algemate::math::inverse(A)));
+        submitBtn->hide(); // 隐藏普通提交，使用 AI 判卷按钮
+        break;
+    }
+    case 2: { // 齐次方程组 Ax = 0
+        auto A = randMat(3, 4, -1, 2);
+        currentQuestion.content = QStringLiteral("求齐次线性方程组 $Ax=0$ 的基础解系：\n$$A = \\begin{pmatrix} %1 \\end{pmatrix}$$").arg(getMatStr(A));
+        currentQuestion.correctAnswer = QStringLiteral("底层参考零空间基：\n$$N(A) = \\begin{pmatrix} %1 \\end{pmatrix}$$").arg(getMatStr(algemate::math::nullspace(A)));
+        break;
+    }
+    case 3: { // 非齐次方程组 Ax = b
+        auto A = randMat(3, 4, -1, 2);
+        auto b = randMat(3, 1, -1, 2);
+        currentQuestion.content = QStringLiteral("求解非齐次线性方程组 $Ax=b$：\n$$A = \\begin{pmatrix} %1 \\end{pmatrix}, \\quad b = \\begin{pmatrix} %2 \\end{pmatrix}$$").arg(getMatStr(A), getMatStr(b));
+        currentQuestion.correctAnswer = QStringLiteral("请 AI 判卷导师独立推导增广矩阵 $[A|b]$ 的行阶梯阵，并评估学生给出的特解与通解的正确性。");
+        break;
+    }
+    case 4: { // 极大线性无关组
+        auto A = randMat(4, 5, -2, 2);
+        currentQuestion.content = QStringLiteral("已知以下列向量构成的向量组，求其秩与一个极大线性无关组：\n$$A = \\begin{pmatrix} %1 \\end{pmatrix}$$").arg(getMatStr(A));
+        currentQuestion.correctAnswer = QStringLiteral("底层算力提供的矩阵秩为 %1，请 AI 导师验证学生找出的极大无关组是否等价。").arg(algemate::math::rank(A));
+        break;
+    }
+    case 5: { // Gram-Schmidt 正交化
+        auto A = randMat(3, 3, -1, 2);
+        currentQuestion.content = QStringLiteral("将列向量组 $A$ 进行 Gram-Schmidt 正交化与单位化：\n$$A = \\begin{pmatrix} %1 \\end{pmatrix}$$").arg(getMatStr(A));
+        currentQuestion.correctAnswer = QStringLiteral("由于正交化涉及根号化简，请 AI 导师严密验证学生过程中的内积计算与规范化操作。");
+        break;
+    }
+    // 高阶特征值等需要对角化防不可约因式生成的题型
+    case 6: case 7: case 8: case 9: {
+        currentQuestion.content = QStringLiteral("此高阶矩阵专项题型（特征值/对角化/二次型/Jordan标准形）涉及复杂的不可约代数数运算。\n由于随机矩阵大多没有有理特征值，**后台正在为你针对性生成具备优美整数特征根的特定题型...** \n\n*请尝试手动给出一种你认为合理的构造，或交由 AI 导师随机出一题进行批阅！*");
+        currentQuestion.correctAnswer = QStringLiteral("这是一道开放式挑战题，请 AI 导师全面审查学生作答逻辑的高代严谨性。");
+        break;
+    }
+    case 10: { // 多项式最大公因式
+        currentQuestion.content = QStringLiteral("求多项式 $f(x)$ 与 $g(x)$ 的最大公因式：\n$$f(x) = x^4 - 2x^3 + x^2 - 4$$\n$$g(x) = x^3 - 2x^2 + 2x - 4$$");
+        currentQuestion.correctAnswer = QStringLiteral("这道题的正确答案应为 $x^2 + 2$ 或其倍数，请 AI 导师利用辗转相除法验证。");
+        break;
+    }
+    }
+
+    updateUIForQuestion();
+}
+
+void CalculationProblemPage::updateUIForQuestion() {
+    progressLabel->setText(QStringLiteral(" 📝 统计：已练习 %1 题   |   正确 %2 题   |   本题尝试：%3 次").arg(totalAttempted).arg(totalCorrect).arg(currentQuestion.attempts));
+
+    auto* qBrowser = reinterpret_cast<Latex::LatexTextBrowser*>(questionLabel);
+    auto* renderer = static_cast<Latex::LatexRenderer*>(this->property("latex_renderer").value<void*>());
+    if (renderer && qBrowser) qBrowser->setHtml(renderer->render(currentQuestion.content, qBrowser->document()));
+    else questionLabel->setText(currentQuestion.content);
+
+    if (auto* oldLayout = answerWidget->layout()) {
+        QLayoutItem* child;
+        while ((child = oldLayout->takeAt(0)) != nullptr) {
+            if (child->widget()) child->widget()->deleteLater();
+            delete child;
+        }
+    }
+
+    auto* answerLayout = qobject_cast<QVBoxLayout*>(answerWidget->layout());
+    answerLayout->setContentsMargins(4, 10, 4, 10);
+    answerLayout->setSpacing(12);
+
+    if (currentQuestion.type == QuestionType::Fill) {
+        auto* lineEdit = new QLineEdit(answerWidget);
+        lineEdit->setObjectName(QStringLiteral("fillAnswer"));
+        lineEdit->setPlaceholderText(QStringLiteral(" 请在此输入最终数值答案..."));
+        answerLayout->addWidget(lineEdit);
+    } else if (currentQuestion.type == QuestionType::Subjective) {
+        auto* textEdit = new QPlainTextEdit(answerWidget);
+        textEdit->setObjectName(QStringLiteral("subjectiveAnswer"));
+        textEdit->setPlaceholderText(QStringLiteral("提示：可以直接使用 LaTeX 源码（例如 (1, -1, 0, 2)^T）以便 AI 导师更精准判卷..."));
+        textEdit->setMinimumHeight(100);
+        textEdit->setMaximumHeight(140);
+        textEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        answerLayout->addWidget(textEdit);
+
+        auto* btnContainer = new QHBoxLayout();
+        auto* aiGradeBtn = new QPushButton(QStringLiteral("🤖 DeepSeek AI 智能判卷"), answerWidget);
+        aiGradeBtn->setObjectName(QStringLiteral("InnerAiGradeButton"));
+        aiGradeBtn->setCursor(Qt::PointingHandCursor);
+        connect(aiGradeBtn, &QPushButton::clicked, this, &CalculationProblemPage::onAiGradeSubjective);
+        btnContainer->addWidget(aiGradeBtn);
+        btnContainer->addStretch();
+        answerLayout->addLayout(btnContainer);
+    }
+}
+
+void CalculationProblemPage::onSubmitAnswer() {
+    currentQuestion.attempts++;
+
+    if (currentQuestion.type == QuestionType::Fill) {
+        auto* lineEdit = answerWidget->findChild<QLineEdit*>(QStringLiteral("fillAnswer"));
+        if (!lineEdit || lineEdit->text().trimmed().isEmpty()) {
+            QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请输入您的数值答案"));
+            return;
+        }
+
+        currentQuestion.userAnswer = lineEdit->text().trimmed();
+        currentQuestion.isCorrect = (currentQuestion.userAnswer == currentQuestion.correctAnswer);
+
+        displayResult(currentQuestion.isCorrect,
+                      currentQuestion.isCorrect ? QStringLiteral("🎉 答对了！后台线性代数引擎验证通过！")
+                                                : QStringLiteral("❌ 答案不正确。引擎给出的正确结果是: %1").arg(currentQuestion.correctAnswer));
+
+        if (currentQuestion.isCorrect) totalCorrect++;
+        else saveToWrongBook(currentQuestion);
+
+    } else {
+        QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("主观阐述题请直接点击 [🤖 DeepSeek AI 智能判卷] 按钮。"));
+    }
+
+    progressLabel->setText(QStringLiteral(" 📝 统计：已练习 %1 题   |   正确 %2 题   |   本题尝试：%3 次").arg(totalAttempted).arg(totalCorrect).arg(currentQuestion.attempts));
+}
+
+void CalculationProblemPage::onAiGradeSubjective() {
+    auto* textEdit = answerWidget->findChild<QPlainTextEdit*>(QStringLiteral("subjectiveAnswer"));
+    if (!textEdit || textEdit->toPlainText().trimmed().isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先在文本框输入您的解系再进行 AI 判卷。"));
+        return;
+    }
+
+    currentQuestion.userAnswer = textEdit->toPlainText().trimmed();
+
+    QString configPath = QCoreApplication::applicationDirPath() + "/algemate_ai.conf";
+    QFile file(configPath);
+    QString apiKey = "";
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        QString encoded = in.readAll().trimmed();
+        if (!encoded.isEmpty()) apiKey = QString(QByteArray::fromBase64(encoded.toUtf8()));
+    }
+
+    if (apiKey.isEmpty()) {
+        QMessageBox::critical(this, QStringLiteral("未检测到 API Key"), QStringLiteral("请前往【AI智能解题】页面配置您的 DeepSeek API Key。"));
+        return;
+    }
+
+    displayResult(true, QStringLiteral("⏳ 联机中... AI 导师正在验证你的作答，请稍候..."));
+
+    if (auto* btn = answerWidget->findChild<QPushButton*>(QStringLiteral("InnerAiGradeButton"))) btn->setEnabled(false);
+
+    QString prompt = QStringLiteral(
+                         "你是一位严谨的高等代数教授。请比对底层算子生成的【标准基】对【学生给出的基】进行精确的等价性判定。\n\n"
+                         "【题目内容】:\n%1\n\n【底层参考标准】:\n%2\n\n【学生作答】:\n%3\n\n"
+                         "1. 首行必须固定为：[结果：通过/不通过]\n"
+                         "2. 然后简短点评两者是否张成相同的空间。"
+                         ).arg(currentQuestion.content, currentQuestion.correctAnswer, currentQuestion.userAnswer);
+
+    QJsonObject rootObj;
+    rootObj["model"] = "deepseek-chat";
+    rootObj["stream"] = false;
+    QJsonArray messages;
+    QJsonObject systemMsg, userMsg;
+    systemMsg["role"] = "system";
+    systemMsg["content"] = QStringLiteral("你是专业的线性代数解题验证导师。");
+    userMsg["role"] = "user";
+    userMsg["content"] = prompt;
+    messages.append(systemMsg);
+    messages.append(userMsg);
+    rootObj["messages"] = messages;
+
+    QNetworkAccessManager* mgr = new QNetworkAccessManager(this);
+    QNetworkRequest request{QUrl(QStringLiteral("https://api.deepseek.com/chat/completions"))};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+
+    QNetworkReply* reply = mgr->post(request, QJsonDocument(rootObj).toJson());
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, mgr]() {
+        mgr->deleteLater(); reply->deleteLater();
+        if (auto* btn = answerWidget->findChild<QPushButton*>(QStringLiteral("InnerAiGradeButton"))) btn->setEnabled(true);
+
+        if (reply->error() != QNetworkReply::NoError) {
+            displayResult(false, QStringLiteral("❌ 判卷通信失败。")); return;
+        }
+
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        QString aiEvaluation = doc.object()["choices"].toArray()[0].toObject()["message"].toObject()["content"].toString();
+
+        currentQuestion.attempts++;
+        bool scorePass = !aiEvaluation.contains(QStringLiteral("结果：不通过"));
+        currentQuestion.isCorrect = scorePass;
+
+        displayResult(scorePass, QStringLiteral("### 🤖 DeepSeek 空间等价性验证报告\n---\n") + aiEvaluation);
+
+        if (scorePass) totalCorrect++;
+        else saveToWrongBook(currentQuestion);
+
+        progressLabel->setText(QStringLiteral(" 📝 统计：已练习 %1 题   |   正确 %2 题   |   本题尝试：%3 次").arg(totalAttempted).arg(totalCorrect).arg(currentQuestion.attempts));
+    });
+}
+
+void CalculationProblemPage::displayResult(bool isCorrect, const QString& feedback) {
+    feedbackLabel->show();
+    auto* browser = reinterpret_cast<Latex::LatexTextBrowser*>(feedbackLabel);
+    auto* renderer = static_cast<Latex::LatexRenderer*>(this->property("latex_renderer").value<void*>());
+
+    if (renderer && browser) {
+        renderer->clearCache();
+        browser->setHtml(renderer->render(feedback, browser->document()));
+        browser->document()->adjustSize();
+        browser->setMinimumHeight(static_cast<int>(browser->document()->size().height()) + 30);
+    } else {
+        browser->setHtml(feedback);
+    }
+
+    if (isCorrect) {
+        feedbackLabel->setStyleSheet("QTextBrowser#AdvancedFeedbackView { background-color: #f0fdf4; color: #166534; padding: 14px; border-radius: 8px; border: 1px solid #bbf7d0; font-size: 13px; margin-top: 8px; line-height: 1.5; }");
+    } else {
+        feedbackLabel->setStyleSheet("QTextBrowser#AdvancedFeedbackView { background-color: #fef2f2; color: #991b1b; padding: 14px; border-radius: 8px; border: 1px solid #fecaca; font-size: 13px; margin-top: 8px; line-height: 1.5; }");
+    }
+}
+
+void CalculationProblemPage::saveToWrongBook(const Question& q) {
+    const QString fileName = QStringLiteral("wrong_questions.json");
+    QJsonArray wrongArray;
+    QFile file(fileName);
+    if (file.exists() && file.open(QIODevice::ReadOnly)) {
+        wrongArray = QJsonDocument::fromJson(file.readAll()).array();
+        file.close();
+    }
+
+    bool alreadyExists = false;
+    QJsonArray updatedArray;
+    for (const auto& val : wrongArray) {
+        QJsonObject obj = val.toObject();
+        if (obj[QStringLiteral("id")].toInt() == q.id) {
+            alreadyExists = true;
+            obj[QStringLiteral("wrongCount")] = obj[QStringLiteral("wrongCount")].toInt() + 1;
+            obj[QStringLiteral("time")] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+            obj[QStringLiteral("userAnswer")] = q.userAnswer;
+            updatedArray.append(obj);
+        } else {
+            updatedArray.append(val);
+        }
+    }
+
+    if (!alreadyExists) {
+        QJsonObject newWrong;
+        newWrong[QStringLiteral("id")] = q.id;
+        newWrong[QStringLiteral("content")] = q.content;
+        newWrong[QStringLiteral("userAnswer")] = q.userAnswer;
+        newWrong[QStringLiteral("correctAnswer")] = q.correctAnswer;
+        newWrong[QStringLiteral("score")] = q.score;
+        newWrong[QStringLiteral("wrongCount")] = 1;
+        newWrong[QStringLiteral("time")] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+        newWrong[QStringLiteral("type")] = (q.type == QuestionType::Fill) ? QStringLiteral("fill") : QStringLiteral("subjective");
+        newWrong[QStringLiteral("choices")] = QJsonArray();
+        updatedArray.append(newWrong);
+    }
+
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(QJsonDocument(updatedArray).toJson(QJsonDocument::Indented));
+        file.close();
+    }
 }
 
 // ==================== ChapterPracticePage ====================
@@ -995,7 +1541,7 @@ void ChapterPracticePage::onAiGradeSubjective() {
     }
 
     QString prompt = QString(
-                         "你是一位严谨的高等代数教授。请根据【标准参考答案】对【学生作答】进行精确的打分和深度批改。\n\n"
+                         "你是一位严谨的线性代数教授。请根据【标准参考答案】对【学生作答】进行精确的打分和深度批改。\n\n"
                          "【题目内容】:\n%1\n\n"
                          "【标准参考答案】:\n%2\n\n"
                          "【学生作答内容】:\n%3\n\n"
@@ -1153,32 +1699,32 @@ bool ChapterPracticePage::eventFilter(QObject* watched, QEvent* event)
     return QWidget::eventFilter(watched, event);
 }
 
-// ==================== TopicPracticePage ====================
+// // ==================== TopicPracticePage ====================
 
-TopicPracticePage::TopicPracticePage(QWidget* parent) : QWidget(parent)
-{
-    auto* lay = new QVBoxLayout(this);
-    lay->setContentsMargins(24, 16, 24, 24);
-    lay->setSpacing(14);
+// TopicPracticePage::TopicPracticePage(QWidget* parent) : QWidget(parent)
+// {
+//     auto* lay = new QVBoxLayout(this);
+//     lay->setContentsMargins(24, 16, 24, 24);
+//     lay->setSpacing(14);
 
-    auto* top = new QHBoxLayout;
-    auto* back = makeBackBtn(this);
-    connect(back, &QPushButton::clicked, this, &TopicPracticePage::backRequested);
-    auto* t = new QLabel(QStringLiteral("专题练习"));
-    t->setObjectName(QStringLiteral("PageTitle"));
-    top->addWidget(back);
-    top->addWidget(t);
-    top->addStretch();
+//     auto* top = new QHBoxLayout;
+//     auto* back = makeBackBtn(this);
+//     connect(back, &QPushButton::clicked, this, &TopicPracticePage::backRequested);
+//     auto* t = new QLabel(QStringLiteral("专题练习"));
+//     t->setObjectName(QStringLiteral("PageTitle"));
+//     top->addWidget(back);
+//     top->addWidget(t);
+//     top->addStretch();
 
-    auto* ph = new QLabel(QStringLiteral("（专题练习功能开发中...）"));
-    ph->setAlignment(Qt::AlignCenter);
-    ph->setObjectName(QStringLiteral("PlaceholderLabel"));
+//     auto* ph = new QLabel(QStringLiteral("（专题练习功能开发中...）"));
+//     ph->setAlignment(Qt::AlignCenter);
+//     ph->setObjectName(QStringLiteral("PlaceholderLabel"));
 
-    lay->addLayout(top);
-    lay->addWidget(ph, 1);
-}
+//     lay->addLayout(top);
+//     lay->addWidget(ph, 1);
+// }
 
-// ==================== 自动化错题入库业务核心 ====================
+// ==================== 自动化错题入库 ====================
 void ChapterPracticePage::saveToWrongBook(const Question& q)
 {
     const QString fileName = QStringLiteral("wrong_questions.json");
@@ -1239,6 +1785,31 @@ void ChapterPracticePage::saveToWrongBook(const Question& q)
     if (file.open(QIODevice::WriteOnly)) {
         file.write(QJsonDocument(updatedArray).toJson(QJsonDocument::Indented));
         file.close();
+    }
+}
+
+void ChapterPracticePage::selectChapterByResourcePath(const QString& path) {
+    if (path.isEmpty()) return;
+
+    // 1. 全量搜寻左侧目录树的所有节点
+    QList<QTreeWidgetItem*> items = m_chapterTree->findItems(QStringLiteral("*"), Qt::MatchWildcard | Qt::MatchRecursive);
+    for (auto* item : items) {
+        // 2. 匹对节点中绑定的资源路径 (Qt::UserRole + 1)
+        if (item->data(0, Qt::UserRole + 1).toString() == path) {
+
+            if (m_chapterTree->currentItem() == item) {
+                // 情况 A：如果原本就已经停留在该节点，currentItemChanged 信号不会被 Qt 触发
+                // 此时必须手动强制刷新一次数据，防止右侧内容由于其他保底机制被清空
+                loadQuestionsByMicroChapter(path);
+            } else {
+                // 情况 B：如果节点不同，直接切换。Qt 会自动触发 currentItemChanged 信号
+                // 从而完美顺带执行你已经写好的 loadQuestionsByMicroChapter(path) 逻辑
+                m_chapterTree->setCurrentItem(item);
+            }
+
+            m_chapterTree->scrollToItem(item); // 视口自动滚动对齐，提升 UX 体验
+            break;
+        }
     }
 }
 
