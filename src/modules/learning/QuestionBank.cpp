@@ -8,7 +8,7 @@ QVector<Question> QuestionBank::getAllQuestions() {
     // ==========================================
 
     // -- 1.1 整除与带余除法 --
-    list.append(Question{111, "ch01_1.md", "【单选题】设多项式 $f(x) = x^4 + 3x^3 + x^2 - 1$ 与 $g(x) = x^2 + 2x - 1$，用 $g(x)$ 除 $f(x)$ 得到的余式为：", QuestionType::Single, 5, "2", {"$2x + 1$", "$-x + 3$", "$-2x - 1$", "$0$"}, 0, "", false});
+    list.append(Question{111, "ch01_1.md", "【单选题】设多项式 $f(x) = x^4 + 3x^3 + x^2 - 1$ 与 $g(x) = x^2 + 2x - 1$，用 $g(x)$ 除 $f(x)$ 得到的余式为：", QuestionType::Single, 5, "2", {"$2x + 1$", "$-x + 3$", "$x - 1$", "$0$"}, 0, "", false});
     list.append(Question{112, "ch01_1.md", "【填空题】若多项式 $g(x) = x - 2$ 能整除 $f(x) = x^3 - kx^2 + 4$，则常数 $k$ 的值为：", QuestionType::Fill, 5, "3", {}, 0, "", false});
     list.append(Question{113, "ch01_1.md", "【主观题】已知 $f(x), g(x) \\in \\mathbb{F}[x]$ 且 $g(x) \\neq 0$。证明：带余除法 $f(x) = q(x)g(x) + r(x)$ 中的商与余式是唯一确定的。", QuestionType::Subjective, 10, "设存在两组解，相减得 $(q_1-q_2)g = r_2-r_1$。若商不相等，左边次数 $\\ge \\deg(g)$，而右边次数 $< \\deg(g)$，产生矛盾。故唯一性成立。", {}, 0, "", false});
 
