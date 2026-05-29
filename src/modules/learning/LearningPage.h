@@ -2,8 +2,14 @@
 #define ALGEMATE_LEARNINGPAGE_H
 
 #include <QWidget>
+#include <QDate>
+#include <QDateTime>
 
+class QLabel;
 class QStackedWidget;
+class QTimer;
+class QShowEvent;
+class QHideEvent;
 
 namespace AlgeMate::Learning {
 
@@ -24,8 +30,25 @@ public:
 
     void showKnowledge();
 
+protected:
+    void showEvent(QShowEvent* event) override;
+    void hideEvent(QHideEvent* event) override;
+
 private:
     void buildDashboard();
+    void loadTodayStudyTime();
+    void saveTodayStudyTime() const;
+    void saveModuleStudyTime(const QString& moduleKey, int seconds) const;
+    void startStudyTimer();
+    void stopStudyTimer();
+    void handleStudyTimerTick();
+    void refreshTodayStudyCard();
+    void updateAutoCheckin();
+    bool shouldCountStudyTime() const;
+    QString currentModuleKey() const;
+    QString formatStudyDuration(int seconds) const;
+
+    // 卡片点击 → 子页面导航
     void showPractice();
     void showExam();
     void showWrongBook();
@@ -40,6 +63,13 @@ private:
 
     // Dashboard 页
     QWidget* m_dashboard = nullptr;
+    QLabel*  m_todayStudyValueLabel = nullptr;
+    QLabel*  m_todayStudySubLabel = nullptr;
+    QTimer*  m_studyTimer = nullptr;
+    QDate    m_studyDate;
+    QDateTime m_lastStudyTick;
+    int      m_todayStudySeconds = 0;
+    bool     m_todayAutoCheckedIn = false;
 
     // 子页面
     KnowledgePage*           m_knowledgePage     = nullptr;

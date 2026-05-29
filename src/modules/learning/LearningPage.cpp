@@ -13,6 +13,13 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QFrame>
+#include <QDate>
+#include <QSettings>
+#include <QTimer>
+#include <QShowEvent>
+#include <QHideEvent>
+#include <QApplication>
+#include <QString>
 
 namespace AlgeMate::Learning {
 
@@ -20,7 +27,9 @@ namespace AlgeMate::Learning {
 // 工厂函数: 创建带内容的可点击卡片
 
 static ClickableCard* makeStatCard(const QString& label, const QString& value,
-                                    const QString& sub, QWidget* parent)
+                                    const QString& sub, QWidget* parent,
+                                    QLabel** valueLabelOut = nullptr,
+                                    QLabel** subLabelOut = nullptr)
 {
     auto* card = new ClickableCard(parent);
     card->setMinimumHeight(100);
@@ -34,6 +43,13 @@ static ClickableCard* makeStatCard(const QString& label, const QString& value,
     vl->setStyleSheet("font-size:28px; font-weight:700; color:#6A5AE0; background:transparent;");
     auto* sb = new QLabel(sub);
     sb->setStyleSheet("font-size:12px; color:#B4B8CC; background:transparent;");
+
+    if (valueLabelOut) {
+        *valueLabelOut = vl;
+    }
+    if (subLabelOut) {
+        *subLabelOut = sb;
+    }
 
     lay->addWidget(lb);
     lay->addWidget(vl);
@@ -75,8 +91,14 @@ LearningPage::LearningPage(QWidget* parent) : QWidget(parent)
     root->setSpacing(0);
 
     m_stack = new QStackedWidget;
+    m_studyTimer = new QTimer(this);
+    m_studyTimer->setInterval(1000);
+    connect(m_studyTimer, &QTimer::timeout, this, &LearningPage::handleStudyTimerTick);
 
     buildDashboard();
+    loadTodayStudyTime();
+    refreshTodayStudyCard();
+
     m_knowledgePage    = new KnowledgePage;
     m_practicePage     = new PracticePage;
     m_calcProbPage     = new CalculationProblemPage;
@@ -148,7 +170,9 @@ void LearningPage::buildDashboard()
     auto* statsRow = new QHBoxLayout;
     statsRow->setSpacing(12);
 
-    auto* stat1 = makeStatCard(QStringLiteral("今日学习"), QStringLiteral("0 分钟"), QStringLiteral("今日暂无记录"), m_dashboard);
+    auto* stat1 = makeStatCard(QStringLiteral("今日学习"), QStringLiteral("0 分钟"),
+                                QStringLiteral("今日暂无记录"), m_dashboard,
+                                &m_todayStudyValueLabel, &m_todayStudySubLabel);
     auto* stat2 = makeStatCard(QStringLiteral("本周进度"), QStringLiteral("0%"),     QStringLiteral("目标 100%"), m_dashboard);
     auto* stat3 = makeStatCard(QStringLiteral("错题数"),   QStringLiteral("0"),      QStringLiteral("共收录"), m_dashboard);
     auto* stat4 = makeStatCard(QStringLiteral("推荐练习"), QStringLiteral("—"),      QStringLiteral("待系统生成"), m_dashboard);
@@ -207,5 +231,221 @@ void LearningPage::showExam()             { m_stack->setCurrentIndex(6); }
 void LearningPage::showWrongBook()        { m_stack->setCurrentIndex(7); }
 void LearningPage::showLearningCenter()   { m_stack->setCurrentIndex(8); }
 void LearningPage::goBack()              { m_stack->setCurrentIndex(0); }
+
+void LearningPage::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+    loadTodayStudyTime();
+    refreshTodayStudyCard();
+    startStudyTimer();
+}
+
+void LearningPage::hideEvent(QHideEvent* event)
+{
+    stopStudyTimer();
+    QWidget::hideEvent(event);
+}
+
+void LearningPage::loadTodayStudyTime()
+{
+    const QDate today = QDate::currentDate();
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("learning/todayStudy"));
+
+    const QDate savedDate = QDate::fromString(
+        settings.value(QStringLiteral("date")).toString(),
+        Qt::ISODate);
+
+    m_studyDate = today;
+    if (savedDate == today) {
+        m_todayStudySeconds = settings.value(QStringLiteral("seconds"), 0).toInt();
+        m_todayAutoCheckedIn = settings.value(QStringLiteral("autoCheckedIn"), false).toBool();
+    } else {
+        settings.endGroup();
+        settings.beginGroup(QStringLiteral("learning/studySecondsByDate"));
+        m_todayStudySeconds = settings.value(today.toString(Qt::ISODate), 0).toInt();
+        settings.endGroup();
+        settings.beginGroup(QStringLiteral("learning/checkinsByDate"));
+        m_todayAutoCheckedIn = settings.value(today.toString(Qt::ISODate), false).toBool();
+        settings.endGroup();
+        updateAutoCheckin();
+        return;
+    }
+
+    settings.endGroup();
+    updateAutoCheckin();
+}
+
+void LearningPage::saveTodayStudyTime() const
+{
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("learning/todayStudy"));
+    settings.setValue(QStringLiteral("date"), m_studyDate.toString(Qt::ISODate));
+    settings.setValue(QStringLiteral("seconds"), m_todayStudySeconds);
+    settings.setValue(QStringLiteral("autoCheckedIn"), m_todayAutoCheckedIn);
+    settings.endGroup();
+
+    settings.beginGroup(QStringLiteral("learning/studySecondsByDate"));
+    settings.setValue(m_studyDate.toString(Qt::ISODate), m_todayStudySeconds);
+    settings.endGroup();
+
+    if (m_todayAutoCheckedIn) {
+        settings.beginGroup(QStringLiteral("learning/checkinsByDate"));
+        settings.setValue(m_studyDate.toString(Qt::ISODate), true);
+        settings.endGroup();
+    }
+}
+
+void LearningPage::saveModuleStudyTime(const QString& moduleKey, int seconds) const
+{
+    if (moduleKey.isEmpty() || seconds <= 0) {
+        return;
+    }
+
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("learning/moduleSecondsByDate"));
+    settings.beginGroup(m_studyDate.toString(Qt::ISODate));
+    settings.setValue(moduleKey, settings.value(moduleKey, 0).toInt() + seconds);
+    settings.endGroup();
+    settings.endGroup();
+}
+
+void LearningPage::startStudyTimer()
+{
+    m_lastStudyTick = QDateTime::currentDateTime();
+    if (!m_studyTimer->isActive()) {
+        m_studyTimer->start();
+    }
+}
+
+void LearningPage::stopStudyTimer()
+{
+    if (m_studyTimer->isActive()) {
+        handleStudyTimerTick();
+        m_studyTimer->stop();
+    }
+    saveTodayStudyTime();
+}
+
+void LearningPage::handleStudyTimerTick()
+{
+    const QDate today = QDate::currentDate();
+    if (m_studyDate != today) {
+        m_studyDate = today;
+        m_todayStudySeconds = 0;
+        m_todayAutoCheckedIn = false;
+    }
+
+    const QDateTime now = QDateTime::currentDateTime();
+    if (!shouldCountStudyTime()) {
+        m_lastStudyTick = now;
+        refreshTodayStudyCard();
+        return;
+    }
+
+    if (m_lastStudyTick.isValid()) {
+        const qint64 elapsed = m_lastStudyTick.secsTo(now);
+        if (elapsed > 0) {
+            const int elapsedSeconds = static_cast<int>(elapsed);
+            m_todayStudySeconds += elapsedSeconds;
+            saveModuleStudyTime(currentModuleKey(), elapsedSeconds);
+            if (m_stack && m_stack->currentIndex() == 8 && m_learningCenterPage) {
+                m_learningCenterPage->refreshData();
+            }
+        }
+    }
+
+    m_lastStudyTick = now;
+    updateAutoCheckin();
+    refreshTodayStudyCard();
+
+    if (m_todayStudySeconds % 30 == 0) {
+        saveTodayStudyTime();
+    }
+}
+
+void LearningPage::refreshTodayStudyCard()
+{
+    if (m_todayStudyValueLabel) {
+        m_todayStudyValueLabel->setText(formatStudyDuration(m_todayStudySeconds));
+    }
+
+    if (m_todayStudySubLabel) {
+        if (m_todayStudySeconds <= 0) {
+            m_todayStudySubLabel->setText(QStringLiteral("今日暂无记录"));
+        } else if (m_todayAutoCheckedIn) {
+            m_todayStudySubLabel->setText(QStringLiteral("正在学习中"));
+        } else {
+            m_todayStudySubLabel->setText(QStringLiteral("超过五分钟自动打卡"));
+        }
+    }
+}
+
+void LearningPage::updateAutoCheckin()
+{
+    constexpr int autoCheckinSeconds = 5 * 60;
+    if (m_todayAutoCheckedIn || m_todayStudySeconds <= autoCheckinSeconds) {
+        return;
+    }
+
+    m_todayAutoCheckedIn = true;
+    saveTodayStudyTime();
+    if (m_learningCenterPage) {
+        m_learningCenterPage->refreshData();
+    }
+}
+
+bool LearningPage::shouldCountStudyTime() const
+{
+    return QApplication::applicationState() == Qt::ApplicationActive
+        && window()
+        && window()->isActiveWindow();
+}
+
+QString LearningPage::currentModuleKey() const
+{
+    if (!m_stack) {
+        return QStringLiteral("overview");
+    }
+
+    switch (m_stack->currentIndex()) {
+    case 1:
+        return QStringLiteral("knowledge");
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+        return QStringLiteral("practice");
+    case 6:
+        return QStringLiteral("exam");
+    case 7:
+        return QStringLiteral("wrongbook");
+    case 8:
+        return QStringLiteral("management");
+    case 0:
+    default:
+        return QStringLiteral("overview");
+    }
+}
+
+QString LearningPage::formatStudyDuration(int seconds) const
+{
+    const int minutes = seconds / 60;
+    if (minutes < 1) {
+        return QStringLiteral("不足 1 分钟");
+    }
+
+    const int hours = minutes / 60;
+    const int remainMinutes = minutes % 60;
+    if (hours <= 0) {
+        return QStringLiteral("%1 分钟").arg(minutes);
+    }
+
+    if (remainMinutes == 0) {
+        return QStringLiteral("%1 小时").arg(hours);
+    }
+
+    return QStringLiteral("%1 小时 %2 分钟").arg(hours).arg(remainMinutes);
+}
 
 } // namespace AlgeMate::Learning
