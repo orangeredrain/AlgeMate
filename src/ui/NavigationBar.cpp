@@ -36,8 +36,26 @@ void NavigationBar::buildUi() {
 }
 
 void NavigationBar::addNavItem(const QString& icon, const QString& title) {
-    auto* item = new QListWidgetItem(QStringLiteral("  %1   %2").arg(icon, title), list_);
+    auto* item = new QListWidgetItem(list_);
     item->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+    QFont font = item->font();
+
+    // 判断当前添加的导航项是不是“设置中心”
+    if (title.contains(QStringLiteral("设置"))) {
+        // 【修改这里】：无视外面传进来的图标，直接强行写死 ⚙️ 加上6个空格，然后再拼接文字(title)
+        item->setText(QStringLiteral("  ⚙️   %1").arg(title));
+
+        font.setPixelSize(14);           // 将字号调大 (Emoji图标会跟随字号同比例放大)
+        item->setFont(font);
+    } else {
+        // 其他选项保持原样
+        item->setText(QStringLiteral("  %1   %2").arg(icon, title));
+
+        font.setPixelSize(14);           // 其他默认导航选项的字号
+        item->setFont(font);
+        item->setSizeHint(QSize(0, 46)); // 其他选项的默认高度
+    }
 }
 
 void NavigationBar::setCurrentIndex(int index) {
