@@ -1,10 +1,11 @@
-<!DOCTYPE RCC>
-<RCC version="1.0">
-  <qresource prefix="/">
-    <file>styles/light.qss</file>
-    <file>styles/dark.qss</file>
-    <file>knowledge/ch01_vectors.md</file>
-    <file>knowledge/ch01_matrices_intro.md</file>
-    <file>knowledge/ch02_matrix_multiply.md</file>
-  </qresource>
+<RCC>
+    <qresource prefix="/">
+        <file>styles/light.qss</file>
+        <file>styles/dark.qss</file>
+        <file>knowledge/ch01_vectors.md</file>
+        <file>knowledge/ch01_matrices_intro.md</file>
+        <file>knowledge/ch02_matrix_multiply.md</file>
+        <file>images/icon.png</file>
+        <file>images/icon.icns</file>
+    </qresource>
 </RCC>

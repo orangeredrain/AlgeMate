@@ -10,6 +10,11 @@
 #include <QToolButton>
 #include <QIcon>
 #include <QFrame>
+#include <QPixmap>
+#include <QEvent>
+#include <QMouseEvent>
+#include <QDialog>
+#include <QVBoxLayout>
 
 namespace AlgeMate {
 
@@ -38,12 +43,18 @@ void TitleBar::buildUi() {
     root->setContentsMargins(20, 8, 20, 8);
     root->setSpacing(14);
 
-    auto* logo = new QLabel(QStringLiteral("A"));
+
+    auto* logo = new QLabel;
+    logo->setObjectName("AppLogo");            // 核心：给它起个名字，方便等下识别
     logo->setFixedSize(36, 36);
     logo->setAlignment(Qt::AlignCenter);
-    logo->setStyleSheet(
-        "background-color:#6A5AE0; color:#FFFFFF;"
-        "border-radius:10px; font-size:18px; font-weight:800;");
+    logo->setCursor(Qt::PointingHandCursor);   // 核心：鼠标悬停时变成小手，提示可点击
+
+    QPixmap logoPix(AppPaths::kAppIcon);
+    logo->setPixmap(logoPix);
+    logo->setScaledContents(true);
+
+    logo->installEventFilter(this);            // 核心：开启事件监听
 
     auto* titleBox = new QVBoxLayout;
     titleBox->setSpacing(0);
@@ -145,6 +156,45 @@ void TitleBar::syncThemeButtons() {
     const bool dark = ThemeManager::instance().currentTheme() == ThemeManager::Theme::Dark;
     btnLight_->setChecked(!dark);
     btnDark_->setChecked(dark);
+}
+
+bool TitleBar::eventFilter(QObject* obj, QEvent* e) {
+    // 如果被点击的是我们的 Logo
+    if (obj->objectName() == "AppLogo" && e->type() == QEvent::MouseButtonRelease) {
+        auto* me = static_cast<QMouseEvent*>(e);
+        if (me->button() == Qt::LeftButton) {
+
+            // 创建一个弹窗来显示大图
+            QDialog dlg(this);
+            dlg.setWindowTitle(QStringLiteral("应用图标"));
+            // 隐藏 Windows 弹窗自带的问号按钮
+            dlg.setWindowFlags(dlg.windowFlags() & ~Qt::WindowContextHelpButtonHint);
+            dlg.setMinimumSize(200, 200);
+
+            auto* lay = new QVBoxLayout(&dlg);
+            lay->setContentsMargins(20, 20, 20, 20);
+
+            auto* imgLabel = new QLabel;
+            imgLabel->setAlignment(Qt::AlignCenter);
+
+            // 加载原比例的大图
+            QPixmap bigPix(AppPaths::kAppIcon);
+            // 如果图片分辨率太大，限制一下最大宽高（比如最大 400x400）防止撑满屏幕
+            if (bigPix.width() > 400 || bigPix.height() > 400) {
+                bigPix = bigPix.scaled(400, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            }
+            imgLabel->setPixmap(bigPix);
+
+            lay->addWidget(imgLabel);
+
+            // 展现弹窗（阻塞式，关掉后才能点别的）
+            dlg.exec();
+
+            return true; // 事件已处理
+        }
+    }
+    // 其他事件交给父类处理
+    return QWidget::eventFilter(obj, e);
 }
 
 }

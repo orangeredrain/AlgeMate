@@ -7,6 +7,7 @@ namespace AlgeMate::AppPaths {
 
 inline constexpr const char* kLightQss = ":/styles/light.qss";
 inline constexpr const char* kDarkQss  = ":/styles/dark.qss";
+inline constexpr const char* kAppIcon  = ":/images/icon.png";
 
 QString appName();
 QString appDisplayName();

@@ -179,7 +179,7 @@ void LearningPage::buildDashboard()
 
     connect(stat1, &ClickableCard::clicked, this, &LearningPage::showLearningCenter);
     connect(stat2, &ClickableCard::clicked, this, &LearningPage::showLearningCenter);
-    connect(stat3, &ClickableCard::clicked, this, &LearningPage::showLearningCenter);
+    connect(stat3, &ClickableCard::clicked, this, &LearningPage::showWrongBook);
     connect(stat4, &ClickableCard::clicked, this, &LearningPage::showLearningCenter);
 
     statsRow->addWidget(stat1);

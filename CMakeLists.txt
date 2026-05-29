@@ -76,8 +76,12 @@ add_subdirectory(${ALGEMATE_MODULES_DIR}/test_center)
 add_subdirectory(${ALGEMATE_SRC_DIR}/latex)
 
 # ---------- 核心壳目标 ----------
+set(MACOS_APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/resources/images/icon.icns")
+# 告诉 CMake 把这个文件拷贝到 App 包的 Resources 目录下
+set_source_files_properties(${MACOS_APP_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 qt_add_executable(AlgeMate
     WIN32 MACOSX_BUNDLE
+    ${MACOS_APP_ICON}
     main.cpp
     # core
     src/core/ThemeManager.h
@@ -98,7 +102,6 @@ qt_add_executable(AlgeMate
     src/ui/UserProfileDialog.cpp
     resources/resources.qrc
 )
-
 target_include_directories(AlgeMate PRIVATE ${ALGEMATE_SRC_DIR})
 
 target_link_libraries(AlgeMate
@@ -120,6 +123,9 @@ target_link_libraries(AlgeMate
 target_compile_definitions(AlgeMate PRIVATE
     ALGEMATE_VERSION_STRING="${PROJECT_VERSION}"
     QT_DISABLE_DEPRECATED_BEFORE=0x060000
+)
+set_target_properties(AlgeMate PROPERTIES
+    MACOSX_BUNDLE_ICON_FILE "icon.icns"
 )
 
 # ---------- 安装 / 部署 ----------
