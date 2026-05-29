@@ -353,9 +353,9 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     // lay->addLayout(bottomLayout);
 
     // 设置计时器
-    auto* timer = new QTimer(this);
-    connect(timer, &QTimer::timeout, this, &ExamProgressPage::onTimeUpdate);
-    timer->start(1000);
+    m_examTimer = new QTimer(this);
+    connect(m_examTimer, &QTimer::timeout, this, &ExamProgressPage::onTimeUpdate);
+    m_examTimer->start(1000);
 
     loadQuestion(0);
 }
@@ -757,6 +757,7 @@ void ExamProgressPage::onSubmitExam() {
     msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
 
     if (msgBox->exec() == QMessageBox::Yes) {
+        if (m_examTimer) m_examTimer->stop();
         for (auto& q : questions) {
             if (q.type == QuestionType::Single) {
                 q.isCorrect = (q.userAnswer == q.correctAnswer);
@@ -818,6 +819,7 @@ void ExamProgressPage::onTimeUpdate() {
         );
 
     if (remainingSeconds <= 0) {
+        if (m_examTimer) m_examTimer->stop();
         QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("考试时间已到，自动交卷"));
         emit examFinished(questions);
     }
@@ -858,6 +860,28 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     top->addWidget(back);
     top->addWidget(title);
     top->addStretch();
+
+    auto* restartBtn = new QPushButton(QStringLiteral("↻ 再考一次"), this);
+    restartBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #10b981;
+            color: white;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background: #059669;
+        }
+    )");
+
+    connect(restartBtn, &QPushButton::clicked, this, [this]() {
+        // 向上寻找父级 ExamPage，并调用它的重置函数
+        if (auto* examPage = qobject_cast<ExamPage*>(this->parentWidget())) {
+            examPage->resetToSettings();
+        }
+    });
+    top->addWidget(restartBtn); // 将按钮加入顶部布局
 
     contentLayout->addLayout(top);
 
@@ -1086,6 +1110,24 @@ void ExamPage::onExamFinished(const QVector<Question>& results) {
 
     currentPage = resultPage;
     layout->addWidget(currentPage);
+}
+
+void ExamPage::resetToSettings() {
+    // 1. 彻底移除并销毁当前的页面（比如考试结果页）
+    if (currentPage) {
+        auto* layout = this->layout();
+        layout->removeWidget(currentPage);
+        currentPage->deleteLater();
+        currentPage = nullptr;
+    }
+
+    // 2. 重新创建全新的考试设置页
+    auto* settingPage = new ExamSettingPage(this);
+    connect(settingPage, &ExamSettingPage::backRequested, this, &ExamPage::backRequested);
+    connect(settingPage, &ExamSettingPage::examStarted, this, &ExamPage::onStartExam);
+
+    currentPage = settingPage;
+    this->layout()->addWidget(currentPage);
 }
 
 } // namespace AlgeMate::Learning

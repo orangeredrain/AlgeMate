@@ -48,6 +48,7 @@ private:
     void loadQuestion(int index);
     void updateUIForQuestion(const Question& q);
     void updateNavButtons();
+    QTimer* m_examTimer = nullptr;
 
     //错题本
     void saveWrongQuestions();
@@ -84,6 +85,7 @@ class ExamPage : public QWidget {
     Q_OBJECT
 public:
     explicit ExamPage(QWidget* parent = nullptr);
+    void resetToSettings();
 
 signals:
     void backRequested();
