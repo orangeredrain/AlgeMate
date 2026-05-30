@@ -8,6 +8,7 @@
 #include <QScreen>
 #include <QTextDocument>
 #include <QUrl>
+#include <QRegularExpression>
 
 namespace AlgeMate::Latex {
 
@@ -199,6 +200,40 @@ static QString escapeText(const QString& s)
     return r;
 }
 
+// 内部: 简易 Markdown -> HTML
+static QString renderMarkdownText(QString s)
+{
+    // ---------- 标题 ----------
+    QRegularExpression h1(R"((^|\n)# ([^\n]+))");
+    s.replace(h1, "\\1<h1 style=\"font-size:22px; font-weight:bold; margin:6px 0;\">\\2</h1>");
+
+    QRegularExpression h2(R"((^|\n)## ([^\n]+))");
+    s.replace(h2, "\\1<h2 style=\"font-size:18px; font-weight:bold; margin:4px 0;\">\\2</h2>");
+
+    QRegularExpression h3(R"((^|\n)### ([^\n]+))");
+    s.replace(h3, "\\1<h3 style=\"font-size:15px; font-weight:bold; margin:2px 0;\">\\2</h3>");
+
+    QRegularExpression h4(R"((^|\n)#### ([^\n]+))");
+    s.replace(h4, "\\1<h4 style=\"font-size:14px; font-weight:bold; margin:2px 0;\">\\2</h4>");
+
+    // ---------- 加粗 ----------
+    QRegularExpression bold(R"(\*\*(.*?)\*\*)");
+    s.replace(bold, "<b>\\1</b>");
+
+    // ---------- 斜体 ----------
+    QRegularExpression italic(R"(\*(.*?)\*)");
+    s.replace(italic, "<i>\\1</i>");
+
+    // ---------- 分割线 ----------
+    QRegularExpression hr(R"((^|\n)---(\n|$))");
+    s.replace(hr, "\\1<hr style=\"border:none; border-top:1px solid #cbd5e0; margin:8px 0;\">\\2");
+
+    // ---------- 换行 ----------
+    s.replace('\n', "<br/>");
+
+    return s;
+}
+
 // 内部: 匹配括号 / 花括号 (支持嵌套)
 
 static int findClosing(const QString& s, int openPos,
@@ -236,7 +271,7 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
 
     auto flushText = [&]() {
         if (!textBuf.isEmpty()) {
-            html += escapeText(textBuf);
+            html += renderMarkdownText(textBuf);
             textBuf.clear();
         }
     };
@@ -278,6 +313,40 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
                 html += mathToImg(latex, doc, m_fontSize, m_textColor,
                                   /*displayStyle=*/true);
             }
+            i = end + 2;
+            continue;
+        }
+
+        // 行内公式: \(...\)
+        if (src[i] == QLatin1Char('\\') &&
+            i + 1 < n &&
+            src[i + 1] == QLatin1Char('(')) {
+
+            flushText();
+
+            i += 2;
+
+            int end = src.indexOf(QStringLiteral("\\)"), i);
+
+            if (end < 0) {
+                textBuf += QStringLiteral("\\(");
+                continue;
+            }
+
+            QString latex = src.mid(i, end - i).trimmed();
+
+            if (!latex.isEmpty()) {
+                latex = expandMathMacros(latex, m_mathMacros);
+
+                html += mathToImg(
+                    latex,
+                    doc,
+                    m_fontSize,
+                    m_textColor,
+                    false
+                    );
+            }
+
             i = end + 2;
             continue;
         }

@@ -13,6 +13,9 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QFrame>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
+
 
 namespace AlgeMate::Learning {
 
@@ -81,7 +84,7 @@ LearningPage::LearningPage(QWidget* parent) : QWidget(parent)
     m_practicePage     = new PracticePage;
     m_calcProbPage     = new CalculationProblemPage;
     m_chapterPracPage  = new ChapterPracticePage;
-    m_topicPracPage    = new TopicPracticePage;
+    // m_topicPracPage    = new TopicPracticePage;
     m_examPage         = new ExamPage;
     m_wrongBookPage    = new WrongBookPage;
     m_learningCenterPage = new LearningCenterPage;
@@ -91,7 +94,8 @@ LearningPage::LearningPage(QWidget* parent) : QWidget(parent)
     m_stack->addWidget(m_practicePage);        // 2
     m_stack->addWidget(m_calcProbPage);        // 3
     m_stack->addWidget(m_chapterPracPage);     // 4
-    m_stack->addWidget(m_topicPracPage);       // 5
+    m_stack->addWidget(new QWidget());         //5
+    // m_stack->addWidget(m_topicPracPage);       // 5
     m_stack->addWidget(m_examPage);            // 6
     m_stack->addWidget(m_wrongBookPage);       // 7
     m_stack->addWidget(m_learningCenterPage);  // 8
@@ -104,7 +108,7 @@ LearningPage::LearningPage(QWidget* parent) : QWidget(parent)
     connect(m_practicePage, &PracticePage::backRequested, this, &LearningPage::goBack);
     connect(m_calcProbPage, &CalculationProblemPage::backRequested, this, &LearningPage::goBack);
     connect(m_chapterPracPage, &ChapterPracticePage::backRequested, this, &LearningPage::goBack);
-    connect(m_topicPracPage, &TopicPracticePage::backRequested, this, &LearningPage::goBack);
+    // connect(m_topicPracPage, &TopicPracticePage::backRequested, this, &LearningPage::goBack);
     connect(m_examPage, &ExamPage::backRequested, this, &LearningPage::goBack);
     connect(m_wrongBookPage, &WrongBookPage::backRequested, this, &LearningPage::goBack);
     connect(m_learningCenterPage, &LearningCenterPage::backRequested, this, &LearningPage::goBack);
@@ -114,12 +118,27 @@ LearningPage::LearningPage(QWidget* parent) : QWidget(parent)
             this, &LearningPage::showCalculationProblem);
     connect(m_practicePage, &PracticePage::chapterPracticeRequested,
             this, &LearningPage::showChapterPractice);
-    connect(m_practicePage, &PracticePage::topicPracticeRequested,
-            this, &LearningPage::showTopicPractice);
+    // connect(m_practicePage, &PracticePage::topicPracticeRequested,
+    //         this, &LearningPage::showTopicPractice);
 
-    // Knowledge → 章节练习
-    connect(m_knowledgePage, &KnowledgePage::enterChapterPractice,
-            this, &LearningPage::showChapterPractice);
+    // Knowledge → 章节练习（动态捕获当前浏览的微观小节并实现题库精准过滤）
+    connect(m_knowledgePage, &KnowledgePage::enterChapterPractice, this, [this]() {
+        // 1. 获取左侧目录树指针
+        if (auto* tree = m_knowledgePage->findChild<QTreeWidget*>(QStringLiteral("KnowledgeTree"))) {
+            if (auto* currentItem = tree->currentItem()) {
+                // 2. 提取节点中绑定的资源路径
+                QString fullPath = currentItem->data(0, Qt::UserRole + 1).toString();
+
+                if (!fullPath.isEmpty()) {
+                    // 不再直接简单粗暴地去加载题目
+                    // 而是命令练习页面的左侧树去同步选中这个章节，让 UI 联动去天然驱动数据
+                    m_chapterPracPage->selectChapterByResourcePath(fullPath);
+                }
+            }
+        }
+        // 3. 执行切页动作
+        m_stack->setCurrentIndex(4);
+    });
 }
 
 void LearningPage::buildDashboard()
@@ -201,10 +220,22 @@ void LearningPage::buildDashboard()
 void LearningPage::showKnowledge()        { m_stack->setCurrentIndex(1); }
 void LearningPage::showPractice()         { m_stack->setCurrentIndex(2); }
 void LearningPage::showCalculationProblem()  { m_stack->setCurrentIndex(3); }
-void LearningPage::showChapterPractice()     { m_stack->setCurrentIndex(4); }
-void LearningPage::showTopicPractice()       { m_stack->setCurrentIndex(5); }
+void LearningPage::showChapterPractice()
+{
+    // // 保底逻辑：如果是直接从快捷入口点进来的，或者是从非知识点页面切过来的，
+    // if (m_chapterPracPage) {
+    //     m_chapterPracPage->onLoadChapterQuestions();
+    // }
+    // 执行切页，切到 StackedWidget 的第 4 页（ChapterPracticePage）
+    m_stack->setCurrentIndex(4);
+}
+// void LearningPage::showTopicPractice()       { m_stack->setCurrentIndex(5); }
 void LearningPage::showExam()             { m_stack->setCurrentIndex(6); }
-void LearningPage::showWrongBook()        { m_stack->setCurrentIndex(7); }
+void LearningPage::showWrongBook()
+{
+    m_wrongBookPage->reload(); // 重新读取错题
+    m_stack->setCurrentIndex(7);
+}
 void LearningPage::showLearningCenter()   { m_stack->setCurrentIndex(8); }
 void LearningPage::goBack()              { m_stack->setCurrentIndex(0); }
 

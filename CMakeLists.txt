@@ -40,7 +40,16 @@ else()
 endif()
 
 # ---------- Qt 6 ----------
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui Svg Xml OpenGL OpenGLWidgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS
+    Core
+    Widgets
+    Gui
+    Svg
+    Xml
+    OpenGL
+    OpenGLWidgets
+    Network
+)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -107,6 +116,7 @@ target_link_libraries(AlgeMate
         Qt6::Gui
         Qt6::Widgets
         Qt6::Svg
+        Qt6::Network
         algemate_math
         algemate_home
         algemate_calculator

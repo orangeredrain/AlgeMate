@@ -23,6 +23,7 @@ public:
 
 signals:
     void backRequested();
+    // void enterChapterPractice(const QString& chapterPath);// 直接把章节的路径发出去
     void enterChapterPractice();
 
 private:
