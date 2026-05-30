@@ -43,6 +43,7 @@ private:
     void stopStudyTimer();
     void handleStudyTimerTick();
     void refreshTodayStudyCard();
+    void refreshProgressCard();
     void updateAutoCheckin();
     bool shouldCountStudyTime() const;
     QString currentModuleKey() const;
@@ -65,6 +66,8 @@ private:
     QWidget* m_dashboard = nullptr;
     QLabel*  m_todayStudyValueLabel = nullptr;
     QLabel*  m_todayStudySubLabel = nullptr;
+    QLabel*  m_progressValueLabel = nullptr;
+    QLabel*  m_progressSubLabel = nullptr;
     QTimer*  m_studyTimer = nullptr;
     QDate    m_studyDate;
     QDateTime m_lastStudyTick;

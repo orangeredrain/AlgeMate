@@ -20,6 +20,9 @@
 #include <QHideEvent>
 #include <QApplication>
 #include <QString>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
 
 namespace AlgeMate::Learning {
 
@@ -173,7 +176,9 @@ void LearningPage::buildDashboard()
     auto* stat1 = makeStatCard(QStringLiteral("今日学习"), QStringLiteral("0 分钟"),
                                 QStringLiteral("今日暂无记录"), m_dashboard,
                                 &m_todayStudyValueLabel, &m_todayStudySubLabel);
-    auto* stat2 = makeStatCard(QStringLiteral("本周进度"), QStringLiteral("0%"),     QStringLiteral("目标 100%"), m_dashboard);
+    auto* stat2 = makeStatCard(QStringLiteral("本日进度"), QStringLiteral("0%"),
+                               QStringLiteral("首页目标同步中"), m_dashboard,
+                               &m_progressValueLabel, &m_progressSubLabel);
     auto* stat3 = makeStatCard(QStringLiteral("错题数"),   QStringLiteral("0"),      QStringLiteral("共收录"), m_dashboard);
     auto* stat4 = makeStatCard(QStringLiteral("推荐练习"), QStringLiteral("—"),      QStringLiteral("待系统生成"), m_dashboard);
 
@@ -237,6 +242,7 @@ void LearningPage::showEvent(QShowEvent* event)
     QWidget::showEvent(event);
     loadTodayStudyTime();
     refreshTodayStudyCard();
+    refreshProgressCard(); // 【新增】：每次进入学习中心，立刻同步首页数据
     startStudyTimer();
 }
 
@@ -377,6 +383,59 @@ void LearningPage::refreshTodayStudyCard()
             m_todayStudySubLabel->setText(QStringLiteral("正在学习中"));
         } else {
             m_todayStudySubLabel->setText(QStringLiteral("超过五分钟自动打卡"));
+        }
+    }
+}
+
+void LearningPage::refreshProgressCard()
+{
+    // 直接读取首页(HomePage)保存在本地的 "HomeGoals" 数据
+    QSettings settings(QStringLiteral("AlgeMate"), QStringLiteral("HomeGoals"));
+    QString jsonStr = settings.value(QStringLiteral("SubGoalsData")).toString();
+
+    int avgPercent = 100; // 默认空状态时为100%（与首页一致）
+    bool hasGoals = false;
+
+    if (!jsonStr.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
+        QJsonArray arr = doc.array();
+        int totalCount = arr.size();
+
+        if (totalCount > 0) {
+            hasGoals = true;
+            int completedCount = 0;
+            for (int i = 0; i < totalCount; ++i) {
+                QJsonObject obj = arr[i].toObject();
+                int current = obj["current"].toInt();
+                int target = obj["target"].toInt();
+                // 判断是否打勾完成
+                if (target > 0 && current >= target) {
+                    completedCount++;
+                }
+            }
+            // 计算出的进度与首页一模一样
+            avgPercent = qRound((double)completedCount / totalCount * 100.0);
+        }
+    }
+
+    // 将计算出的百分比更新到学习中心的“每日进度”卡片上
+    if (m_progressValueLabel) {
+        m_progressValueLabel->setText(QStringLiteral("%1%").arg(avgPercent));
+
+        if (avgPercent >= 100) {
+            m_progressValueLabel->setStyleSheet("font-size:28px; font-weight:700; color:#4CAF50; background:transparent;");
+        } else {
+            m_progressValueLabel->setStyleSheet("font-size:28px; font-weight:700; color:#6A5AE0; background:transparent;");
+        }
+    }
+
+    if (m_progressSubLabel) {
+        if (!hasGoals) {
+            m_progressSubLabel->setText(QStringLiteral("暂未设置目标"));
+        } else if (avgPercent >= 100) {
+            m_progressSubLabel->setText(QStringLiteral("今日目标达成 🎉"));
+        } else {
+            m_progressSubLabel->setText(QStringLiteral("继续加油 😜"));
         }
     }
 }
