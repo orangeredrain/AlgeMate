@@ -585,7 +585,7 @@ void CalculationProblemPage::onAiGradeSubjective() {
                          ).arg(currentQuestion.content, currentQuestion.correctAnswer, currentQuestion.userAnswer);
 
     QJsonObject rootObj;
-    rootObj["model"] = "deepseek-chat";
+    rootObj["model"] = "deepseek-v4-pro";
     rootObj["stream"] = false;
     QJsonArray messages;
     QJsonObject systemMsg, userMsg;
@@ -1522,7 +1522,7 @@ void ChapterPracticePage::onAiGradeSubjective() {
 
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&file);
-        QString encoded = in.readAll().trimmed();
+        QString encoded = in.readLine().trimmed(); // 只读第一行！
         if (!encoded.isEmpty()) {
             apiKey = QString(QByteArray::fromBase64(encoded.toUtf8()));
         }

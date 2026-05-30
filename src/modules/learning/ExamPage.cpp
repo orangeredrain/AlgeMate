@@ -21,6 +21,19 @@
 #include <QJsonArray>
 #include <QDateTime>
 
+#include "PastExams.h"
+#include <QComboBox>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QCoreApplication>
+#include <QUrl>
+#include <QRegularExpression>
+#include <QDialog>
+#include <QTextBrowser>
+#include "latex/LatexRenderer.h"
+#include "latex/LatexTextBrowser.h"
+
 namespace AlgeMate::Learning {
 
 // ==================== ExamSettingPage ====================
@@ -99,6 +112,23 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
     timeSpinBox->setValue(60);
     timeSpinBox->setSuffix(QStringLiteral(" 分钟"));
 
+    // 试卷选择
+    auto* examLabel = new QLabel(QStringLiteral("📜 选择试卷："));
+    examLabel->setStyleSheet(R"(
+        font-size: 16px; font-weight: 600; color: #374151;
+    )");
+    examComboBox = new QComboBox(this);
+    examComboBox->addItems(PastExams::getExamList()); // 从 PastExams 加载列表
+    examComboBox->setStyleSheet(R"(
+        QComboBox { border: 2px solid #d1d5db; border-radius: 12px; padding: 10px; font-size: 15px; min-width: 280px; background: white; }
+        QComboBox:focus { border: 2px solid #2563eb; }
+    )");
+
+    auto* examLayout = new QHBoxLayout;
+    examLayout->addWidget(examLabel);
+    examLayout->addWidget(examComboBox);
+    examLayout->addStretch();
+
     auto* timeLayout = new QHBoxLayout;
     timeLayout->addWidget(timeLabel);
     timeLayout->addWidget(timeSpinBox);
@@ -146,10 +176,14 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
             background: #1e40af;
         }
     )");
+    // connect(startBtn, &QPushButton::clicked, this, [this]() {
+    //     emit examStarted(timeSpinBox->value());
+    // });
     connect(startBtn, &QPushButton::clicked, this, [this]() {
-        emit examStarted(timeSpinBox->value());
+        emit examStarted(timeSpinBox->value(), examComboBox->currentIndex(), examComboBox->currentText());
     });
 
+    cardLayout->addLayout(examLayout);
     cardLayout->addLayout(timeLayout);
     cardLayout->addWidget(infoLabel);
     cardLayout->addStretch();
@@ -163,9 +197,8 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
 
 // ==================== ExamProgressPage ====================
 
-ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeMinutes, QWidget* parent)
-    : QWidget(parent), questions(questions), currentQuestionIndex(0), remainingSeconds(timeMinutes * 60) {
-
+ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeMinutes, const QString& examName, QWidget* parent)
+    : QWidget(parent), questions(questions), currentQuestionIndex(0), remainingSeconds(timeMinutes * 60), m_examName(examName) {
     auto* lay = new QVBoxLayout(this);
     setStyleSheet(R"(
         QWidget {
@@ -192,7 +225,13 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
         font-weight: bold;
     )");
 
+    // 考试名称 Label
+    auto* nameLabel = new QLabel(m_examName, this);
+    nameLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #1f2937;");
+
     top->addWidget(back);
+    top->addStretch();
+    top->addWidget(nameLabel); // 居中显示试卷名
     top->addStretch();
     top->addWidget(timerLabel);
 
@@ -218,16 +257,19 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     auto* questionCardLayout = new QVBoxLayout(questionCard);
     questionCardLayout->setContentsMargins(24,24,24,24);
 
-    questionLabel = new QLabel(this);
-    questionLabel->setWordWrap(true);
-    questionLabel->setStyleSheet(R"(
-        font-size: 18px;
-        line-height: 1.8;
-        color: #111827;
+    questionBrowser = new Latex::LatexTextBrowser(this);
+    questionBrowser->setStyleSheet(R"(
+        LatexTextBrowser {
+            background: transparent;
+            border: none;
+            font-size: 18px;
+            color: #111827;
+            font-family: "Microsoft YaHei";
+        }
     )");
 
     auto* scrollArea = new QScrollArea(this);
-    questionCardLayout->addWidget(questionLabel);
+    questionCardLayout->addWidget(questionBrowser);
     scrollArea->setWidget(questionCard);
     scrollArea->setWidgetResizable(true);
 
@@ -481,7 +523,13 @@ void ExamProgressPage::updateNavButtons() {
 
 void ExamProgressPage::updateUIForQuestion(const Question& q) {
     // 设置题目内容
-    questionLabel->setText(q.content);
+    // questionLabel->setText(q.content);
+    // 使用 Latex 渲染设置题目内容
+    Latex::LatexRenderer renderer;
+    renderer.addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
+    renderer.addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
+    renderer.addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
+    questionBrowser->setHtml(renderer.render(q.content, questionBrowser->document()));
 
     // 清空旧的答案区域
     if (answerWidget->layout()) {
@@ -697,6 +745,7 @@ void ExamProgressPage::onPreviousQuestion() {
     }
 }
 
+/*
 void ExamProgressPage::saveWrongQuestions()
 {
     QFile file("wrong_questions.json");
@@ -749,62 +798,233 @@ void ExamProgressPage::saveWrongQuestions()
     if (!file.open(QIODevice::WriteOnly)) return;
     file.write(QJsonDocument(allWrongQuestions).toJson());
     file.close();
+}*/
+
+void ExamProgressPage::saveWrongQuestions() {
+    QFile file("wrong_questions.json");
+    QJsonArray allWrongQuestions;
+
+    if (file.exists() && file.open(QIODevice::ReadOnly)) {
+        allWrongQuestions = QJsonDocument::fromJson(file.readAll()).array();
+        file.close();
+    }
+
+    QJsonArray updatedArray;
+    for (int i = 0; i < allWrongQuestions.size(); ++i) {
+        updatedArray.append(allWrongQuestions[i]);
+    }
+
+    for (const auto& q : questions) {
+        if (q.isCorrect) continue;
+
+        bool alreadyExists = false;
+        for (int i = 0; i < updatedArray.size(); ++i) {
+            QJsonObject obj = updatedArray[i].toObject();
+            if (obj["id"].toInt() == q.id) {
+                alreadyExists = true;
+                obj["wrongCount"] = obj["wrongCount"].toInt() + 1;
+                obj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+                obj["userAnswer"] = q.userAnswer;
+                updatedArray[i] = obj; // 更新旧记录
+                break;
+            }
+        }
+
+        if (!alreadyExists) {
+            QJsonObject obj;
+            obj["id"] = q.id;
+            obj["content"] = q.content;
+            obj["userAnswer"] = q.userAnswer;
+            obj["correctAnswer"] = q.correctAnswer;
+            obj["score"] = q.score;
+            obj["earnedScore"] = q.earnedScore;
+            obj["aiReport"] = q.aiReport;
+            obj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+            obj["wrongCount"] = 1;
+            obj["type"] = (q.type == QuestionType::Single) ? "single" : (q.type == QuestionType::Fill ? "fill" : "subjective");
+
+            QJsonArray choicesArray;
+            for (const auto& c : q.choices) { choicesArray.append(c); }
+            obj["choices"] = choicesArray;
+
+            updatedArray.append(obj); // 插入新错题
+        }
+    }
+
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(QJsonDocument(updatedArray).toJson(QJsonDocument::Indented));
+        file.close();
+    }
 }
 
 void ExamProgressPage::onSubmitExam() {
     auto* msgBox = new QMessageBox(this);
-    msgBox->setText(QStringLiteral("确定要交卷吗？交卷后将无法修改答案。"));
+    msgBox->setText(QStringLiteral("确定要交卷吗？提交后不可更改答案\n交卷后客观题将立即出分，解答题将交由 DeepSeek AI 智能批阅。"));
     msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
 
     if (msgBox->exec() == QMessageBox::Yes) {
         if (m_examTimer) m_examTimer->stop();
-        for (auto& q : questions) {
+        this->setEnabled(false); // 避免判卷期间二次点击
+
+        m_pendingAITasks = 0;
+
+        // 1. 自动批改客观题，并初始化得分；筛选出主观题交由 AI 处理
+        for (int i = 0; i < questions.size(); ++i) {
+            auto& q = questions[i];
             if (q.type == QuestionType::Single) {
                 q.isCorrect = (q.userAnswer == q.correctAnswer);
+                q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
             } else if (q.type == QuestionType::Fill) {
                 bool ok1, ok2;
                 double userValue = q.userAnswer.toDouble(&ok1);
                 double correctValue = q.correctAnswer.toDouble(&ok2);
                 q.isCorrect = ok1 && ok2 && std::abs(userValue - correctValue) < 0.0001;
+                q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
             } else {
-                q.isCorrect = false;
-            }
-        }
-        QJsonArray historyArray;
-        for (const auto& q : questions) {
-            QJsonObject obj;
-            obj["id"] = q.id; // ⚡ 顺手修复：历史记录也带上ID
-            obj["content"] = q.content;
-            obj["userAnswer"] = q.userAnswer;
-            obj["correctAnswer"] = q.correctAnswer;
-            obj["isCorrect"] = q.isCorrect;
-            obj["score"] = q.score;
-            historyArray.append(obj);
-        }
-
-        QJsonObject examObj;
-        examObj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-        examObj["questions"] = historyArray;
-
-        QFile file("exam_history.json");
-        QJsonArray allHistory;
-        if (file.exists()) {
-            if (file.open(QIODevice::ReadOnly)) {
-                QJsonDocument oldDoc = QJsonDocument::fromJson(file.readAll());
-                allHistory = oldDoc.array();
-                file.close();
+                // 主观题累计进入 AI 异步流
+                m_pendingAITasks++;
+                gradeSubjectiveWithAI(i);
             }
         }
 
-        allHistory.append(examObj);
-        if(file.open(QIODevice::WriteOnly)){
-            file.write(QJsonDocument(allHistory).toJson());
-            file.close();
+        // 如果整张试卷没有主观题，直接进入收尾保存
+        if (m_pendingAITasks == 0) {
+            finishExamAndSave();
         }
-
-        saveWrongQuestions();
-        emit examFinished(questions);
     }
+}
+
+// 调用 DeepSeek AI 批改单道题
+void ExamProgressPage::gradeSubjectiveWithAI(int index) {
+    Question& q = questions[index];
+    QString configPath = QCoreApplication::applicationDirPath() + "/algemate_ai.conf";
+    QFile file(configPath);
+    QString apiKey = "";
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        QString encoded = in.readLine().trimmed(); // 只读第一行
+        if (!encoded.isEmpty()) apiKey = QString(QByteArray::fromBase64(encoded.toUtf8()));
+    }
+
+    // 未配置 Key 或未作答的保底直接判 0 分
+    if (apiKey.isEmpty() || q.userAnswer.trimmed().isEmpty()) {
+        q.isCorrect = false;
+        q.earnedScore = 0;
+        q.aiReport = q.userAnswer.trimmed().isEmpty() ? QStringLiteral("学生未作答，自动判 0 分。") : QStringLiteral("未检测到 API 凭证，无法出分。");
+        m_pendingAITasks--;
+        if (m_pendingAITasks == 0) finishExamAndSave();
+        return;
+    }
+
+    // 强制要求 AI 给出明确的分数结构
+    QString prompt = QString(
+                         "你是一位严谨的线性代数教授。请对比【参考答案】对【学生作答】进行精确的百分制比例打分和深度批改。\n\n"
+                         "【题目内容】:\n%1\n\n"
+                         "【本题满分】: %2 分\n\n"
+                         "【参考标准答案】:\n%3\n\n"
+                         "【学生作答内容】:\n%4\n\n"
+                         "请务必严格按照以下规范进行响应：\n"
+                         "1. 回复的第一行必须固定返回得分结论，格式为：[得分：X] （X为一个介于 0 到 %2 之间的整数分数）。\n"
+                         "2. 随后请分段详细阐述：题目难度、得分点、逻辑断层或失误诊断，并指出优化建议。\n"
+                         "3. 讲解中涉及的核心数学表达式请使用标准 LaTeX 格式包裹。"
+                         ).arg(q.content).arg(q.score).arg(q.correctAnswer).arg(q.userAnswer);
+
+    QJsonObject rootObj;
+    rootObj["model"] = "deepseek-v4-pro";
+    rootObj["stream"] = false;
+    QJsonArray messages;
+    QJsonObject sysMsg, usrMsg;
+    sysMsg["role"] = "system"; sysMsg["content"] = "你是专业的线性代数阅卷官，擅长给出准确的分数和极具学术价值的评语。";
+    usrMsg["role"] = "user"; usrMsg["content"] = prompt;
+    messages.append(sysMsg); messages.append(usrMsg);
+    rootObj["messages"] = messages;
+
+    QNetworkAccessManager* mgr = new QNetworkAccessManager(this);
+    QNetworkRequest request{QUrl(QStringLiteral("https://api.deepseek.com/chat/completions"))};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+
+    QNetworkReply* reply = mgr->post(request, QJsonDocument(rootObj).toJson());
+
+    connect(reply, &QNetworkReply::finished, this, [this, index, reply, mgr]() {
+        mgr->deleteLater(); reply->deleteLater();
+        Question& qRef = questions[index];
+
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QString aiEval = doc.object()["choices"].toArray()[0].toObject()["message"].toObject()["content"].toString();
+            qRef.aiReport = aiEval; // 将完整的评阅报告留存入结构体
+
+            // 利用正则表达式提取 AI 分数
+            double extractedScore = 0;
+            QRegularExpression re(QStringLiteral("\\[得分：(\\d+(?:\\.\\d+)?)\\]"));
+            QRegularExpressionMatch match = re.match(aiEval);
+            if (match.hasMatch()) {
+                extractedScore = match.captured(1).toDouble();
+            } else {
+                // 备用兜底解析
+                QRegularExpression reBackup(QStringLiteral("得分：(\\d+)"));
+                QRegularExpressionMatch matchBackup = reBackup.match(aiEval);
+                if (matchBackup.hasMatch()) extractedScore = matchBackup.captured(1).toInt();
+            }
+
+            qRef.earnedScore = static_cast<int>(extractedScore);
+
+            // 【修改】判定核心：如果分数大于等于 60% 视为通过
+            if (qRef.earnedScore >= (qRef.score * 0.6)) {
+                qRef.isCorrect = true;
+            } else {
+                qRef.isCorrect = false;
+            }
+        } else {
+            qRef.aiReport = QStringLiteral("网络超时或判卷通信失败。");
+            qRef.earnedScore = 0;
+            qRef.isCorrect = false;
+        }
+
+        m_pendingAITasks--;
+        if (m_pendingAITasks == 0) finishExamAndSave();
+    });
+}
+
+// 所有判卷任务结束后的统一存档
+void ExamProgressPage::finishExamAndSave() {
+    this->setEnabled(true);
+
+    QJsonArray historyArray;
+    for (const auto& q : questions) {
+        QJsonObject obj;
+        obj["id"] = q.id;
+        obj["content"] = q.content;
+        obj["userAnswer"] = q.userAnswer;
+        obj["correctAnswer"] = q.correctAnswer;
+        obj["isCorrect"] = q.isCorrect;
+        obj["score"] = q.score;
+        obj["earnedScore"] = q.earnedScore;
+        obj["aiReport"] = q.aiReport;
+        historyArray.append(obj);
+    }
+
+    QJsonObject examObj;
+    examObj["examName"] = m_examName; // 【修复】把考试名称存入历史，以便后续查询区分
+    examObj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+    examObj["questions"] = historyArray;
+
+    QFile file("exam_history.json");
+    QJsonArray allHistory;
+    if (file.exists() && file.open(QIODevice::ReadOnly)) {
+        allHistory = QJsonDocument::fromJson(file.readAll()).array();
+        file.close();
+    }
+
+    allHistory.append(examObj);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(QJsonDocument(allHistory).toJson(QJsonDocument::Indented));
+        file.close();
+    }
+
+    saveWrongQuestions();
+    emit examFinished(questions); // 切页前往成绩单
 }
 
 void ExamProgressPage::onTimeUpdate() {
@@ -831,193 +1051,331 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     : QWidget(parent) {
 
     auto* lay = new QVBoxLayout(this);
-    auto* scrollArea = new QScrollArea(this);
-    scrollArea->setWidgetResizable(true);
-    auto* container = new QWidget;
-    auto* contentLayout = new QVBoxLayout(container);
-    contentLayout->setContentsMargins(24,16,24,24);
-    contentLayout->setSpacing(20);
-    scrollArea->setWidget(container);
-    lay->addWidget(scrollArea);
+    lay->setContentsMargins(0, 0, 0, 0);
+    lay->setSpacing(0);
 
-
+    // 全局背景色 (学而思风格的淡灰蓝背景)
     setStyleSheet(R"(
         QWidget {
             background-color: #f3f6fb;
-            font-family: "Microsoft YaHei";
+            font-family: "Microsoft YaHei", "PingFang SC";
         }
     )");
-    lay->setContentsMargins(24, 16, 24, 24);
-    lay->setSpacing(14);
 
+    auto* scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+
+    auto* container = new QWidget;
+    auto* contentLayout = new QVBoxLayout(container);
+    contentLayout->setContentsMargins(32, 24, 32, 40); // 增加四周留白呼吸感
+    contentLayout->setSpacing(24);
+    scrollArea->setWidget(container);
+    lay->addWidget(scrollArea);
+
+    // ==========================================
+    // 1. 顶部导航栏 (清爽风格)
+    // ==========================================
     auto* top = new QHBoxLayout;
-    auto* back = new QPushButton(QStringLiteral("← 返回"), this);
-    back->setObjectName(QStringLiteral("LearnBackBtn"));
-    connect(back, &QPushButton::clicked, this, &ExamResultPage::backRequested);
 
-    auto* title = new QLabel(QStringLiteral("考试结果"));
-    title->setObjectName(QStringLiteral("PageTitle"));
-    top->addWidget(back);
-    top->addWidget(title);
-    top->addStretch();
-
-    auto* restartBtn = new QPushButton(QStringLiteral("↻ 再考一次"), this);
-    restartBtn->setStyleSheet(R"(
+    auto* back = new QPushButton(QStringLiteral("← 返回主页"), this);
+    back->setStyleSheet(R"(
         QPushButton {
-            background: #10b981;
-            color: white;
+            background: transparent;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
             border-radius: 8px;
             padding: 8px 16px;
+            font-size: 14px;
             font-weight: bold;
         }
         QPushButton:hover {
-            background: #059669;
+            background: #f1f5f9;
+            color: #3b82f6;
+            border-color: #93c5fd;
         }
     )");
+    connect(back, &QPushButton::clicked, this, &ExamResultPage::backRequested);
 
+    auto* title = new QLabel(QStringLiteral("考试成绩单"));
+    title->setStyleSheet("font-size: 22px; font-weight: 800; color: #1e293b;");
+
+    auto* restartBtn = new QPushButton(QStringLiteral("↻ 重新考试"), this);
+    restartBtn->setStyleSheet(R"(
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b82f6, stop:1 #2563eb);
+            color: white;
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #60a5fa, stop:1 #3b82f6);
+        }
+    )");
     connect(restartBtn, &QPushButton::clicked, this, [this]() {
-        // 向上寻找父级 ExamPage，并调用它的重置函数
         if (auto* examPage = qobject_cast<ExamPage*>(this->parentWidget())) {
             examPage->resetToSettings();
         }
     });
-    top->addWidget(restartBtn); // 将按钮加入顶部布局
 
+    top->addWidget(back);
+    top->addStretch();
+    top->addWidget(title);
+    top->addStretch();
+    top->addWidget(restartBtn);
     contentLayout->addLayout(top);
 
-    // 计算总分和得分
+    // ==========================================
+    // 2. 成绩汇总卡片 (高级渐变 + 核心数据展示)
+    // ==========================================
     int totalScore = 0;
     int earnedScore = 0;
     for (const auto& q : results) {
         totalScore += q.score;
-        if (q.isCorrect) {
-            earnedScore += q.score;
-        }
+        earnedScore += q.earnedScore; // 严格取实际得分
     }
 
-    // 显示总体成绩
     auto* scoreCard = new QFrame(container);
     scoreCard->setStyleSheet(R"(
         QFrame {
-            background: white;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffffff, stop:1 #f8fafc);
             border-radius: 24px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #e2e8f0;
         }
     )");
-    auto* scoreLayout = new QVBoxLayout(scoreCard);
-    scoreLayout->setContentsMargins(40,40,40,40);
-    scoreLayout->setSpacing(14);
 
-    auto* scoreLabel = new QLabel(
-        QStringLiteral("总分：%1/%2").arg(earnedScore).arg(totalScore), this);
-    scoreLabel->setStyleSheet(R"(
-        font-size: 32px;
-        font-weight: 800;
-        color: #2563eb;
-    )");
+    auto* scoreLayout = new QVBoxLayout(scoreCard);
+    scoreLayout->setContentsMargins(40, 40, 40, 40);
+    scoreLayout->setSpacing(12);
+
+    auto* scoreLabel = new QLabel(QStringLiteral("%1<span style='font-size:24px; color:#94a3b8;'> / %2分</span>")
+                                      .arg(earnedScore).arg(totalScore), this);
+    scoreLabel->setTextFormat(Qt::RichText);
+    scoreLabel->setStyleSheet("font-size: 64px; font-weight: 900; color: #2563eb;");
     scoreLabel->setAlignment(Qt::AlignCenter);
 
     double percentage = (totalScore > 0) ? (earnedScore * 100.0 / totalScore) : 0;
-    QString level;
-    if (percentage >= 90)
-        level = "Excellent!";
-    else if (percentage >= 75)
-        level = "Good!";
-    else if (percentage >= 60)
-        level = "Pass";
-    else
-        level = "Needs Improvement";
-    auto* percentLabel = new QLabel(
-        QStringLiteral("正确率：%1%").arg(static_cast<int>(percentage)), this);
-    percentLabel->setStyleSheet(R"(font-size: 22px;font-weight: 600;color: #6b7280;)");
-    percentLabel->setAlignment(Qt::AlignCenter);
+    QString level = (percentage >= 90) ? "🏆 极具天赋，继续保持！" :
+                        (percentage >= 75) ? "🌟 掌握良好，大有可为！" :
+                        (percentage >= 60) ? "✅ 顺利及格，仍需巩固。" : "💪 暂未通过，请查漏补缺。";
+
+    auto* levelLabel = new QLabel(level, this);
+    levelLabel->setAlignment(Qt::AlignCenter);
+    levelLabel->setStyleSheet(QString("font-size: 18px; font-weight: bold; color: %1;")
+                                  .arg(percentage >= 60 ? "#10b981" : "#f59e0b"));
 
     scoreLayout->addWidget(scoreLabel);
-    scoreLayout->addWidget(percentLabel);
-    auto* levelLabel = new QLabel(level, this);
-
-    levelLabel->setAlignment(Qt::AlignCenter);
-
-    levelLabel->setStyleSheet(R"(
-        font-size: 28px;
-        font-weight: bold;
-        color: #10b981;
-    )");
-
     scoreLayout->addWidget(levelLabel);
-
     contentLayout->addWidget(scoreCard);
 
-    // 显示每道题的结果
+    // ==========================================
+    // 3. 逐题解析列表 (精致化卡片流)
+    // ==========================================
     auto* resultsWidget = new QWidget;
     auto* resultsLayout = new QVBoxLayout(resultsWidget);
+    resultsLayout->setSpacing(20); // 卡片间距
 
     for (int i = 0; i < results.size(); ++i) {
         const auto& q = results[i];
 
-        auto* itemLayout = new QVBoxLayout;
-        itemLayout->setContentsMargins(15, 10, 15, 10);
-        itemLayout->setSpacing(5);
-
-        QString typeStr;
-        if (q.type == QuestionType::Single) {
-            typeStr = QStringLiteral("单选题");
-        } else if (q.type == QuestionType::Fill) {
-            typeStr = QStringLiteral("填空题");
-        } else {
-            typeStr = QStringLiteral("解答题");
-        }
-
-        auto* titleLabel = new QLabel(
-            QStringLiteral("[%1] 第 %2 题 (%3分) - %4")
-                .arg(typeStr).arg(i + 1).arg(q.score)
-                .arg(q.isCorrect ? QStringLiteral("✓ 正确") : QStringLiteral("✗ 错误")), this);
-        titleLabel->setStyleSheet(
-            q.isCorrect? "color: #10b981; font-weight: bold; font-size: 15px;": "color: #ef4444; font-weight: bold; font-size: 15px;");
-        titleLabel->setWordWrap(true);
-
-        auto* contentLabel = new QLabel(QStringLiteral("题目：%1").arg(q.content), this);
-        contentLabel->setWordWrap(true);
-        contentLabel->setStyleSheet("color: #555; font-size: 12px;");
-
-        // ⚡ 核心修复：把 0/1 的索引翻译成 A/B/C/D
-        QString displayUserAns = q.userAnswer;
-        QString displayCorrectAns = q.correctAnswer;
-        if (q.type == QuestionType::Single) {
-            bool okU, okC;
-            int uIdx = displayUserAns.toInt(&okU);
-            int cIdx = displayCorrectAns.toInt(&okC);
-            if (okU && !displayUserAns.isEmpty()) displayUserAns = QString(QChar('A' + uIdx));
-            if (okC && !displayCorrectAns.isEmpty()) displayCorrectAns = QString(QChar('A' + cIdx));
-        }
-        if (displayUserAns.isEmpty()) displayUserAns = QStringLiteral("未作答");
-
-        auto* answerLabel = new QLabel(QStringLiteral("您的答案：%1").arg(displayUserAns), this);
-        answerLabel->setWordWrap(true);
-        answerLabel->setStyleSheet("color: #3498db; font-size: 12px;");
-
-        auto* correctLabel = new QLabel(QStringLiteral("正确答案：%1").arg(displayCorrectAns), this);
-        correctLabel->setWordWrap(true);
-        correctLabel->setStyleSheet("color: #27ae60; font-size: 12px;");
-
-        itemLayout->addWidget(titleLabel);
-        itemLayout->addWidget(contentLabel);
-        itemLayout->addWidget(answerLabel);
-        itemLayout->addWidget(correctLabel);
-
         auto* itemFrame = new QFrame(container);
-        itemFrame->setLayout(itemLayout);
         itemFrame->setStyleSheet(R"(
             QFrame {
-                background: white; border-radius: 18px; border: 1px solid #e5e7eb; padding: 8px;
+                background: white;
+                border-radius: 20px;
+                border: 1px solid #e2e8f0;
+            }
+            QFrame:hover {
+                border: 1px solid #bfdbfe;
+                background: #fdfeff;
             }
         )");
 
+        auto* itemLayout = new QVBoxLayout(itemFrame);
+        itemLayout->setContentsMargins(24, 20, 24, 20);
+        itemLayout->setSpacing(12);
+
+        // --- 头部：题型、序号、对错徽章、具体得分 ---
+        QString typeStr = (q.type == QuestionType::Single) ? QStringLiteral("单选题") :
+                              (q.type == QuestionType::Fill) ? QStringLiteral("填空题") : QStringLiteral("解答题");
+
+        QString statusBadge = q.isCorrect
+                                  ? QStringLiteral("<span style='background-color:#d1fae5; color:#059669; padding:2px 8px; border-radius:4px;'>✓ 正确</span>")
+                                  : QStringLiteral("<span style='background-color:#fee2e2; color:#dc2626; padding:2px 8px; border-radius:4px;'>✗ 错误</span>");
+
+        // 【核心修复】显示具体得分
+        auto* titleLabel = new QLabel(
+            QStringLiteral("<span style='color:#64748b;'>[%1]</span> <b>第 %2 题</b> &nbsp;&nbsp; %3 &nbsp;&nbsp; <span style='color:#3b82f6;'>得分: %4/%5 分</span>")
+                .arg(typeStr).arg(i + 1).arg(statusBadge).arg(q.earnedScore).arg(q.score), this);
+        titleLabel->setTextFormat(Qt::RichText);
+        titleLabel->setStyleSheet("font-size: 16px; color: #1e293b;");
+        itemLayout->addWidget(titleLabel);
+
+        // --- 题干内容 (支持 LaTeX 渲染) ---
+        auto* contentBrowser = new Latex::LatexTextBrowser(this);
+        contentBrowser->setStyleSheet(R"(
+            LatexTextBrowser {
+                background: transparent;
+                border: none;
+                color: #475569;
+                font-size: 15px;
+                margin-top: 4px;
+                margin-bottom: 8px;
+            }
+        )");
+        Latex::LatexRenderer renderer;
+        renderer.addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
+        renderer.addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
+        renderer.addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
+        contentBrowser->setHtml(renderer.render(q.content, contentBrowser->document()));
+
+        itemLayout->addWidget(contentBrowser);
+
+        // --- 作答与标准答案比对区 (灰色轻背景包裹) ---
+        auto* answerBox = new QFrame;
+        answerBox->setStyleSheet("background: #f8fafc; border-radius: 12px; padding: 12px; border: 1px solid #f1f5f9;");
+        auto* ansLayout = new QVBoxLayout(answerBox);
+        ansLayout->setContentsMargins(12, 12, 12, 12);
+        ansLayout->setSpacing(8);
+
+        // 格式化选项 (A/B/C/D)
+        QString displayUserAns = q.userAnswer;
+        QString displayCorrectAns = q.correctAnswer;
+        if (q.type == QuestionType::Single) {
+            if (!displayUserAns.isEmpty()) displayUserAns = QString(QChar('A' + displayUserAns.toInt()));
+            if (!displayCorrectAns.isEmpty()) displayCorrectAns = QString(QChar('A' + displayCorrectAns.toInt()));
+        }
+        if (displayUserAns.trimmed().isEmpty()) displayUserAns = QStringLiteral("<span style='color:#94a3b8; font-style:italic;'>未作答</span>");
+
+        // auto* answerLabel = new QLabel(QStringLiteral("<b>您的作答：</b>%1").arg(displayUserAns), this);
+        // answerLabel->setWordWrap(true);
+        // answerLabel->setTextFormat(Qt::RichText);
+        // answerLabel->setStyleSheet(QString("font-size: 14px; %1").arg(q.isCorrect ? "color: #059669;" : "color: #dc2626;"));
+
+        // auto* correctLabel = new QLabel(QStringLiteral("<b>标准答案：</b><span style='color:#059669;'>%1</span>").arg(displayCorrectAns), this);
+        // correctLabel->setWordWrap(true);
+        // correctLabel->setTextFormat(Qt::RichText);
+        // correctLabel->setStyleSheet("font-size: 14px; color: #334155;");
+
+        // ansLayout->addWidget(answerLabel);
+        // ansLayout->addWidget(correctLabel);
+
+        //为作答和答案应用 LaTeX 渲染
+        // Latex::LatexRenderer renderer;
+        renderer.addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
+        renderer.addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
+        renderer.addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
+
+        // 渲染
+        auto* answerBrowser = new Latex::LatexTextBrowser(this);
+        QString ansColor = q.isCorrect ? "#059669" : "#dc2626";
+        answerBrowser->setStyleSheet(QString(R"(
+            LatexTextBrowser {
+                background: transparent;
+                border: none;
+                font-size: 14px;
+                color: %1;
+            }
+        )").arg(ansColor));
+
+        // 处理可能遗留的字面量换行符
+        displayUserAns.replace("\\n", "<br>").replace("\n", "<br>");
+        QString userHtml = QStringLiteral("<b>您的作答：</b><br>") + displayUserAns;
+        answerBrowser->setHtml(renderer.render(userHtml, answerBrowser->document()));
+
+        // 渲染标准答案
+        auto* correctBrowser = new Latex::LatexTextBrowser(this);
+        correctBrowser->setStyleSheet(R"(
+            LatexTextBrowser {
+                background: transparent;
+                border: none;
+                font-size: 14px;
+                color: #059669;
+            }
+        )");
+
+        displayCorrectAns.replace("\\n", "<br>").replace("\n", "<br>");
+        QString correctHtml = QStringLiteral("<b style='color:#334155;'>标准答案：</b><br>") + displayCorrectAns;
+        correctBrowser->setHtml(renderer.render(correctHtml, correctBrowser->document()));
+
+        ansLayout->addWidget(answerBrowser);
+        ansLayout->addWidget(correctBrowser);
+        itemLayout->addWidget(answerBox);
+
+        // --- AI 详情按钮 (解答题强制显示，兜底空报告) ---
+        if (q.type == QuestionType::Subjective) {
+            auto* detailLayout = new QHBoxLayout();
+            detailLayout->addStretch();
+
+            auto* detailBtn = new QPushButton(QStringLiteral("🤖 查看 AI 导师评阅详情"), itemFrame);
+            detailBtn->setCursor(Qt::PointingHandCursor);
+            detailBtn->setStyleSheet(R"(
+                QPushButton {
+                    background: #eff6ff;
+                    color: #2563eb;
+                    border: 1px solid #bfdbfe;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #dbeafe;
+                    color: #1d4ed8;
+                }
+            )");
+
+            // 兜底：如果没作答或由于网络断开导致 aiReport 为空，给一个默认提示
+            QString currentReport = q.aiReport.trimmed().isEmpty()
+                                        ? QStringLiteral("### 🤖 智能评阅提醒\n\n系统未检测到您的作答，或网络连接超时。\n建议您下次作答完毕后再提交，以便 AI 导师为您提供详尽的解题思路和失分分析。")
+                                        : q.aiReport;
+
+            connect(detailBtn, &QPushButton::clicked, this, [this, currentReport]() {
+                QDialog* dlg = new QDialog(this);
+                dlg->setWindowTitle(QStringLiteral("🤖 DeepSeek 智能导师评阅报告"));
+                dlg->setMinimumSize(650, 500);
+                dlg->setStyleSheet("QDialog { background-color: #f8fafc; }");
+
+                auto* dLayout = new QVBoxLayout(dlg);
+                auto* textBrowser = new Latex::LatexTextBrowser(dlg);
+                textBrowser->setStyleSheet(R"(
+                    LatexTextBrowser {
+                        background: white;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 12px;
+                        padding: 16px;
+                        font-family: 'Microsoft YaHei';
+                        font-size: 14px;
+                        color: #334155;
+                        line-height: 1.6;
+                    }
+                )");
+
+                Latex::LatexRenderer renderer;
+                renderer.addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
+                renderer.addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
+                renderer.addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
+
+                // textBrowser->setMarkdown(currentReport);
+                textBrowser->setHtml(renderer.render(currentReport, textBrowser->document()));
+                dLayout->addWidget(textBrowser);
+                dlg->exec();
+                dlg->deleteLater();
+            });
+
+            detailLayout->addWidget(detailBtn);
+            itemLayout->addLayout(detailLayout);
+        }
+
         resultsLayout->addWidget(itemFrame);
     }
+
     resultsLayout->addStretch();
     contentLayout->addWidget(resultsWidget);
 }
+
 // ==================== ExamPage ====================
 
 ExamPage::ExamPage(QWidget* parent) : QWidget(parent), currentPage(nullptr) {
@@ -1033,63 +1391,20 @@ ExamPage::ExamPage(QWidget* parent) : QWidget(parent), currentPage(nullptr) {
     currentPage = settingPage;
     lay->addWidget(currentPage);
 
-    loadQuestions();
+
 }
 
-void ExamPage::loadQuestions() {
-    // 示例：从MD文件加载题目
-    // 这里可以扩展为从配置文件或数据库读取题目
 
-    Question q1;
-    q1.id = 1;
-    q1.contentPath = "questions/q1.md";
-    q1.content = "计算矩阵A的行列式，其中A = [[1, 2], [3, 4]]";
-    q1.type = QuestionType::Fill;
-    q1.score = 10;
-    q1.correctAnswer = "-2";
-    q1.attempts = 0;
-    q1.isCorrect = false;
-    examQuestions.append(q1);
-
-    Question q2;
-    q2.id = 2;
-    q2.contentPath = "questions/q2.md";
-    q2.content = "以下哪个是矩阵的性质？";
-    q2.type = QuestionType::Single;
-    q2.score = 5;
-    q2.correctAnswer = "1";
-    q2.choices = {
-        QStringLiteral("(A+B)² = A² + 2AB + B²"),
-        QStringLiteral("矩阵乘法满足交换律"),
-        QStringLiteral("可逆矩阵的逆是唯一的"),
-        QStringLiteral("所有矩阵都可以相加")
-    };
-    q2.attempts = 0;
-    q2.isCorrect = false;
-    examQuestions.append(q2);
-
-    Question q3;
-    q3.id = 3;
-    q3.contentPath = "questions/q3.md";
-    q3.content = "证明：如果矩阵A可逆，则A的逆矩阵是唯一的。";
-    q3.type = QuestionType::Subjective;
-    q3.score = 20;
-    q3.correctAnswer = "标准答案：假设A有两个逆矩阵B和C，则AB=BA=I，AC=CA=I。"
-                       "则B=BI=B(AC)=(BA)C=IC=C，所以B=C，逆矩阵唯一。";
-    q3.attempts = 0;
-    q3.isCorrect = false;
-    examQuestions.append(q3);
-}
-
-void ExamPage::onStartExam(int timeMinutes) {
-    // 移除当前页面
+void ExamPage::onStartExam(int timeMinutes, int examIndex, const QString& examName) {
     auto* oldPage = currentPage;
     auto* layout = this->layout();
     layout->removeWidget(oldPage);
     oldPage->deleteLater();
 
-    // 创建考试进行页面
-    auto* progressPage = new ExamProgressPage(examQuestions, timeMinutes, this);
+    // 动态从真题库获取试卷
+    QVector<Question> examQuestions = PastExams::getExamPaper(examIndex);
+
+    auto* progressPage = new ExamProgressPage(examQuestions, timeMinutes, examName, this);
     connect(progressPage, &ExamProgressPage::backRequested, this, &ExamPage::backRequested);
     connect(progressPage, &ExamProgressPage::examFinished, this, &ExamPage::onExamFinished);
 

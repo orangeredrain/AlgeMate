@@ -22,6 +22,8 @@ struct Question {
     int attempts;                    // 做题次数
     QString userAnswer;              // 用户答案
     bool isCorrect;                  // 是否正确
+    int earnedScore = 0;             // 实际得分
+    QString aiReport;                // AI 智能评阅报告原文
 };
 
 class QuestionBank {

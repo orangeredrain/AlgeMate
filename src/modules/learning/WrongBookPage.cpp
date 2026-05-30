@@ -334,12 +334,19 @@ void WrongBookPage::loadWrongQuestions()
 {
     QFile file("wrong_questions.json");
     if (!file.exists() || !file.open(QIODevice::ReadOnly)) {
+        //  更新数量并发送信号
+        m_wrongQuestionCount = 0;
+        emit wrongCountChanged(m_wrongQuestionCount);
         auto* emptyLabel = new QLabel(QStringLiteral("🎉 还没有任何错题记录，继续保持！"), this);
         emptyLabel->setAlignment(Qt::AlignCenter); emptyLabel->setStyleSheet("font-size: 18px; color: #6b7280; padding: 80px;");
         contentLayout->addWidget(emptyLabel, 0, 0); return;
     }
 
     QJsonArray arr = QJsonDocument::fromJson(file.readAll()).array(); file.close();
+    // 获取 JSON 数组长度，存入变量并发送信号
+    m_wrongQuestionCount = arr.size();
+
+    emit wrongCountChanged(m_wrongQuestionCount);
     if (arr.isEmpty()) {
         auto* emptyLabel = new QLabel(QStringLiteral("🎉 还没有任何错题记录，继续保持！"), this);
         emptyLabel->setAlignment(Qt::AlignCenter); emptyLabel->setStyleSheet("font-size: 18px; color: #6b7280; padding: 80px;");
@@ -512,6 +519,12 @@ void WrongBookPage::reload()
         delete child;
     }
     loadWrongQuestions();
+}
+
+// ==================== 接口实现 ====================
+int WrongBookPage::getWrongCount() const
+{
+    return m_wrongQuestionCount;
 }
 
 } // namespace AlgeMate::Learning

@@ -16,6 +16,8 @@ qt_add_library(algemate_learning STATIC
     # ApiClient(no_use).cpp
     QuestionBank.h
     QuestionBank.cpp
+    PastExams.h
+    PastExams.cpp
 )
 
 target_link_libraries(algemate_learning
@@ -26,6 +28,7 @@ target_link_libraries(algemate_learning
         Qt6::Network
         algemate_latex
         algemate_math
+        algemate_ai_solver
 )
 
 target_include_directories(algemate_learning

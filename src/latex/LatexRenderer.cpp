@@ -203,8 +203,6 @@ static QString escapeText(const QString& s)
 // 内部: 简易 Markdown -> HTML
 static QString renderMarkdownText(QString s)
 {
-    // 【修改点】：直接删掉原本的 s = s.toHtmlEscaped();
-
     // ---------- 标题 ----------
     QRegularExpression h1(R"((^|\n)# ([^\n]+))");
     s.replace(h1, "\\1<h1 style=\"font-size:22px; font-weight:bold; margin:6px 0;\">\\2</h1>");
@@ -214,6 +212,9 @@ static QString renderMarkdownText(QString s)
 
     QRegularExpression h3(R"((^|\n)### ([^\n]+))");
     s.replace(h3, "\\1<h3 style=\"font-size:15px; font-weight:bold; margin:2px 0;\">\\2</h3>");
+
+    QRegularExpression h4(R"((^|\n)#### ([^\n]+))");
+    s.replace(h4, "\\1<h4 style=\"font-size:14px; font-weight:bold; margin:2px 0;\">\\2</h4>");
 
     // ---------- 加粗 ----------
     QRegularExpression bold(R"(\*\*(.*?)\*\*)");
