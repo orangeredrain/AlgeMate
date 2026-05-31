@@ -44,7 +44,6 @@ private slots:
     void onReturnToCatalog();            // 从做题页返回目录
     void onGenerateCurrentType();        // 重新生成当前题型
     void onSubmitAnswer();
-    void onAiGradeSubjective();
 
 private:
     void buildCatalog();
@@ -62,7 +61,7 @@ private:
     QWidget* m_problemWidget = nullptr;
     QLabel* m_problemTitleLabel = nullptr;
 
-    int m_currentType = 0; // 当前选中的题型：0=秩, 1=迹, 2=行列式, 3=基础解系
+    int m_currentType = 0; // 当前选中的题型：0=矩阵的秩, 1=多项式最大公因式
     Question currentQuestion;
     int totalAttempted = 0;
     int totalCorrect = 0;

@@ -40,16 +40,7 @@ else()
 endif()
 
 # ---------- Qt 6 ----------
-find_package(Qt6 6.5 REQUIRED COMPONENTS
-    Core
-    Widgets
-    Gui
-    Svg
-    Xml
-    OpenGL
-    OpenGLWidgets
-    Network
-)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui Svg Xml OpenGL OpenGLWidgets Network)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -110,6 +101,7 @@ qt_add_executable(AlgeMate
     src/ui/UserProfileDialog.h
     src/ui/UserProfileDialog.cpp
     resources/resources.qrc
+    resources/icon.rc
 )
 target_include_directories(AlgeMate PRIVATE ${ALGEMATE_SRC_DIR})
 
@@ -119,7 +111,6 @@ target_link_libraries(AlgeMate
         Qt6::Gui
         Qt6::Widgets
         Qt6::Svg
-        Qt6::Network
         algemate_math
         algemate_home
         algemate_calculator

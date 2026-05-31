@@ -1,4 +1,5 @@
 #include "ExamPage.h"
+#include "modules/ai_solver/OcrAttachWidget.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -33,6 +34,7 @@
 #include <QTextBrowser>
 #include "latex/LatexRenderer.h"
 #include "latex/LatexTextBrowser.h"
+#include "core/ThemeManager.h"
 
 namespace AlgeMate::Learning {
 
@@ -41,12 +43,6 @@ namespace AlgeMate::Learning {
 ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
 
     auto* lay = new QVBoxLayout(this);
-    setStyleSheet(R"(
-        QWidget {
-            background-color: #f3f6fb;
-            font-family: "Microsoft YaHei";
-        }
-    )");
     lay->setContentsMargins(24, 16, 24, 24);
     lay->setSpacing(20);
 
@@ -57,11 +53,6 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
 
     auto* title = new QLabel(QStringLiteral("数学模拟考试"));
 
-    title->setStyleSheet(R"(
-        font-size: 30px;
-        font-weight: 700;
-        color: #111827;
-    )");
     top->addWidget(back);
     top->addWidget(title);
     top->addStretch();
@@ -71,58 +62,23 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
     centerLayout->addStretch();
     auto* card = new QFrame(this);
     card->setFixedWidth(520);
-    card->setStyleSheet(R"(
-        QFrame {
-            background: white;
-            border-radius: 24px;
-            border: 1px solid #e5e7eb;
-        }
-    )");
 
     auto* cardLayout = new QVBoxLayout(card);
-
     cardLayout->setContentsMargins(40,40,40,40);
     cardLayout->setSpacing(24);
 
     auto* timeLabel = new QLabel(QStringLiteral("考试时间（分钟）："));
     timeLabel->setText("⏱ 考试时长");
-    timeLabel->setStyleSheet(R"(
-        font-size: 16px;
-        font-weight: 600;
-        color: #374151;
-    )");
     timeSpinBox = new QSpinBox(this);
-    timeSpinBox->setStyleSheet(R"(
-        QSpinBox {
-            border: 2px solid #d1d5db;
-            border-radius: 12px;
-            padding: 10px;
-            font-size: 16px;
-            min-width: 120px;
-            background: white;
-        }
-
-        QSpinBox:focus {
-            border: 2px solid #2563eb;
-        }
-    )");
-
     timeSpinBox->setMinimum(5);
     timeSpinBox->setMaximum(300);
-    timeSpinBox->setValue(60);
+    timeSpinBox->setValue(120);
     timeSpinBox->setSuffix(QStringLiteral(" 分钟"));
 
     // 试卷选择
     auto* examLabel = new QLabel(QStringLiteral("📜 选择试卷："));
-    examLabel->setStyleSheet(R"(
-        font-size: 16px; font-weight: 600; color: #374151;
-    )");
     examComboBox = new QComboBox(this);
     examComboBox->addItems(PastExams::getExamList()); // 从 PastExams 加载列表
-    examComboBox->setStyleSheet(R"(
-        QComboBox { border: 2px solid #d1d5db; border-radius: 12px; padding: 10px; font-size: 15px; min-width: 280px; background: white; }
-        QComboBox:focus { border: 2px solid #2563eb; }
-    )");
 
     auto* examLayout = new QHBoxLayout;
     examLayout->addWidget(examLabel);
@@ -141,44 +97,12 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
         "📊 交卷后查看成绩与解析\n"
         "🤖 支持 AI 判卷与历史记录"
         ));
-
+    infoLabel->setObjectName(QStringLiteral("ExamInfoLabel"));
     infoLabel->setWordWrap(true);
-
-    infoLabel->setStyleSheet(R"(
-        QLabel {
-            background: #f9fafb;
-            border-radius: 16px;
-            padding: 20px;
-            font-size: 15px;
-            line-height: 1.8;
-            color: #4b5563;
-            border: 1px solid #e5e7eb;
-        }
-    )");
 
     auto* startBtn = new QPushButton(QStringLiteral("开始考试"), this);
     startBtn->setMinimumHeight(56);
 
-    startBtn->setStyleSheet(R"(
-        QPushButton {
-            background: #2563eb;
-            color: white;
-            border-radius: 16px;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        QPushButton:hover {
-            background: #1d4ed8;
-        }
-
-        QPushButton:pressed {
-            background: #1e40af;
-        }
-    )");
-    // connect(startBtn, &QPushButton::clicked, this, [this]() {
-    //     emit examStarted(timeSpinBox->value());
-    // });
     connect(startBtn, &QPushButton::clicked, this, [this]() {
         emit examStarted(timeSpinBox->value(), examComboBox->currentIndex(), examComboBox->currentText());
     });
@@ -193,6 +117,43 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
 
     lay->addLayout(top);
     lay->addLayout(centerLayout, 1);
+
+    // 主题感知: 所有原本硬编码颜色集中在 lambda, 跟随亮/暗主题切换.
+    auto applyTheme = [=, this]() {
+        const bool dark = AlgeMate::ThemeManager::instance().currentTheme()
+                          == AlgeMate::ThemeManager::Theme::Dark;
+        this->setStyleSheet(dark
+            ? "QWidget { background-color: #1C1B2E; font-family: \"Microsoft YaHei\"; color: #E6E7F0; }"
+            : "QWidget { background-color: #f3f6fb; font-family: \"Microsoft YaHei\"; }");
+        title->setStyleSheet(dark
+            ? "font-size: 30px; font-weight: 700; color: #F3F3FA; background: transparent;"
+            : "font-size: 30px; font-weight: 700; color: #111827; background: transparent;");
+        card->setStyleSheet(dark
+            ? "QFrame { background: #28263F; border-radius: 24px; border: 1px solid #3A3754; }"
+            : "QFrame { background: white; border-radius: 24px; border: 1px solid #e5e7eb; }");
+        timeLabel->setStyleSheet(dark
+            ? "font-size: 16px; font-weight: 600; color: #E6E7F0; background: transparent;"
+            : "font-size: 16px; font-weight: 600; color: #374151; background: transparent;");
+        examLabel->setStyleSheet(dark
+            ? "font-size: 16px; font-weight: 600; color: #E6E7F0; background: transparent;"
+            : "font-size: 16px; font-weight: 600; color: #374151; background: transparent;");
+        timeSpinBox->setStyleSheet(dark
+            ? "QSpinBox { border: 2px solid #3A3754; border-radius: 12px; padding: 10px; font-size: 16px; min-width: 120px; background: #2C2A45; color: #F3F3FA; } QSpinBox:focus { border: 2px solid #8B7BFF; }"
+            : "QSpinBox { border: 2px solid #d1d5db; border-radius: 12px; padding: 10px; font-size: 16px; min-width: 120px; background: white; } QSpinBox:focus { border: 2px solid #2563eb; }");
+        examComboBox->setStyleSheet(dark
+            ? "QComboBox { border: 2px solid #3A3754; border-radius: 12px; padding: 10px; font-size: 15px; min-width: 280px; background: #2C2A45; color: #F3F3FA; } QComboBox:focus { border: 2px solid #8B7BFF; } QComboBox QAbstractItemView { background: #28263F; color: #E6E7F0; selection-background-color: #3A3460; }"
+            : "QComboBox { border: 2px solid #d1d5db; border-radius: 12px; padding: 10px; font-size: 15px; min-width: 280px; background: white; } QComboBox:focus { border: 2px solid #2563eb; }");
+        infoLabel->setStyleSheet(dark
+            ? "QLabel#ExamInfoLabel { background: #2C2A45; border-radius: 16px; padding: 20px; font-size: 15px; line-height: 1.8; color: #C9CCE6; border: 1px solid #3A3754; }"
+            : "QLabel#ExamInfoLabel { background: #f9fafb; border-radius: 16px; padding: 20px; font-size: 15px; line-height: 1.8; color: #4b5563; border: 1px solid #e5e7eb; }");
+        startBtn->setStyleSheet(dark
+            ? "QPushButton { background: #6B7CFF; color: white; border-radius: 16px; font-size: 18px; font-weight: bold; } QPushButton:hover { background: #8B7BFF; } QPushButton:pressed { background: #5A6BEE; }"
+            : "QPushButton { background: #2563eb; color: white; border-radius: 16px; font-size: 18px; font-weight: bold; } QPushButton:hover { background: #1d4ed8; } QPushButton:pressed { background: #1e40af; }");
+    };
+    applyTheme();
+    connect(&AlgeMate::ThemeManager::instance(),
+            &AlgeMate::ThemeManager::themeChanged,
+            this, [applyTheme](AlgeMate::ThemeManager::Theme){ applyTheme(); });
 }
 
 // ==================== ExamProgressPage ====================
@@ -200,12 +161,6 @@ ExamSettingPage::ExamSettingPage(QWidget* parent) : QWidget(parent) {
 ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeMinutes, const QString& examName, QWidget* parent)
     : QWidget(parent), questions(questions), currentQuestionIndex(0), remainingSeconds(timeMinutes * 60), m_examName(examName) {
     auto* lay = new QVBoxLayout(this);
-    setStyleSheet(R"(
-        QWidget {
-            background-color: #f5f7fb;
-            font-family: "Microsoft YaHei";
-        }
-    )");
     lay->setContentsMargins(24, 16, 24, 24);
     lay->setSpacing(14);
 
@@ -216,18 +171,9 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     connect(back, &QPushButton::clicked, this, &ExamProgressPage::backRequested);
 
     timerLabel = new QLabel(QStringLiteral("剩余时间: 60:00"), this);
-    timerLabel->setStyleSheet(R"(
-        background: #fee2e2;
-        color: #dc2626;
-        border-radius: 10px;
-        padding: 8px 14px;
-        font-size: 15px;
-        font-weight: bold;
-    )");
 
     // 考试名称 Label
     auto* nameLabel = new QLabel(m_examName, this);
-    nameLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #1f2937;");
 
     top->addWidget(back);
     top->addStretch();
@@ -246,27 +192,11 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
 
     // 题目内容
     auto* questionCard = new QFrame(this);
-    questionCard->setStyleSheet(R"(
-        QFrame {
-            background: white;
-            border-radius: 16px;
-            border: 1px solid #e5e7eb;
-        }
-    )");
 
     auto* questionCardLayout = new QVBoxLayout(questionCard);
     questionCardLayout->setContentsMargins(24,24,24,24);
 
     questionBrowser = new Latex::LatexTextBrowser(this);
-    questionBrowser->setStyleSheet(R"(
-        LatexTextBrowser {
-            background: transparent;
-            border: none;
-            font-size: 18px;
-            color: #111827;
-            font-family: "Microsoft YaHei";
-        }
-    )");
 
     auto* scrollArea = new QScrollArea(this);
     questionCardLayout->addWidget(questionBrowser);
@@ -281,25 +211,9 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     auto* navWidget = new QWidget(this);
     navWidget->setFixedWidth(190);
 
-    navWidget->setStyleSheet(R"(
-        QWidget {
-            background: white;
-            border-radius: 16px;
-            border: 1px solid #e5e7eb;
-        }
-    )");
-
     auto* navLayout = new QVBoxLayout(navWidget);
     auto* grid = new QGridLayout;
     auto* navTitle = new QLabel(QStringLiteral("题目"), this);
-
-    navTitle->setStyleSheet(R"(
-        font-size: 18px;
-        font-weight: 700;
-        color: #111827;
-        padding-bottom: 8px;
-    )");
-
     navTitle->setAlignment(Qt::AlignCenter);
 
     navLayout->addWidget(navTitle);
@@ -313,19 +227,6 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
             this);
 
         btn->setFixedSize(42,42);
-
-        btn->setStyleSheet(R"(
-        QPushButton {
-            background: #f3f4f6;
-            border-radius: 22px;
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        QPushButton:hover {
-            background: #dbeafe;
-        }
-    )");
 
         connect(btn, &QPushButton::clicked,
                 this,
@@ -342,36 +243,15 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     // 底部按钮
     auto* bottomLayout = new QHBoxLayout;
     auto* prevBtn = new QPushButton(QStringLiteral("上一题"), this);
-    // auto* submitBtn = new QPushButton(QStringLiteral("提交答案"), this);
     auto* nextBtn = new QPushButton(QStringLiteral("下一题"), this);
     auto* examSubmitBtn = new QPushButton(QStringLiteral("交卷"), this);
-    QString btnStyle = R"(
-        QPushButton {
-            background: #2563eb;
-            color: white;
-            border-radius: 10px;
-            padding: 10px 18px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        QPushButton:hover {
-            background: #1d4ed8;
-        }
-    )";
-    prevBtn->setStyleSheet(btnStyle);
-    // submitBtn->setStyleSheet(btnStyle);
-    nextBtn->setStyleSheet(btnStyle);
-    examSubmitBtn->setStyleSheet("background-color: #e74c3c; color: white;");
 
     connect(prevBtn, &QPushButton::clicked, this, &ExamProgressPage::onPreviousQuestion);
-    // connect(submitBtn, &QPushButton::clicked, this, &ExamProgressPage::onSubmitAnswer);
     connect(nextBtn, &QPushButton::clicked, this, &ExamProgressPage::onNextQuestion);
     connect(examSubmitBtn, &QPushButton::clicked, this, &ExamProgressPage::onSubmitExam);
 
     bottomLayout->addWidget(prevBtn);
     bottomLayout->addStretch();
-    // bottomLayout->addWidget(submitBtn);
     bottomLayout->addWidget(nextBtn);
     bottomLayout->addStretch();
     bottomLayout->addWidget(examSubmitBtn);
@@ -390,9 +270,51 @@ ExamProgressPage::ExamProgressPage(const QVector<Question>& questions, int timeM
     lay->addLayout(top);
     lay->addLayout(infoLayout);
     lay->addLayout(mainContentLayout, 1);
-    // lay->addWidget(scrollArea);
-    // lay->addWidget(answerWidget);
-    // lay->addLayout(bottomLayout);
+
+    // 主题感知: 原本硬编码颜色集中在 lambda, 跟随主题切换.
+    auto applyTheme = [=, this]() {
+        const bool dark = AlgeMate::ThemeManager::instance().currentTheme()
+                          == AlgeMate::ThemeManager::Theme::Dark;
+        this->setStyleSheet(dark
+            ? "QWidget { background-color: #1C1B2E; font-family: \"Microsoft YaHei\"; color: #E6E7F0; }"
+            : "QWidget { background-color: #f5f7fb; font-family: \"Microsoft YaHei\"; }");
+        timerLabel->setStyleSheet(dark
+            ? "background: #4A1F1F; color: #FF8888; border-radius: 10px; padding: 8px 14px; font-size: 15px; font-weight: bold;"
+            : "background: #fee2e2; color: #dc2626; border-radius: 10px; padding: 8px 14px; font-size: 15px; font-weight: bold;");
+        nameLabel->setStyleSheet(dark
+            ? "font-size: 18px; font-weight: bold; color: #F3F3FA; background: transparent;"
+            : "font-size: 18px; font-weight: bold; color: #1f2937; background: transparent;");
+        questionCard->setStyleSheet(dark
+            ? "QFrame { background: #28263F; border-radius: 16px; border: 1px solid #3A3754; }"
+            : "QFrame { background: white; border-radius: 16px; border: 1px solid #e5e7eb; }");
+        questionBrowser->setStyleSheet(dark
+            ? "LatexTextBrowser { background: transparent; border: none; font-size: 18px; color: #F3F3FA; font-family: \"Microsoft YaHei\"; }"
+            : "LatexTextBrowser { background: transparent; border: none; font-size: 18px; color: #111827; font-family: \"Microsoft YaHei\"; }");
+        navWidget->setStyleSheet(dark
+            ? "QWidget { background: #28263F; border-radius: 16px; border: 1px solid #3A3754; }"
+            : "QWidget { background: white; border-radius: 16px; border: 1px solid #e5e7eb; }");
+        navTitle->setStyleSheet(dark
+            ? "font-size: 18px; font-weight: 700; color: #F3F3FA; padding-bottom: 8px; background: transparent; border: none;"
+            : "font-size: 18px; font-weight: 700; color: #111827; padding-bottom: 8px; background: transparent; border: none;");
+        const QString navBtnStyle = dark
+            ? "QPushButton { background: #2C2A45; color: #E6E7F0; border-radius: 22px; font-size: 20px; font-weight: bold; border: 1px solid #3A3754; } QPushButton:hover { background: #312F4A; color: #B8ACFF; }"
+            : "QPushButton { background: #f3f4f6; border-radius: 22px; font-size: 20px; font-weight: bold; } QPushButton:hover { background: #dbeafe; }";
+        for (auto* nb : navButtons) {
+            if (nb) nb->setStyleSheet(navBtnStyle);
+        }
+        const QString btnStyle = dark
+            ? "QPushButton { background: #6B7CFF; color: white; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: #8B7BFF; }"
+            : "QPushButton { background: #2563eb; color: white; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: #1d4ed8; }";
+        prevBtn->setStyleSheet(btnStyle);
+        nextBtn->setStyleSheet(btnStyle);
+        examSubmitBtn->setStyleSheet(dark
+            ? "QPushButton { background-color: #c0392b; color: white; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: #d44837; }"
+            : "QPushButton { background-color: #e74c3c; color: white; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: #c0392b; }");
+    };
+    applyTheme();
+    connect(&AlgeMate::ThemeManager::instance(),
+            &AlgeMate::ThemeManager::themeChanged,
+            this, [applyTheme](AlgeMate::ThemeManager::Theme){ applyTheme(); });
 
     // 设置计时器
     m_examTimer = new QTimer(this);
@@ -525,7 +447,10 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
     // 设置题目内容
     // questionLabel->setText(q.content);
     // 使用 Latex 渲染设置题目内容
+    const bool dark = AlgeMate::ThemeManager::instance().currentTheme()
+                      == AlgeMate::ThemeManager::Theme::Dark;
     Latex::LatexRenderer renderer;
+    renderer.setTextColor(dark ? QColor("#F3F3FA") : QColor("#1F2033"));
     renderer.addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
     renderer.addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
     renderer.addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
@@ -550,7 +475,25 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
         auto* buttonGroup = new QButtonGroup(answerWidget);
         for (int i = 0; i < q.choices.size(); ++i) {
             auto* radio = new QRadioButton(q.choices[i], answerWidget);
-            radio->setStyleSheet(R"(
+            radio->setStyleSheet(dark ? R"(
+                QRadioButton {
+                    background: #28263F;
+                    color: #E6E7F0;
+                    border: 2px solid #3B395A;
+                    border-radius: 12px;
+                    padding: 14px;
+                    font-size: 15px;
+                }
+                QRadioButton:hover {
+                    border: 2px solid #6F77FF;
+                    background: #312F4A;
+                }
+                QRadioButton:checked {
+                    border: 2px solid #6F77FF;
+                    background: #3B395A;
+                    font-weight: bold;
+                }
+            )" : R"(
                 QRadioButton {
                     background: white;
                     border: 2px solid #d1d5db;
@@ -558,12 +501,10 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                     padding: 14px;
                     font-size: 15px;
                 }
-
                 QRadioButton:hover {
                     border: 2px solid #60a5fa;
                     background: #f0f7ff;
                 }
-
                 QRadioButton:checked {
                     border: 2px solid #2563eb;
                     background: #dbeafe;
@@ -598,7 +539,19 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
     } else if (q.type == QuestionType::Fill) {
         // 填空题：输入框
         auto* lineEdit = new QLineEdit(answerWidget);
-        lineEdit->setStyleSheet(R"(
+        lineEdit->setStyleSheet(dark ? R"(
+            QLineEdit {
+                background: #28263F;
+                color: #E6E7F0;
+                border: 2px solid #3B395A;
+                border-radius: 10px;
+                padding: 12px;
+                font-size: 15px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #6F77FF;
+            }
+        )" : R"(
             QLineEdit {
                 background: white;
                 border: 2px solid #d1d5db;
@@ -606,7 +559,6 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                 padding: 12px;
                 font-size: 15px;
             }
-
             QLineEdit:focus {
                 border: 2px solid #2563eb;
             }
@@ -635,9 +587,21 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                     updateNavButtons();
                 });
     } else if (q.type == QuestionType::Subjective) {
-        // 解答题：文本编辑框
+        // 解答题：文本编辑框 + 图像上传 OCR（可拖拽）
         auto* textEdit = new QPlainTextEdit(answerWidget);
-        textEdit->setStyleSheet(R"(
+        textEdit->setStyleSheet(dark ? R"(
+            QPlainTextEdit {
+                background: #28263F;
+                color: #E6E7F0;
+                border: 2px solid #3B395A;
+                border-radius: 12px;
+                padding: 12px;
+                font-size: 15px;
+            }
+            QPlainTextEdit:focus {
+                border: 2px solid #6F77FF;
+            }
+        )" : R"(
             QPlainTextEdit {
                 background: white;
                 border: 2px solid #d1d5db;
@@ -645,13 +609,12 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                 padding: 12px;
                 font-size: 15px;
             }
-
             QPlainTextEdit:focus {
                 border: 2px solid #2563eb;
             }
         )");
         textEdit->setObjectName(QStringLiteral("subjectiveAnswer"));
-        textEdit->setPlaceholderText(QStringLiteral("请输入您的解答"));
+        textEdit->setPlaceholderText(QStringLiteral("请输入您的解答，或下方上传手写拍照 / 图片进行 OCR 识别"));
         textEdit->setMinimumHeight(120);
         textEdit->setPlainText(q.userAnswer);
         answerLayout->addWidget(textEdit);
@@ -666,6 +629,21 @@ void ExamProgressPage::updateUIForQuestion(const Question& q) {
                         textEdit->toPlainText();
                     updateNavButtons();
                 });
+
+        // OCR 上传组件（点击选图 / 拖拽折入都可）
+        auto* ocr = new AiSolver::OcrAttachWidget(
+            QStringLiteral("可以点击“📷 上传图片识别”或直接拖拽手写拍照到这里识别后追加到补答区"),
+            answerWidget);
+        connect(ocr, &AiSolver::OcrAttachWidget::ocrTextReady,
+                this, [textEdit](const QString& text) {
+                    if (text.isEmpty()) return;
+                    QString cur = textEdit->toPlainText();
+                    if (!cur.isEmpty() && !cur.endsWith(QLatin1Char('\n')))
+                        cur += QLatin1Char('\n');
+                    cur += text;
+                    textEdit->setPlainText(cur);
+                });
+        answerLayout->addWidget(ocr);
     }
 
     answerLayout->addStretch();
@@ -930,7 +908,7 @@ void ExamProgressPage::gradeSubjectiveWithAI(int index) {
                          ).arg(q.content).arg(q.score).arg(q.correctAnswer).arg(q.userAnswer);
 
     QJsonObject rootObj;
-    rootObj["model"] = "deepseek-v4-pro";
+    rootObj["model"] = "deepseek-chat";
     rootObj["stream"] = false;
     QJsonArray messages;
     QJsonObject sysMsg, usrMsg;
@@ -1054,13 +1032,13 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     lay->setContentsMargins(0, 0, 0, 0);
     lay->setSpacing(0);
 
-    // 全局背景色 (学而思风格的淡灰蓝背景)
-    setStyleSheet(R"(
-        QWidget {
-            background-color: #f3f6fb;
-            font-family: "Microsoft YaHei", "PingFang SC";
-        }
-    )");
+    const bool dark = AlgeMate::ThemeManager::instance().currentTheme()
+                      == AlgeMate::ThemeManager::Theme::Dark;
+
+    // 全局背景色
+    setStyleSheet(dark
+        ? "QWidget { background-color: #1C1B2E; color: #E6E7F0; font-family: \"Microsoft YaHei\", \"PingFang SC\"; }"
+        : "QWidget { background-color: #f3f6fb; font-family: \"Microsoft YaHei\", \"PingFang SC\"; }");
 
     auto* scrollArea = new QScrollArea(this);
     scrollArea->setWidgetResizable(true);
@@ -1079,41 +1057,19 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     auto* top = new QHBoxLayout;
 
     auto* back = new QPushButton(QStringLiteral("← 返回主页"), this);
-    back->setStyleSheet(R"(
-        QPushButton {
-            background: transparent;
-            color: #64748b;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background: #f1f5f9;
-            color: #3b82f6;
-            border-color: #93c5fd;
-        }
-    )");
+    back->setStyleSheet(dark
+        ? "QPushButton { background: transparent; color: #C9C9DC; border: 1px solid #3B395A; border-radius: 8px; padding: 8px 16px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: #28263F; color: #6F77FF; border-color: #6F77FF; }"
+        : "QPushButton { background: transparent; color: #64748b; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 16px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: #f1f5f9; color: #3b82f6; border-color: #93c5fd; }");
     connect(back, &QPushButton::clicked, this, &ExamResultPage::backRequested);
 
     auto* title = new QLabel(QStringLiteral("考试成绩单"));
-    title->setStyleSheet("font-size: 22px; font-weight: 800; color: #1e293b;");
+    title->setStyleSheet(dark ? "font-size: 22px; font-weight: 800; color: #E6E7F0;"
+                              : "font-size: 22px; font-weight: 800; color: #1e293b;");
 
     auto* restartBtn = new QPushButton(QStringLiteral("↻ 重新考试"), this);
-    restartBtn->setStyleSheet(R"(
-        QPushButton {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b82f6, stop:1 #2563eb);
-            color: white;
-            border-radius: 8px;
-            padding: 8px 20px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #60a5fa, stop:1 #3b82f6);
-        }
-    )");
+    restartBtn->setStyleSheet(dark
+        ? "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6F77FF, stop:1 #5563E8); color: white; border-radius: 8px; padding: 8px 20px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #8FA1FF, stop:1 #6F77FF); }"
+        : "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b82f6, stop:1 #2563eb); color: white; border-radius: 8px; padding: 8px 20px; font-size: 14px; font-weight: bold; } QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #60a5fa, stop:1 #3b82f6); }");
     connect(restartBtn, &QPushButton::clicked, this, [this]() {
         if (auto* examPage = qobject_cast<ExamPage*>(this->parentWidget())) {
             examPage->resetToSettings();
@@ -1138,13 +1094,9 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     }
 
     auto* scoreCard = new QFrame(container);
-    scoreCard->setStyleSheet(R"(
-        QFrame {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffffff, stop:1 #f8fafc);
-            border-radius: 24px;
-            border: 1px solid #e2e8f0;
-        }
-    )");
+    scoreCard->setStyleSheet(dark
+        ? "QFrame { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #28263F, stop:1 #1F1E33); border-radius: 24px; border: 1px solid #3B395A; }"
+        : "QFrame { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffffff, stop:1 #f8fafc); border-radius: 24px; border: 1px solid #e2e8f0; }");
 
     auto* scoreLayout = new QVBoxLayout(scoreCard);
     scoreLayout->setContentsMargins(40, 40, 40, 40);
@@ -1153,7 +1105,8 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     auto* scoreLabel = new QLabel(QStringLiteral("%1<span style='font-size:24px; color:#94a3b8;'> / %2分</span>")
                                       .arg(earnedScore).arg(totalScore), this);
     scoreLabel->setTextFormat(Qt::RichText);
-    scoreLabel->setStyleSheet("font-size: 64px; font-weight: 900; color: #2563eb;");
+    scoreLabel->setStyleSheet(dark ? "font-size: 64px; font-weight: 900; color: #8FA1FF;"
+                                   : "font-size: 64px; font-weight: 900; color: #2563eb;");
     scoreLabel->setAlignment(Qt::AlignCenter);
 
     double percentage = (totalScore > 0) ? (earnedScore * 100.0 / totalScore) : 0;
@@ -1164,7 +1117,8 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     auto* levelLabel = new QLabel(level, this);
     levelLabel->setAlignment(Qt::AlignCenter);
     levelLabel->setStyleSheet(QString("font-size: 18px; font-weight: bold; color: %1;")
-                                  .arg(percentage >= 60 ? "#10b981" : "#f59e0b"));
+                                  .arg(percentage >= 60 ? (dark ? "#34d399" : "#10b981")
+                                                        : (dark ? "#fbbf24" : "#f59e0b")));
 
     scoreLayout->addWidget(scoreLabel);
     scoreLayout->addWidget(levelLabel);
@@ -1181,17 +1135,9 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
         const auto& q = results[i];
 
         auto* itemFrame = new QFrame(container);
-        itemFrame->setStyleSheet(R"(
-            QFrame {
-                background: white;
-                border-radius: 20px;
-                border: 1px solid #e2e8f0;
-            }
-            QFrame:hover {
-                border: 1px solid #bfdbfe;
-                background: #fdfeff;
-            }
-        )");
+        itemFrame->setStyleSheet(dark
+            ? "QFrame { background: #28263F; border-radius: 20px; border: 1px solid #3B395A; } QFrame:hover { border: 1px solid #6F77FF; background: #312F4A; }"
+            : "QFrame { background: white; border-radius: 20px; border: 1px solid #e2e8f0; } QFrame:hover { border: 1px solid #bfdbfe; background: #fdfeff; }");
 
         auto* itemLayout = new QVBoxLayout(itemFrame);
         itemLayout->setContentsMargins(24, 20, 24, 20);
@@ -1210,22 +1156,17 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
             QStringLiteral("<span style='color:#64748b;'>[%1]</span> <b>第 %2 题</b> &nbsp;&nbsp; %3 &nbsp;&nbsp; <span style='color:#3b82f6;'>得分: %4/%5 分</span>")
                 .arg(typeStr).arg(i + 1).arg(statusBadge).arg(q.earnedScore).arg(q.score), this);
         titleLabel->setTextFormat(Qt::RichText);
-        titleLabel->setStyleSheet("font-size: 16px; color: #1e293b;");
+        titleLabel->setStyleSheet(dark ? "font-size: 16px; color: #E6E7F0;"
+                                       : "font-size: 16px; color: #1e293b;");
         itemLayout->addWidget(titleLabel);
 
         // --- 题干内容 (支持 LaTeX 渲染) ---
         auto* contentBrowser = new Latex::LatexTextBrowser(this);
-        contentBrowser->setStyleSheet(R"(
-            LatexTextBrowser {
-                background: transparent;
-                border: none;
-                color: #475569;
-                font-size: 15px;
-                margin-top: 4px;
-                margin-bottom: 8px;
-            }
-        )");
+        contentBrowser->setStyleSheet(dark
+            ? "LatexTextBrowser { background: transparent; border: none; color: #C9C9DC; font-size: 15px; margin-top: 4px; margin-bottom: 8px; }"
+            : "LatexTextBrowser { background: transparent; border: none; color: #475569; font-size: 15px; margin-top: 4px; margin-bottom: 8px; }");
         Latex::LatexRenderer renderer;
+        renderer.setTextColor(dark ? QColor("#F3F3FA") : QColor("#1F2033"));
         renderer.addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
         renderer.addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
         renderer.addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
@@ -1235,7 +1176,8 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
 
         // --- 作答与标准答案比对区 (灰色轻背景包裹) ---
         auto* answerBox = new QFrame;
-        answerBox->setStyleSheet("background: #f8fafc; border-radius: 12px; padding: 12px; border: 1px solid #f1f5f9;");
+        answerBox->setStyleSheet(dark ? "background: #1F1E33; border-radius: 12px; padding: 12px; border: 1px solid #3B395A;"
+                                      : "background: #f8fafc; border-radius: 12px; padding: 12px; border: 1px solid #f1f5f9;");
         auto* ansLayout = new QVBoxLayout(answerBox);
         ansLayout->setContentsMargins(12, 12, 12, 12);
         ansLayout->setSpacing(8);
@@ -1270,7 +1212,8 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
 
         // 渲染
         auto* answerBrowser = new Latex::LatexTextBrowser(this);
-        QString ansColor = q.isCorrect ? "#059669" : "#dc2626";
+        QString ansColor = q.isCorrect ? (dark ? "#34d399" : "#059669")
+                                       : (dark ? "#f87171" : "#dc2626");
         answerBrowser->setStyleSheet(QString(R"(
             LatexTextBrowser {
                 background: transparent;
@@ -1287,14 +1230,9 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
 
         // 渲染标准答案
         auto* correctBrowser = new Latex::LatexTextBrowser(this);
-        correctBrowser->setStyleSheet(R"(
-            LatexTextBrowser {
-                background: transparent;
-                border: none;
-                font-size: 14px;
-                color: #059669;
-            }
-        )");
+        correctBrowser->setStyleSheet(dark
+            ? "LatexTextBrowser { background: transparent; border: none; font-size: 14px; color: #34d399; }"
+            : "LatexTextBrowser { background: transparent; border: none; font-size: 14px; color: #059669; }");
 
         displayCorrectAns.replace("\\n", "<br>").replace("\n", "<br>");
         QString correctHtml = QStringLiteral("<b style='color:#334155;'>标准答案：</b><br>") + displayCorrectAns;
@@ -1311,21 +1249,9 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
 
             auto* detailBtn = new QPushButton(QStringLiteral("🤖 查看 AI 导师评阅详情"), itemFrame);
             detailBtn->setCursor(Qt::PointingHandCursor);
-            detailBtn->setStyleSheet(R"(
-                QPushButton {
-                    background: #eff6ff;
-                    color: #2563eb;
-                    border: 1px solid #bfdbfe;
-                    border-radius: 8px;
-                    padding: 8px 16px;
-                    font-size: 13px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background: #dbeafe;
-                    color: #1d4ed8;
-                }
-            )");
+            detailBtn->setStyleSheet(dark
+                ? "QPushButton { background: #312F4A; color: #8FA1FF; border: 1px solid #3B395A; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: bold; } QPushButton:hover { background: #3B395A; color: #B0BBFF; }"
+                : "QPushButton { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: bold; } QPushButton:hover { background: #dbeafe; color: #1d4ed8; }");
 
             // 兜底：如果没作答或由于网络断开导致 aiReport 为空，给一个默认提示
             QString currentReport = q.aiReport.trimmed().isEmpty()
@@ -1333,27 +1259,22 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
                                         : q.aiReport;
 
             connect(detailBtn, &QPushButton::clicked, this, [this, currentReport]() {
+                const bool dlgDark = AlgeMate::ThemeManager::instance().currentTheme()
+                                     == AlgeMate::ThemeManager::Theme::Dark;
                 QDialog* dlg = new QDialog(this);
                 dlg->setWindowTitle(QStringLiteral("🤖 DeepSeek 智能导师评阅报告"));
                 dlg->setMinimumSize(650, 500);
-                dlg->setStyleSheet("QDialog { background-color: #f8fafc; }");
+                dlg->setStyleSheet(dlgDark ? "QDialog { background-color: #1C1B2E; }"
+                                           : "QDialog { background-color: #f8fafc; }");
 
                 auto* dLayout = new QVBoxLayout(dlg);
                 auto* textBrowser = new Latex::LatexTextBrowser(dlg);
-                textBrowser->setStyleSheet(R"(
-                    LatexTextBrowser {
-                        background: white;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 12px;
-                        padding: 16px;
-                        font-family: 'Microsoft YaHei';
-                        font-size: 14px;
-                        color: #334155;
-                        line-height: 1.6;
-                    }
-                )");
+                textBrowser->setStyleSheet(dlgDark
+                    ? "LatexTextBrowser { background: #28263F; border: 1px solid #3B395A; border-radius: 12px; padding: 16px; font-family: 'Microsoft YaHei'; font-size: 14px; color: #E6E7F0; line-height: 1.6; }"
+                    : "LatexTextBrowser { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: 'Microsoft YaHei'; font-size: 14px; color: #334155; line-height: 1.6; }");
 
                 Latex::LatexRenderer renderer;
+                renderer.setTextColor(dlgDark ? QColor("#F3F3FA") : QColor("#1F2033"));
                 renderer.addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
                 renderer.addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
                 renderer.addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));

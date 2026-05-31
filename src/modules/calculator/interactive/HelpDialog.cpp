@@ -4,6 +4,7 @@
 #include "expr/Value.h"
 #include "LatexTextBrowser.h"
 #include "core/ThemeManager.h"
+#include "latex/LatexRenderer.h"
 
 #include <QPalette>
 #include <QPushButton>
@@ -194,7 +195,7 @@ QList<Section> allSections() {
             QStringLiteral("标准形"),
             {
                 {QStringLiteral("jordan(A)"),
-                 QStringLiteral("Jordan 标准形 $J$ 与相似矩阵 $Q$ ($Q^{-1} A Q = J$); 同时给出行列式因子 / 不变因子 / 初等因子"),
+                 QStringLiteral("Jordan 标准形 $J$ (复数域, 数值解); 同时给出行列式因子 / 不变因子 / 初等因子 / Jordan 块"),
                  QStringLiteral("jordan([3,-1;1,1])")},
                 {QStringLiteral("rcf(A) / frobenius(A)"),
                  QStringLiteral("有理标准形 $F$ = $\\mathrm{diag}(C(d_1), \\ldots, C(d_r))$; 同时给出特征多项式的 $\\mathbb{Q}$ 不可约分解 + 不变因子"),
@@ -353,6 +354,7 @@ HelpDialog::HelpDialog(QWidget* parent) : QDialog(parent) {
     view_->setObjectName(QStringLiteral("CalcHelpView"));
     view_->setOpenExternalLinks(false);
     view_->setFrameShape(QFrame::NoFrame);
+    AlgeMate::Latex::attachLatexAutoPostProcess(view_);
     QFont f(QStringLiteral("Microsoft YaHei UI"));
     f.setPointSize(10);
     view_->setFont(f);

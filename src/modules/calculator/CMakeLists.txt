@@ -61,6 +61,7 @@ target_link_libraries(algemate_calculator
         Qt6::Widgets
         Qt6::OpenGLWidgets
         algemate_math
+        algemate_latex
     PRIVATE
         JKQTMathTextLib
 )
