@@ -32,6 +32,8 @@ private:
     QAbstractButton* btnUser_ = nullptr;
     QLabel*      avatarLabel_ = nullptr;
     QLabel*      nameLabel_   = nullptr;
+protected:
+    bool eventFilter(QObject* obj, QEvent* e) override;
 };
 
 }

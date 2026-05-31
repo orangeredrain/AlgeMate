@@ -3,6 +3,7 @@
 #include "core/AppPaths.h"
 
 #include <QApplication>
+#include <QIcon>
 
 int main(int argc, char* argv[]) {
     QApplication::setHighDpiScaleFactorRoundingPolicy(
@@ -17,6 +18,8 @@ int main(int argc, char* argv[]) {
     app.setApplicationName(AlgeMate::AppPaths::appName());
     app.setApplicationDisplayName(AlgeMate::AppPaths::appDisplayName());
     app.setApplicationVersion(AlgeMate::AppPaths::appVersion());
+
+    app.setWindowIcon(QIcon(AlgeMate::AppPaths::kAppIcon));
 
     AlgeMate::ThemeManager::instance().applyTheme(
         AlgeMate::ThemeManager::Theme::Light);

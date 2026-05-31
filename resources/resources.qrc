@@ -5,42 +5,7 @@
         <file>knowledge/ch01_vectors.md</file>
         <file>knowledge/ch01_matrices_intro.md</file>
         <file>knowledge/ch02_matrix_multiply.md</file>
-        <file>knowledge/ch01_1.md</file>
-        <file>knowledge/ch01_2.md</file>
-        <file>knowledge/ch01_3.md</file>
-        <file>knowledge/ch01_4.md</file>
-        <file>knowledge/ch01_5.md</file>
-        <file>knowledge/ch02_1.md</file>
-        <file>knowledge/ch02_2.md</file>
-        <file>knowledge/ch03_1.md</file>
-        <file>knowledge/ch03_2.md</file>
-        <file>knowledge/ch03_3.md</file>
-        <file>knowledge/ch03_4.md</file>
-        <file>knowledge/ch03_5.md</file>
-        <file>knowledge/ch04_1.md</file>
-        <file>knowledge/ch04_2.md</file>
-        <file>knowledge/ch04_3.md</file>
-        <file>knowledge/ch05_1.md</file>
-        <file>knowledge/ch05_2.md</file>
-        <file>knowledge/ch05_3.md</file>
-        <file>knowledge/ch05_4.md</file>
-        <file>knowledge/ch06_1.md</file>
-        <file>knowledge/ch06_2.md</file>
-        <file>knowledge/ch07_1.md</file>
-        <file>knowledge/ch07_2.md</file>
-        <file>knowledge/ch07_3.md</file>
-        <file>knowledge/ch07_4.md</file>
-        <file>knowledge/ch08_1.md</file>
-        <file>knowledge/ch08_2.md</file>
-        <file>knowledge/ch08_3.md</file>
-        <file>knowledge/ch08_4.md</file>
-        <file>knowledge/ch08_5.md</file>
-        <file>knowledge/ch09_1.md</file>
-        <file>knowledge/ch09_2.md</file>
-        <file>knowledge/ch09_3.md</file>
-        <file>knowledge/ch10_1.md</file>
-        <file>knowledge/ch10_2.md</file>
-        <file>knowledge/ch10_3.md</file>
-        <file>knowledge/ch10_4.md</file>
+        <file>images/icon.png</file>
+        <file>images/icon.icns</file>
     </qresource>
 </RCC>

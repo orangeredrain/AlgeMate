@@ -18,6 +18,8 @@ qt_add_library(algemate_learning STATIC
     QuestionBank.cpp
     PastExams.h
     PastExams.cpp
+    RecommendPracticePage.h
+    RecommendPracticePage.cpp
 )
 
 target_link_libraries(algemate_learning
