@@ -10,6 +10,7 @@ class QLabel;
 class QEvent;
 class QProgressBar;
 class QVBoxLayout;
+class QStackedWidget;
 
 namespace AlgeMate::Home {
 
@@ -41,7 +42,7 @@ public:
     explicit HomePage(QWidget* parent = nullptr);
 
     void setSubGoalProgress(const QString& goalName, int currentProgress);
-
+    void showGoalDetail();
 signals:
     void requestNavigate(int target);
 
@@ -59,6 +60,8 @@ private:
     void saveGoals();
     void loadGoals();
 
+    QStackedWidget* stackedWidget_ = nullptr;
+
     QLabel* avatarLabel_   = nullptr;
     QLabel* greetingLabel_ = nullptr;
     QLabel* subtitleLabel_ = nullptr;
@@ -69,9 +72,12 @@ private:
     QProgressBar* goalProgressBar_ = nullptr;
     QVBoxLayout* subGoalsLayout_ = nullptr;
 
-    QList<SubGoal> subGoals_;
+    QWidget* detailPageWidget_ = nullptr;
+    QVBoxLayout* detailSubGoalsLayout_ = nullptr;
+    QLabel* detailPercentLabel_ = nullptr;
+    QProgressBar* detailProgressBar_ = nullptr;
 
-    // 指向当前打开的编辑弹窗（用于拦截关闭事件）
+    QList<SubGoal> subGoals_;
     GoalEditDialog* editDialog_ = nullptr;
 };
 

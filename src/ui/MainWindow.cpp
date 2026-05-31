@@ -93,6 +93,15 @@ void MainWindow::registerModules() {
                 if (target == Home::HomePage::Knowledge)
                     learningPage_->showKnowledge();
             });
+    connect(learningPage, &Learning::LearningPage::requestNavigateToHomeGoalDetail,
+            this, [this, home]() {
+                // 1. 切换左侧导航高亮到“首页” (索引 0)
+                nav_->setCurrentIndex(0);
+                // 2. 切换主视图到“首页” (索引 0)
+                stack_->setCurrentIndex(0);
+                // 3. 调用首页内部的方法，展开全量目标
+                home->showGoalDetail();
+            });
 }
 
 }

@@ -1,6 +1,7 @@
 #include "HomePage.h"
 #include "core/UserProfile.h"
 
+#include <QStackedWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -545,10 +546,22 @@ static QFrame* makeQuickCard(const QString& emoji, const QString& title, const Q
 }
 
 HomePage::HomePage(QWidget* parent) : QWidget(parent) {
-    auto* root = new QVBoxLayout(this);
+    // 整个 HomePage 的最外层布局，只用来放置 stackedWidget
+    auto* rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+
+    stackedWidget_ = new QStackedWidget(this);
+    rootLayout->addWidget(stackedWidget_);
+
+    // =========================================================================
+    // ==================== 页面 0：主页视图 (Main Page) ========================
+    // =========================================================================
+    auto* mainPageWidget = new QWidget(this);
+    auto* root = new QVBoxLayout(mainPageWidget);
     root->setContentsMargins(32, 32, 32, 32);
     root->setSpacing(24);
 
+    // ---------------- [头像与欢迎语区域] ----------------
     auto* headRow = new QHBoxLayout;
     headRow->setSpacing(18);
 
@@ -603,10 +616,16 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     });
     headRow->addWidget(settingsBtn, 0, Qt::AlignTop);
 
+    // ---------------- [目标区域大框 (GoalFrame)] ----------------
     auto* goalFrame = new QFrame;
     goalFrame->setObjectName("GoalFrame");
-    goalFrame->setStyleSheet("QFrame#GoalFrame { background-color: #FAFAFC; border: 1px solid #E2E8F0; border-radius: 16px; }");
-    goalFrame->setMinimumHeight(250);
+    goalFrame->setStyleSheet("QFrame#GoalFrame { background-color: #FAFAFC; border: 1px solid #E2E8F0; border-radius: 16px; }"
+                             "QFrame#GoalFrame:hover { border-color: #6B7CFF; background-color: #F8F9FC; }");
+    goalFrame->setMinimumHeight(270);
+
+    // ====== 【核心修改】让大框具备可点击的视觉反馈并安装过滤器 ======
+    goalFrame->setCursor(Qt::PointingHandCursor);
+    goalFrame->installEventFilter(this);
 
     auto* goalLay = new QVBoxLayout(goalFrame);
     goalLay->setContentsMargins(24, 20, 24, 16);
@@ -664,32 +683,22 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     topGoalRow->addWidget(editBtn, 0, Qt::AlignTop);
     goalLay->addLayout(topGoalRow);
 
+    // 主页内置的简易滚动目标列表
     auto* scrollArea = new QScrollArea;
     scrollArea->setWidgetResizable(true);
     scrollArea->setFrameShape(QFrame::NoFrame);
-    scrollArea->setStyleSheet(
-        "QScrollArea { background: transparent; border: none; }"
-        "QScrollBar:vertical { width: 6px; background: transparent; margin: 0px; }"
-        "QScrollBar::handle:vertical { background: #CBD5E0; border-radius: 3px; min-height: 20px; }"
-        "QScrollBar::handle:vertical:hover { background: #A0AEC0; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }"
-        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }"
-        );
+    scrollArea->setStyleSheet("QScrollArea { background: transparent; border: none; }");
 
     auto* scrollContent = new QWidget;
     scrollContent->setStyleSheet("background: transparent;");
-
     subGoalsLayout_ = new QVBoxLayout(scrollContent);
     subGoalsLayout_->setSpacing(12);
     subGoalsLayout_->setContentsMargins(52, 10, 10, 10);
     subGoalsLayout_->setAlignment(Qt::AlignTop);
-
     scrollArea->setWidget(scrollContent);
     goalLay->addWidget(scrollArea, 1);
 
-    auto* bottomActionRow = new QHBoxLayout;
-    bottomActionRow->addStretch();
-
+    // ---------------- [下方网格卡片功能区] ----------------
     auto* grid = new QGridLayout;
     grid->setSpacing(16);
 
@@ -701,10 +710,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
         { "📈", "学习中心",         "进度追踪、错题本、打卡与推荐练习",           "#E6E9FF", Learning,   1, 1 }
     };
     for (const auto& i : infos) {
-        auto* card = makeQuickCard(QString::fromUtf8(i.emoji),
-                                   QString::fromUtf8(i.title),
-                                   QString::fromUtf8(i.desc),
-                                   QString::fromUtf8(i.accent));
+        auto* card = makeQuickCard(QString::fromUtf8(i.emoji), QString::fromUtf8(i.title), QString::fromUtf8(i.desc), QString::fromUtf8(i.accent));
         cardTargets_.insert(card, int(i.target));
         card->installEventFilter(this);
         grid->addWidget(card, i.row, i.col);
@@ -715,18 +721,91 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     root->addLayout(grid);
     root->addStretch();
 
+    stackedWidget_->addWidget(mainPageWidget); // 将主页面加入 Stacking 管理
+
+    // =========================================================================
+    // ==================== 页面 1：目标详情展开页 (Detail Page) ===============
+    // =========================================================================
+    detailPageWidget_ = new QWidget(this);
+    auto* detailLayout = new QVBoxLayout(detailPageWidget_);
+    detailLayout->setContentsMargins(32, 32, 32, 32);
+    detailLayout->setSpacing(20);
+
+    // 顶部导航返回行
+    auto* detailHeaderRow = new QHBoxLayout;
+    auto* backBtn = new QPushButton(QStringLiteral("⬅  返回首页"));
+    backBtn->setCursor(Qt::PointingHandCursor);
+    backBtn->setStyleSheet("QPushButton { background: transparent; border: none; color: #6B7CFF; font-size: 16px; font-weight: bold; }"
+                           "QPushButton:hover { color: #5A6AE0; }");
+    connect(backBtn, &QPushButton::clicked, this, [this]() {
+        stackedWidget_->setCurrentIndex(0); // 切回主页
+    });
+
+    auto* detailTitleText = new QLabel(QStringLiteral("我的未完成目标明细"));
+    detailTitleText->setStyleSheet("font-size: 20px; font-weight: 700; color: #2D3748;");
+
+    auto* detailEditBtn = new QPushButton(QStringLiteral("✏️ 编辑目标"));
+    detailEditBtn->setCursor(Qt::PointingHandCursor);
+    detailEditBtn->setStyleSheet("QPushButton { background: #6B7CFF; color: white; border-radius: 8px; padding: 6px 14px; font-weight: bold; border: none; }"
+                                 "QPushButton:hover { background: #5A6AE0; }");
+    connect(detailEditBtn, &QPushButton::clicked, this, &HomePage::onEditGoalsClicked);
+
+    detailHeaderRow->addWidget(backBtn);
+    detailHeaderRow->addSpacing(20);
+    detailHeaderRow->addWidget(detailTitleText);
+    detailHeaderRow->addStretch();
+    detailHeaderRow->addWidget(detailEditBtn);
+    detailLayout->addLayout(detailHeaderRow);
+
+    // 总进度总览面板
+    auto* progressPanel = new QFrame;
+    progressPanel->setStyleSheet("QFrame { background: #F8F9FC; border-radius: 12px; border: 1px solid #E2E8F0; }");
+    auto* progressPanelLay = new QVBoxLayout(progressPanel);
+    progressPanelLay->setContentsMargins(20, 16, 20, 16);
+
+    auto* pTextLay = new QHBoxLayout;
+    auto* pStaticLbl = new QLabel(QStringLiteral("当前目标总达成率："));
+    pStaticLbl->setStyleSheet("font-size: 14px; color: #4A5568; border: none;");
+    detailPercentLabel_ = new QLabel("0%");
+    detailPercentLabel_->setStyleSheet("font-size: 18px; font-weight: bold; color: #6B7CFF; border: none;");
+    pTextLay->addWidget(pStaticLbl);
+    pTextLay->addWidget(detailPercentLabel_);
+    pTextLay->addStretch();
+
+    detailProgressBar_ = new QProgressBar;
+    detailProgressBar_->setFixedHeight(10);
+    detailProgressBar_->setTextVisible(false);
+
+    progressPanelLay->addLayout(pTextLay);
+    progressPanelLay->addWidget(detailProgressBar_);
+    detailLayout->addWidget(progressPanel);
+
+    // 展开后的独立全量滚动区域
+    auto* detailScrollArea = new QScrollArea;
+    detailScrollArea->setWidgetResizable(true);
+    detailScrollArea->setStyleSheet("QScrollArea { background: transparent; border: none; }"
+                                    "QScrollBar:vertical { width: 6px; background: transparent; }"
+                                    "QScrollBar::handle:vertical { background: #CBD5E0; border-radius: 3px; }");
+    auto* detailScrollContent = new QWidget;
+    detailScrollContent->setStyleSheet("background: transparent;");
+    detailSubGoalsLayout_ = new QVBoxLayout(detailScrollContent);
+    detailSubGoalsLayout_->setSpacing(14);
+    detailSubGoalsLayout_->setContentsMargins(10, 10, 10, 10);
+    detailSubGoalsLayout_->setAlignment(Qt::AlignTop);
+
+    detailScrollArea->setWidget(detailScrollContent);
+    detailLayout->addWidget(detailScrollArea, 1);
+
+    stackedWidget_->addWidget(detailPageWidget_); // 将详情展开面加入 Stacking 管理
+
+    // =========================================================================
+    // ==================== 后置通用状态加载初始化 ============================
+    // =========================================================================
     refreshGreeting();
-    connect(&UserProfile::instance(), &UserProfile::profileChanged,
-            this, &HomePage::refreshGreeting);
+    connect(&UserProfile::instance(), &UserProfile::profileChanged, this, &HomePage::refreshGreeting);
 
     loadGoals();
     updateGoalUI();
-
-    QTimer::singleShot(0, this, [this]() {
-        if (QWidget* topWin = this->window()) {
-            topWin->installEventFilter(this);
-        }
-    });
 
     // ==================== 智能通知核心逻辑 ====================
 
@@ -739,13 +818,21 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
             if (!isCompleted) {
                 QDate d = QDate::fromString(g.deadline, Qt::ISODate);
                 if (d.isValid() && d <= today) {
-                    dueTasks.append(g.name);
+
+                    // 👇 构建提醒前缀
+                    QString prefix = g.category;
+                    // 如果是“练习”且子类别不为空，就拼接上子类别
+                    if (g.category == QStringLiteral("练习") && !g.subCategory.isEmpty()) {
+                        prefix += QStringLiteral(" · ") + g.subCategory;
+                    }
+
+                    // 最终格式：类别[ · 子类别] · 具体名称
+                    dueTasks.append(prefix + QStringLiteral(" - ") + g.name);
                 }
             }
         }
         return dueTasks;
     };
-
     // 2. 触发弹窗和系统通知的通用函数
     auto triggerNotifications = [this](const QStringList& dueTasks) {
         // [修复系统通知不显示]：系统托盘创建后需要一点时间注入系统底层，直接调用会导致被系统抛弃
@@ -900,28 +987,30 @@ void HomePage::onEditGoalsClicked() {
 }
 
 void HomePage::updateGoalUI() {
+    // 1. 清空主页面的小列表
     QLayoutItem* item;
     while ((item = subGoalsLayout_->takeAt(0)) != nullptr) {
         if (QWidget* w = item->widget()) w->deleteLater();
         delete item;
     }
+    // 2. 清空展开页的大列表
+    while ((item = detailSubGoalsLayout_->takeAt(0)) != nullptr) {
+        if (QWidget* w = item->widget()) w->deleteLater();
+        delete item;
+    }
 
     if (subGoals_.isEmpty()) {
-        goalTitleLabel_->setText(QStringLiteral("没有待完成的任务💫"));
-        goalPercentLabel_->setText(QStringLiteral("100%"));
-        goalPercentLabel_->setStyleSheet("font-size: 14px; font-weight: 700; color: #4CAF50; border: none;");
-
-        goalProgressBar_->setRange(0, 100);
+        QString emptyText = QStringLiteral("没有待完成的任务💫");
+        goalTitleLabel_->setText(emptyText);
+        goalPercentLabel_->setText("100%");
+        detailPercentLabel_->setText("100%");
         goalProgressBar_->setValue(100);
-        goalProgressBar_->setStyleSheet("QProgressBar { background-color: #E2E8F0; border-radius: 4px; border: none; }"
-                                        "QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #81C784, stop:1 #4CAF50); border-radius: 4px; }");
+        detailProgressBar_->setValue(100);
         return;
     }
 
     goalTitleLabel_->setText(QStringLiteral("学习总进度"));
-
     double sumOfPercentages = 0.0;
-
     QList<int> pendingList;
     QList<int> doneList;
 
@@ -935,7 +1024,7 @@ void HomePage::updateGoalUI() {
         }
     }
 
-    // ==================== 核心：按剩余时间由少到多排序 ====================
+    // 按剩余时间排序
     std::sort(pendingList.begin(), pendingList.end(), [this](int a, int b) {
         QDate da = QDate::fromString(subGoals_[a].deadline, Qt::ISODate);
         QDate db = QDate::fromString(subGoals_[b].deadline, Qt::ISODate);
@@ -944,173 +1033,197 @@ void HomePage::updateGoalUI() {
         return da < db;
     });
 
+    // 辅助闭包：由于两边展现形式完全一致，我们让它同时构造并加进两个布局
     auto createRowUI = [this](int i, bool isCompleted) {
         const auto& goal = subGoals_[i];
 
-        auto* subRow = new QWidget;
-        auto* subLay = new QHBoxLayout(subRow);
-        subLay->setContentsMargins(0, 4, 0, 4);
-        subLay->setSpacing(12);
+        // 同时为主页列表(mode 0)和详情页列表(mode 1)渲染UI
+        for (int mode = 0; mode < 2; ++mode) {
 
-        QString themeColor = "#718096";
-        QString badgeBg = "#E2E8F0";
-        QString badgeText = goal.category;
-        QString displayText = goal.name;
-
-        if (goal.category == QStringLiteral("知识点学习")) {
-            themeColor = "#38A169";
-            badgeBg = "#DCF3EA";
-        } else if (goal.category == QStringLiteral("练习")) {
-            themeColor = "#6B7CFF";
-            badgeBg = "#EBE5FF";
-            if (!goal.subCategory.isEmpty()) {
-                badgeText = QStringLiteral("练习 · %1").arg(goal.subCategory);
+            // 👇👇👇 核心修改：如果是展开详情页 (mode == 1) 且目标已完成，则直接跳过不生成界面 👇👇👇
+            if (mode == 1 && isCompleted) {
+                continue;
             }
-        } else if (goal.category == QStringLiteral("测试")) {
-            themeColor = "#DD6B20";
-            badgeBg = "#FFE8D6";
-        }
 
-        auto* checkBtn = new QPushButton;
-        checkBtn->setFixedSize(24, 24);
-        checkBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        checkBtn->setCursor(Qt::PointingHandCursor);
+            auto* subRow = new QWidget;
+            auto* subLay = new QHBoxLayout(subRow);
+            subLay->setContentsMargins(0, 4, 0, 4);
+            subLay->setSpacing(12);
 
-        if (isCompleted) {
-            checkBtn->setText(QStringLiteral("✓"));
-            checkBtn->setStyleSheet(QString(
-                                        "QPushButton {"
-                                        "  min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px;"
-                                        "  padding: 0; margin: 0;"
-                                        "  background-color: %1; color: white;"
-                                        "  border-radius: 12px; border: none; font-size: 14px; font-weight: bold;"
-                                        "}"
-                                        ).arg(themeColor));
-        } else {
-            checkBtn->setText(QStringLiteral(""));
-            checkBtn->setStyleSheet(QString(
-                                        "QPushButton {"
-                                        "  min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px;"
-                                        "  padding: 0; margin: 0;"
-                                        "  background-color: transparent; border: 2px solid #CBD5E0;"
-                                        "  border-radius: 12px;"
-                                        "}"
-                                        "QPushButton:hover { border-color: %1; background-color: %2; }"
-                                        ).arg(themeColor, badgeBg));
-        }
+            if (mode == 1) {
+                subRow->setStyleSheet("QWidget { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; }");
+                subLay->setContentsMargins(12, 10, 12, 10);
+            }
 
-        connect(checkBtn, &QPushButton::clicked, this, [this, i]() {
-            bool currentlyDone = (subGoals_[i].current >= subGoals_[i].target && subGoals_[i].target > 0);
-            if (currentlyDone) {
-                subGoals_[i].current = 0;
+            QString themeColor = "#718096";
+            QString badgeBg = "#E2E8F0";
+            QString badgeText = goal.category;
+            QString displayText = goal.name;
+
+            if (goal.category == QStringLiteral("知识点学习")) {
+                themeColor = "#38A169";
+                badgeBg = "#DCF3EA";
+            } else if (goal.category == QStringLiteral("练习")) {
+                themeColor = "#6B7CFF";
+                badgeBg = "#EBE5FF";
+                if (!goal.subCategory.isEmpty()) {
+                    badgeText = QStringLiteral("练习 · %1").arg(goal.subCategory);
+                }
+            } else if (goal.category == QStringLiteral("测试")) {
+                themeColor = "#DD6B20";
+                badgeBg = "#FFE8D6";
+            }
+
+            auto* checkBtn = new QPushButton;
+            checkBtn->setCursor(Qt::PointingHandCursor);
+
+            if (isCompleted) {
+                int btnSize = 22;
+                checkBtn->setFixedSize(btnSize, btnSize);
+                checkBtn->setText(QStringLiteral("✓"));
+                checkBtn->setStyleSheet(QString(
+                                            "QPushButton {"
+                                            "  min-width: 22px; max-width: 22px; min-height: 22px; max-height: 22px;"
+                                            "  background-color: %1; color: white;"
+                                            "  border-radius: 11px; border: none; font-size: 12px; font-weight: bold;"
+                                            "  padding: 0px; margin: 0px;"
+                                            "}"
+                                            ).arg(themeColor));
             } else {
-                subGoals_[i].current = subGoals_[i].target;
+                int btnSize = 30;
+                checkBtn->setFixedSize(btnSize, btnSize);
+                checkBtn->setText(QStringLiteral(""));
+                checkBtn->setStyleSheet(QString(
+                                            "QPushButton {"
+                                            "  min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px;"
+                                            "  background-color: transparent; border: 2px solid #CBD5E0;"
+                                            "  border-radius: 15px; padding: 0px; margin: 0px;"
+                                            "}"
+                                            "QPushButton:hover { border-color: %1; background-color: %2; }"
+                                            ).arg(themeColor, badgeBg));
             }
-            updateGoalUI();
-            saveGoals();
-        });
 
-        auto* badgeLbl = new QLabel(badgeText);
-        badgeLbl->setAlignment(Qt::AlignCenter);
-        badgeLbl->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-
-        if (isCompleted) {
-            badgeLbl->setStyleSheet(QStringLiteral("background-color: #F7FAFC; color: #A0AEC0; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none;"));
-        } else {
-            badgeLbl->setStyleSheet(QStringLiteral("background-color: %1; color: %2; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none;").arg(badgeBg, themeColor));
-        }
-
-        auto* nameLbl = new QLabel(displayText);
-        nameLbl->setWordWrap(true);
-        nameLbl->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-
-        if (isCompleted) {
-            nameLbl->setStyleSheet("color: #A0AEC0; font-size: 14px; text-decoration: line-through; border: none;");
-        } else {
-            nameLbl->setStyleSheet("color: #2D3748; font-size: 14px; font-weight: 500; border: none;");
-        }
-
-        subLay->addWidget(checkBtn, 0, Qt::AlignVCenter);
-        subLay->addWidget(badgeLbl, 0, Qt::AlignVCenter);
-        subLay->addWidget(nameLbl, 1, Qt::AlignVCenter);
-
-        if (!goal.deadline.isEmpty()) {
-            QDate targetDate = QDate::fromString(goal.deadline, Qt::ISODate);
-            if (targetDate.isValid()) {
-                qint64 daysLeft = QDate::currentDate().daysTo(targetDate);
-                QString timeText;
-                QString timeStyle;
-
-                if (isCompleted) {
-                    timeText = QStringLiteral("已达成");
-                    timeStyle = "color: #CBD5E0; font-size: 12px; border: none; font-weight: bold;";
+            connect(checkBtn, &QPushButton::clicked, this, [this, i]() {
+                bool currentlyDone = (subGoals_[i].current >= subGoals_[i].target && subGoals_[i].target > 0);
+                if (currentlyDone) {
+                    subGoals_[i].current = 0;
+                } else {
+                    subGoals_[i].current = subGoals_[i].target;
                 }
-                else if (daysLeft < 0) {
-                    timeText = QStringLiteral("已逾期");
-                    timeStyle = "color: #E53E3E; font-size: 12px; border: none; font-weight: bold;";
-                }
-                else if (daysLeft <= 1) {
-                    timeText = (daysLeft == 0) ? QStringLiteral("今日截止") : QStringLiteral("剩余 1 天");
-                    timeStyle = "color: #E53E3E; font-size: 12px; border: none; font-weight: bold;";
-                }
-                else {
-                    timeText = QStringLiteral("剩余 %1 天").arg(daysLeft);
-                    timeStyle = "color: #A0AEC0; font-size: 12px; border: none; font-weight: bold;";
-                }
+                updateGoalUI();
+                saveGoals();
+            });
 
-                auto* dateLbl = new QLabel(QStringLiteral("⏳ ") + timeText);
-                dateLbl->setStyleSheet(timeStyle);
-                subLay->addWidget(dateLbl, 0, Qt::AlignVCenter);
+            auto* badgeLbl = new QLabel(badgeText);
+            badgeLbl->setAlignment(Qt::AlignCenter);
+            badgeLbl->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+
+            if (isCompleted) {
+                badgeLbl->setStyleSheet(QStringLiteral("background-color: #F7FAFC; color: #A0AEC0; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none;"));
+            } else {
+                badgeLbl->setStyleSheet(QStringLiteral("background-color: %1; color: %2; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none;").arg(badgeBg, themeColor));
             }
-        }
 
-        subGoalsLayout_->addWidget(subRow);
+            auto* nameLbl = new QLabel(displayText);
+            nameLbl->setWordWrap(true);
+            nameLbl->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+            if (isCompleted) {
+                nameLbl->setStyleSheet("color: #A0AEC0; font-size: 14px; text-decoration: line-through; border: none; background: transparent;");
+            } else {
+                nameLbl->setStyleSheet("color: #2D3748; font-size: 14px; font-weight: 500; border: none; background: transparent;");
+            }
+
+            subLay->addWidget(checkBtn, 0, Qt::AlignVCenter);
+            subLay->addWidget(badgeLbl, 0, Qt::AlignVCenter);
+            subLay->addWidget(nameLbl, 1, Qt::AlignVCenter);
+
+            if (!goal.deadline.isEmpty()) {
+                QDate targetDate = QDate::fromString(goal.deadline, Qt::ISODate);
+                if (targetDate.isValid()) {
+                    qint64 daysLeft = QDate::currentDate().daysTo(targetDate);
+                    QString timeText;
+                    QString timeStyle;
+
+                    // 👇👇👇 核心修改：明确显式具体的“截止日期”并在括号内加上倒计时 👇👇👇
+                    QString dateStr = targetDate.toString("MM/dd");
+
+                    if (isCompleted) {
+                        timeText = QStringLiteral("已达成");
+                        timeStyle = "color: #CBD5E0; font-size: 12px; border: none; font-weight: bold;";
+                    }
+                    else if (daysLeft < 0) {
+                        timeText = QStringLiteral("%1 (已逾期)").arg(dateStr);
+                        timeStyle = "color: #E53E3E; font-size: 12px; border: none; font-weight: bold;";
+                    }
+                    else if (daysLeft <= 1) {
+                        timeText = QStringLiteral("%1 %2").arg(dateStr, daysLeft == 0 ? QStringLiteral("(今日截止)") : QStringLiteral("(剩余 1 天)"));
+                        timeStyle = "color: #E53E3E; font-size: 12px; border: none; font-weight: bold;";
+                    }
+                    else {
+                        timeText = QStringLiteral("%1 (剩余 %2 天)").arg(dateStr).arg(daysLeft);
+                        timeStyle = "color: #A0AEC0; font-size: 12px; border: none; font-weight: bold;";
+                    }
+
+                    auto* dateLbl = new QLabel(QStringLiteral("⏳ ") + timeText);
+                    dateLbl->setStyleSheet(timeStyle + " background: transparent;");
+                    subLay->addWidget(dateLbl, 0, Qt::AlignVCenter);
+                }
+            }
+
+            if (mode == 0) subGoalsLayout_->addWidget(subRow);
+            else detailSubGoalsLayout_->addWidget(subRow);
+        }
     };
 
-    for (int idx : pendingList) {
-        createRowUI(idx, false);
+    for (int idx : pendingList) createRowUI(idx, false);
+    for (int idx : doneList) createRowUI(idx, true);
+
+    // 👇 附加优化：如果详情页的未完成任务全部清空了，展示一个庆祝文本
+    if (pendingList.isEmpty()) {
+        auto* emptyDetailLbl = new QLabel(QStringLiteral("🎉 太棒啦！当前阶段任务已全部清理完毕！"));
+        emptyDetailLbl->setStyleSheet("color: #8A8FA3; font-size: 14px; margin-top: 30px; border: none;");
+        emptyDetailLbl->setAlignment(Qt::AlignCenter);
+        detailSubGoalsLayout_->addWidget(emptyDetailLbl);
     }
 
-    for (int idx : doneList) {
-        createRowUI(idx, true);
-    }
-
+    // 更新两个页面的百分比与进度条
     int avgPercent = subGoals_.isEmpty() ? 0 : qRound(sumOfPercentages / subGoals_.size());
-    goalProgressBar_->setRange(0, 100);
     goalProgressBar_->setValue(avgPercent);
-    goalPercentLabel_->setText(QStringLiteral("%1%").arg(avgPercent));
+    detailProgressBar_->setValue(avgPercent);
+    goalPercentLabel_->setText(QString("%1%").arg(avgPercent));
+    detailPercentLabel_->setText(QString("%1%").arg(avgPercent));
 
-    if (avgPercent >= 100) {
-        goalPercentLabel_->setStyleSheet("font-size: 14px; font-weight: 700; color: #4CAF50; border: none;");
-        goalProgressBar_->setStyleSheet("QProgressBar { background-color: #E2E8F0; border-radius: 4px; border: none; }"
-                                        "QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #81C784, stop:1 #4CAF50); border-radius: 4px; }");
-    } else {
-        goalPercentLabel_->setStyleSheet("font-size: 14px; font-weight: 700; color: #6B7CFF; border: none;");
-        goalProgressBar_->setStyleSheet("QProgressBar { background-color: #E2E8F0; border-radius: 4px; border: none; }"
-                                        "QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #8E9EFF, stop:1 #6B7CFF); border-radius: 4px; }");
-    }
+    // 进度条颜色微调
+    QString barStyle = avgPercent >= 100 ? "QProgressBar { background-color: #E2E8F0; border-radius: 4px; border: none; } QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #81C784, stop:1 #4CAF50); border-radius: 4px; }"
+                                         : "QProgressBar { background-color: #E2E8F0; border-radius: 4px; border: none; } QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #8E9EFF, stop:1 #6B7CFF); border-radius: 4px; }";
+    goalProgressBar_->setStyleSheet(barStyle);
+    detailProgressBar_->setStyleSheet(barStyle);
 }
 
 bool HomePage::eventFilter(QObject* obj, QEvent* e) {
+    // 保持你原本拦截主窗体关闭以确认未保存编辑的逻辑不变
     if (e->type() == QEvent::Close && obj == this->window()) {
         if (editDialog_ && editDialog_->isVisible()) {
-            int ans = QMessageBox::question(this,
-                                            QStringLiteral("关闭提示"),
-                                            QStringLiteral("有未保存的目标，是否继续关闭窗口？"),
-                                            QMessageBox::Yes | QMessageBox::No,
-                                            QMessageBox::No);
-
-            if (ans == QMessageBox::No) {
-                return true;
-            }
+            int ans = QMessageBox::question(this, QStringLiteral("关闭提示"), QStringLiteral("有未保存的目标，是否继续关闭窗口？"), QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (ans == QMessageBox::No) return true;
         }
     }
 
     if (e->type() == QEvent::MouseButtonRelease) {
-        auto it = cardTargets_.constFind(obj);
-        if (it != cardTargets_.constEnd()) {
-            auto* me = static_cast<QMouseEvent*>(e);
-            if (me->button() == Qt::LeftButton) {
+        auto* me = static_cast<QMouseEvent*>(e);
+        if (me->button() == Qt::LeftButton) {
+
+            // ====== 【核心修改】点击 GoalFrame 区域时，无缝平滑切到展开详情页 ======
+            if (obj->objectName() == QStringLiteral("GoalFrame")) {
+                if (stackedWidget_) {
+                    stackedWidget_->setCurrentIndex(1); // 切换到详情页面 (Detail Page)
+                }
+                return true;
+            }
+
+            auto it = cardTargets_.constFind(obj);
+            if (it != cardTargets_.constEnd()) {
                 emit requestNavigate(it.value());
                 return true;
             }
@@ -1118,5 +1231,9 @@ bool HomePage::eventFilter(QObject* obj, QEvent* e) {
     }
     return QWidget::eventFilter(obj, e);
 }
-
+void HomePage::showGoalDetail() {
+    if (stackedWidget_ && stackedWidget_->currentIndex() != 1) {
+        stackedWidget_->setCurrentIndex(1); // 强制切到详情页
+    }
+}
 }

@@ -183,7 +183,9 @@ void LearningPage::buildDashboard()
     auto* stat4 = makeStatCard(QStringLiteral("推荐练习"), QStringLiteral("—"),      QStringLiteral("待系统生成"), m_dashboard);
 
     connect(stat1, &ClickableCard::clicked, this, &LearningPage::showLearningCenter);
-    connect(stat2, &ClickableCard::clicked, this, &LearningPage::showLearningCenter);
+    connect(stat2, &ClickableCard::clicked, this, [this]() {
+        emit requestNavigateToHomeGoalDetail();
+    });
     connect(stat3, &ClickableCard::clicked, this, &LearningPage::showWrongBook);
     connect(stat4, &ClickableCard::clicked, this, &LearningPage::showLearningCenter);
 
