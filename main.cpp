@@ -24,8 +24,6 @@ int main(int argc, char* argv[]) {
     AlgeMate::ThemeManager::instance().applyTheme(
         AlgeMate::ThemeManager::Theme::Light);
 
-    app.setWindowIcon(QIcon(":/icon.ico"));
-
     AlgeMate::MainWindow w;
     w.show();
     return app.exec();

@@ -5,8 +5,6 @@ qt_add_library(algemate_ai_solver STATIC
     DeepSeekClient.cpp
     MessageBubble.h
     MessageBubble.cpp
-    OcrAttachWidget.h
-    OcrAttachWidget.cpp
 )
 
 target_link_libraries(algemate_ai_solver

@@ -427,22 +427,9 @@ void LearningPage::saveModuleStudyTime(const QString& moduleKey, int seconds) co
     settings.endGroup();
 }
 
-void LearningPage::saveHourStudyTime(int hour, int seconds) const
-{
-    if (hour < 0 || hour > 23 || seconds <= 0) return;
-    QSettings settings;
-    settings.beginGroup(QStringLiteral("learning/studySecondsByHour"));
-    settings.beginGroup(m_studyDate.toString(Qt::ISODate));
-    const QString key = QString::number(hour);
-    settings.setValue(key, settings.value(key, 0).toInt() + seconds);
-    settings.endGroup();
-    settings.endGroup();
-}
-
 void LearningPage::startStudyTimer()
 {
     m_lastStudyTick = QDateTime::currentDateTime();
-    m_pendingStudyMs = 0;
     if (!m_studyTimer->isActive()) {
         m_studyTimer->start();
     }
@@ -461,41 +448,26 @@ void LearningPage::handleStudyTimerTick()
 {
     const QDate today = QDate::currentDate();
     if (m_studyDate != today) {
-        // 跨日: 先把昨日最后状态落盘, 再切换. 否则下一次 saveTodayStudyTime 会用 today 写 0 秒覆盖
-        if (m_studyDate.isValid() && m_todayStudySeconds > 0) {
-            saveTodayStudyTime();
-        }
         m_studyDate = today;
         m_todayStudySeconds = 0;
         m_todayAutoCheckedIn = false;
-        m_pendingStudyMs = 0;
     }
 
     const QDateTime now = QDateTime::currentDateTime();
     if (!shouldCountStudyTime()) {
         m_lastStudyTick = now;
-        m_pendingStudyMs = 0;        // 非活跃期间不累积残余
         refreshTodayStudyCard();
         return;
     }
 
     if (m_lastStudyTick.isValid()) {
-        // 用毫秒累加, 整秒部分进位。避免 QTimer 1000ms 调度抖动下 secsTo 永返 0.
-        const qint64 elapsedMs = m_lastStudyTick.msecsTo(now);
-        if (elapsedMs > 0) {
-            m_pendingStudyMs += elapsedMs;
-            // 防休眠后一次补太多 (原隐患): 超过 5 分钟丢弃
-            if (m_pendingStudyMs > 5LL * 60LL * 1000LL) m_pendingStudyMs = 0;
-            const int wholeSeconds = static_cast<int>(m_pendingStudyMs / 1000);
-            if (wholeSeconds > 0) {
-                m_pendingStudyMs -= static_cast<qint64>(wholeSeconds) * 1000;
-                m_todayStudySeconds += wholeSeconds;
-                saveModuleStudyTime(currentModuleKey(), wholeSeconds);
-                saveHourStudyTime(now.time().hour(), wholeSeconds);
-                if (m_stack && m_learningCenterPage
-                    && m_stack->currentWidget() == m_learningCenterPage) {
-                    m_learningCenterPage->refreshData();
-                }
+        const qint64 elapsed = m_lastStudyTick.secsTo(now);
+        if (elapsed > 0) {
+            const int elapsedSeconds = static_cast<int>(elapsed);
+            m_todayStudySeconds += elapsedSeconds;
+            saveModuleStudyTime(currentModuleKey(), elapsedSeconds);
+            if (m_stack && m_stack->currentIndex() == 8 && m_learningCenterPage) {
+                m_learningCenterPage->refreshData();
             }
         }
     }
@@ -504,7 +476,7 @@ void LearningPage::handleStudyTimerTick()
     updateAutoCheckin();
     refreshTodayStudyCard();
 
-    if (m_todayStudySeconds > 0 && m_todayStudySeconds % 30 == 0) {
+    if (m_todayStudySeconds % 30 == 0) {
         saveTodayStudyTime();
     }
 }

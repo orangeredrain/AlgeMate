@@ -23,8 +23,6 @@
 #include <algorithm>
 #include <set>
 
-#include <QStringList>
-
 namespace AlgeMate::Calculator::Interactive {
 
 using algemate::math::AlgReal;
@@ -36,129 +34,6 @@ using algemate::math::Polynomial;
 using algemate::math::PolynomialZp;
 
 // 类型转换辅助
-
-namespace {
-
-// ================ Jordan / 复根数值化辅助 (参考 demo/JordanFormPage) ================
-//
-// 原 “jordan(A)” 走 algemate::math::jordanForm 的精确复数路径，在含重根或复特征
-// 值时会崩溃。现改为：先走 λ-矩阵 → 行列式因子 → 不变因子（均精确），再在 ℂ 上
-// 用 Durand–Kerner 数值求根得到初等因子 / Jordan 块。与 demo 页一致。
-
-using JCmplx = std::complex<double>;
-
-inline std::vector<JCmplx> jPolyToCoeffs(const Polynomial<Fraction>& p) {
-    std::vector<JCmplx> c;
-    for (const auto& coeff : p.coeffs())
-        c.emplace_back(coeff.toDouble(), 0.0);
-    return c;
-}
-
-inline JCmplx jEvalPoly(const std::vector<JCmplx>& c, JCmplx x) {
-    JCmplx r(0.0, 0.0);
-    for (int i = static_cast<int>(c.size()) - 1; i >= 0; --i)
-        r = r * x + c[i];
-    return r;
-}
-
-inline std::vector<JCmplx> jDurandKerner(const std::vector<JCmplx>& c) {
-    int n = static_cast<int>(c.size()) - 1;
-    if (n <= 0) return {};
-    if (n == 1) return {-c[0] / c[1]};
-    std::vector<JCmplx> roots(n);
-    for (int i = 0; i < n; ++i) {
-        double angle = 2.0 * 3.141592653589793 * i / n + 0.4;
-        roots[i] = JCmplx(0.4 * std::cos(angle), 0.9 * std::sin(angle));
-    }
-    for (int iter = 0; iter < 200; ++iter) {
-        double maxDelta = 0.0;
-        for (int i = 0; i < n; ++i) {
-            JCmplx p = jEvalPoly(c, roots[i]);
-            JCmplx denom(1.0, 0.0);
-            for (int j = 0; j < n; ++j)
-                if (j != i) denom *= (roots[i] - roots[j]);
-            if (std::abs(denom) < 1e-60) { roots[i] += JCmplx(1e-8, 1e-8); continue; }
-            JCmplx delta = p / denom;
-            if (std::abs(delta) > 1e6) delta = delta * (1e6 / std::abs(delta));
-            roots[i] -= delta;
-            maxDelta = std::max(maxDelta, std::abs(delta));
-        }
-        if (maxDelta < 1e-12) break;
-    }
-    return roots;
-}
-
-struct JNumRoot { double re; double im; int mult; };
-
-inline std::vector<JNumRoot> jNumericalRoots(const Polynomial<Fraction>& p) {
-    if (p.degree() <= 0) return {};
-    auto coeffs = jPolyToCoeffs(p);
-    auto roots  = jDurandKerner(coeffs);
-    for (auto& r : roots)
-        if (std::abs(r.imag()) < 1e-3) r = JCmplx(r.real(), 0.0);
-    std::vector<JNumRoot> result;
-    std::vector<bool> used(roots.size(), false);
-    for (std::size_t i = 0; i < roots.size(); ++i) {
-        if (used[i]) continue;
-        double re = roots[i].real(), im = roots[i].imag();
-        int mult = 1;
-        for (std::size_t j = i + 1; j < roots.size(); ++j) {
-            if (used[j]) continue;
-            double dr = re - roots[j].real(), di = im - roots[j].imag();
-            if (dr * dr + di * di < 1e-6) { ++mult; used[j] = true; }
-        }
-        used[i] = true;
-        result.push_back({re, im, mult});
-    }
-    return result;
-}
-
-inline QString jFmtDouble(double v) {
-    if (std::abs(v) < 1e-12) v = 0.0;
-    QString s = QString::number(v, 'f', 2);
-    if (s.contains(QLatin1Char('.'))) {
-        while (s.endsWith(QLatin1Char('0'))) s.chop(1);
-        if (s.endsWith(QLatin1Char('.'))) s.chop(1);
-    }
-    return s;
-}
-
-// 复数 (re, im) → LaTeX. 纯实 / 纯虚 / 一般复数 三种格式。
-inline QString jComplexNumLtx(double re, double im) {
-    if (jFmtDouble(std::abs(im)) == QStringLiteral("0"))
-        return jFmtDouble(re);
-    if (jFmtDouble(std::abs(re)) == QStringLiteral("0")) {
-        if (std::abs(im - 1.0) < 1e-12) return QStringLiteral("i");
-        if (std::abs(im + 1.0) < 1e-12) return QStringLiteral("-i");
-        return jFmtDouble(im) + QStringLiteral("i");
-    }
-    QString sign = (im > 0) ? QStringLiteral("+") : QStringLiteral("");
-    return jFmtDouble(re) + sign + jFmtDouble(im) + QStringLiteral("i");
-}
-
-// 初等因子的单个一次因式 LaTeX, 例如 (\lambda - 3) / (\lambda + 2) / (\lambda - 2i) / (\lambda - (1+2i))
-inline QString jFormatFactorLtx(double re, double im, int mult) {
-    QString factor;
-    if (jFmtDouble(std::abs(im)) == QStringLiteral("0")) {
-        if (jFmtDouble(std::abs(re)) == QStringLiteral("0"))
-            factor = QStringLiteral("\\lambda");
-        else if (re > 0)
-            factor = QStringLiteral("(\\lambda - %1)").arg(jFmtDouble(re));
-        else
-            factor = QStringLiteral("(\\lambda + %1)").arg(jFmtDouble(-re));
-    } else if (jFmtDouble(std::abs(re)) == QStringLiteral("0")) {
-        if (im > 0)
-            factor = QStringLiteral("(\\lambda - %1)").arg(jComplexNumLtx(0, im));
-        else
-            factor = QStringLiteral("(\\lambda + %1)").arg(jComplexNumLtx(0, -im));
-    } else {
-        factor = QStringLiteral("(\\lambda - (%1))").arg(jComplexNumLtx(re, im));
-    }
-    if (mult > 1) factor += QStringLiteral("^{%1}").arg(mult);
-    return factor;
-}
-
-} // anonymous namespace
 
 static Matrix<Fraction> toFractionMatrix(const MatrixA& M, const char* op) {
     Matrix<Fraction> F(M.rows(), M.cols());
@@ -1332,10 +1207,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                     break;
                 }
             }
-            if (p == 0) {
-                // qq 本身是素数 (包含 q=2,3,5,7 等一次幂情况): p^1
-                p = qq; k = 1; qq = 1;
-            }
+            if (p == 0) { p = qq; k = 1; }  // q 本身是素数
             if (qq != 1) throw std::runtime_error(
                 "irredcnt: 有限域的阶一定是素数的方幂, q=" + std::to_string(q) + " 不合法");
         }
@@ -1635,124 +1507,75 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value::makeNamedMatrices(std::move(items));
     }
 
-    // ================ Jordan 标准形 (复数域数值化; 参考 demo/JordanFormPage) ================
-    //
-    // 不再调用 algemate::math::jordanForm (含重根 / 复特征值时会崩溃), 改为:
-    //   1) 精确: λI - A → 行列式因子 D_k(λ) → 不变因子 d_k = D_k / D_{k-1}
-    //   2) 数值: 对每个非常量不变因子用 Durand–Kerner 在 ℂ 上求复根 → 初等因子 → Jordan 块
-    //   3) 输出: J 以 LaTeX 矩阵的形式返回 (元素可为复数), 不再提供似实矩阵 Q.
+    // ================ Jordan / 有理标准形 ================
     if (fn == "jordan") {
         need(1);
         if (!args[0].isMatrix()) throw std::runtime_error("jordan 需要矩阵参数");
         const MatrixA& Ma = args[0].asMatrix();
         if (!Ma.isSquare()) throw std::runtime_error("jordan 要求方阵");
         Matrix<Fraction> A = toFractionMatrix(Ma, "jordan");
-
-        // ---- 1. 行列式因子 D_k (精确) ----
-        auto lamM = algemate::math::lambdaMinus(A);
-        std::vector<Polynomial<Fraction>> D = algemate::math::determinantalDivisors(lamM);
-        const std::size_t n = A.rows();
-
-        // ---- 2. 不变因子 d_k = D_k / D_{k-1} (含连续的 1) ----
-        std::vector<Polynomial<Fraction>> allInvs;
-        std::vector<Polynomial<Fraction>> nonOneInvs;
-        {
-            Polynomial<Fraction> Dprev(Fraction(1));
-            for (std::size_t k = 0; k < D.size(); ++k) {
-                auto qr = D[k].divmod(Dprev);
-                allInvs.push_back(qr.quotient);
-                Dprev = D[k];
-                if (!(qr.quotient.degree() == 0
-                      && qr.quotient.coeffs()[0] == Fraction(1)))
-                    nonOneInvs.push_back(qr.quotient);
+        auto lm = algemate::math::lambdaMinus(A);
+        auto detDivs = algemate::math::determinantalDivisors(lm);
+        auto invDivs = algemate::math::invariantFactors(lm);
+        auto elemDivs = algemate::math::elementaryDivisorsOf(A);
+        auto jr = algemate::math::jordanForm(A);
+        // J / Q 转为 MatrixA (仅在纯实时可行)
+        MatrixA J(jr.J.rows(), jr.J.cols());
+        for (std::size_t i = 0; i < jr.J.rows(); ++i) {
+            for (std::size_t j = 0; j < jr.J.cols(); ++j) {
+                const Complex& z = jr.J(i, j);
+                if (!z.imag().isZero())
+                    throw std::runtime_error("jordan 暂不支持含复特征值的输出");
+                J(i, j) = z.real();
             }
         }
-
-        // ---- 3. 初等因子 + Jordan 块 (复数域数值) ----
-        struct JBlockInfo { double re; double im; int size; };
-        std::vector<JBlockInfo> blockInfos;
-        std::vector<QString>    elemFactorLtx;   // 按不变因子分组拼成一个乘积字符串
-        for (const auto& inv : nonOneInvs) {
-            auto roots = jNumericalRoots(inv);
-            QStringList terms;
-            for (const auto& r : roots) {
-                terms << jFormatFactorLtx(r.re, r.im, r.mult);
-                blockInfos.push_back({r.re, r.im, r.mult});
+        MatrixA Qm(jr.Q.rows(), jr.Q.cols());
+        for (std::size_t i = 0; i < jr.Q.rows(); ++i) {
+            for (std::size_t j = 0; j < jr.Q.cols(); ++j) {
+                const Complex& z = jr.Q(i, j);
+                if (!z.imag().isZero())
+                    throw std::runtime_error("jordan 暂不支持含复特征向量的输出");
+                Qm(i, j) = z.real();
             }
-            elemFactorLtx.push_back(terms.join(QStringLiteral(",\\quad ")));
         }
-
-        // ---- 4. 拼出 Jordan 矩阵的 LaTeX (让完整于不变因子乘积为 1 的退化情况也能走) ----
-        QString jLtx;
-        if (blockInfos.empty()) {
-            // 所有不变因子都是 1 → 只能是 n=0; 多举步逻辑会报 "要求方阵", 这里避免除零.
-            jLtx = QStringLiteral("J = ()");
-        } else {
-            std::size_t total = 0;
-            for (const auto& bi : blockInfos)
-                total += static_cast<std::size_t>(bi.size);
-            const bool ghost = (total == 1);
-            QString cols = ghost ? QStringLiteral("cr")
-                                 : QString(static_cast<int>(total), QLatin1Char('c'));
-            QString body;
-            std::size_t off = 0;
-            for (const auto& bi : blockInfos) {
-                for (int i = 0; i < bi.size; ++i) {
-                    if (off + static_cast<std::size_t>(i) > 0)
-                        body += QStringLiteral(" \\\\ ");
-                    for (std::size_t j = 0; j < total; ++j) {
-                        if (j) body += QStringLiteral(" & ");
-                        if (j == off + static_cast<std::size_t>(i))
-                            body += jComplexNumLtx(bi.re, bi.im);
-                        else if (j == off + static_cast<std::size_t>(i) + 1
-                                 && i + 1 < bi.size)
-                            body += QStringLiteral("1");
-                        else
-                            body += QStringLiteral("0");
-                    }
-                    if (ghost) body += QStringLiteral(" & ");
-                }
-                off += static_cast<std::size_t>(bi.size);
-            }
-            jLtx = QStringLiteral(
-                "J = \\left(\\begin{array}{%1}%2\\end{array}\\right)")
-                .arg(cols, body);
-        }
-
-        // ---- 5. 说明垃圈 (行列式因子 / 不变因子 / 初等因子 / Jordan 块) ----
         QString note;
-        note += QStringLiteral("Jordan 标准形 (复数域, 数值解); 特征值含复数时已以 $a+bi$ 形式呈现.");
+        note += QStringLiteral("满足 $Q^{-1} A Q = J$.");
         note += QStringLiteral("\n行列式因子:");
-        for (std::size_t k = 0; k < D.size(); ++k) {
+        for (std::size_t k = 0; k < detDivs.size(); ++k) {
             note += QStringLiteral("\n  $D_{%1}(\\lambda) = %2$")
                         .arg(k + 1)
-                        .arg(polyFractionToLatex_(D[k], QStringLiteral("\\lambda ")));
+                        .arg(polyFractionToLatex_(detDivs[k], QStringLiteral("\\lambda ")));
         }
         note += QStringLiteral("\n不变因子:");
-        for (std::size_t i = 0; i < allInvs.size(); ++i) {
-            note += QStringLiteral("\n  $d_{%1}(\\lambda) = %2$")
-                        .arg(i + 1)
-                        .arg(polyFractionToLatex_(allInvs[i], QStringLiteral("\\lambda ")));
+        {
+            const std::size_t n = A.rows();
+            const std::size_t pad = (invDivs.size() < n) ? (n - invDivs.size()) : 0;
+            for (std::size_t i = 0; i < pad; ++i) {
+                note += QStringLiteral("\n  $d_{%1}(\\lambda) = 1$").arg(i + 1);
+            }
+            for (std::size_t i = 0; i < invDivs.size(); ++i) {
+                note += QStringLiteral("\n  $d_{%1}(\\lambda) = %2$")
+                            .arg(pad + i + 1)
+                            .arg(polyFractionToLatex_(invDivs[i], QStringLiteral("\\lambda ")));
+            }
         }
-        note += QStringLiteral("\n初等因子 (复数域完全分解):");
-        if (elemFactorLtx.empty()) {
-            note += QStringLiteral("\n  无 (所有不变因子均为 1)");
-        } else {
-            for (const auto& s : elemFactorLtx)
-                note += QStringLiteral("\n  $%1$").arg(s);
-        }
-        note += QStringLiteral("\nJordan 块:");
-        if (blockInfos.empty()) {
+        note += QStringLiteral("\n初等因子:");
+        if (elemDivs.empty()) {
             note += QStringLiteral("\n  无");
         } else {
-            for (const auto& bi : blockInfos)
-                note += QStringLiteral("\n  $J_{%1}(%2)$")
-                            .arg(bi.size)
-                            .arg(jComplexNumLtx(bi.re, bi.im));
+            for (const auto& ed : elemDivs) {
+                QString pTex = polyFractionToLatex_(ed.prime, QStringLiteral("\\lambda "));
+                if (ed.power == 1)
+                    note += QStringLiteral("\n  $(%1)$").arg(pTex);
+                else
+                    note += QStringLiteral("\n  $(%1)^{%2}$").arg(pTex).arg(ed.power);
+            }
         }
         lastCallNote_ = note;
-        // makeText 走 renderNoteWithLatex, 需以 $...$ 包裹才会被当作 LaTeX 渲染.
-        return Value::makeText(QStringLiteral("$") + jLtx + QStringLiteral("$"));
+        std::vector<std::pair<QString, MatrixA>> items;
+        items.emplace_back(QStringLiteral("J ="), std::move(J));
+        items.emplace_back(QStringLiteral("Q ="), std::move(Qm));
+        return Value::makeNamedMatrices(std::move(items));
     }
     if (fn == "rcf" || fn == "frobenius" || fn == "rationalcanonical") {
         need(1);

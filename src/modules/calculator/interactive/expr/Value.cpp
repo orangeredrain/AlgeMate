@@ -1,5 +1,4 @@
 #include "Value.h"
-#include "latex/LatexRenderer.h"
 
 #include <QStringList>
 #include <QPainter>
@@ -847,14 +846,12 @@ static QString complexToLatex(const ComplexC& z, const DisplayFormat& fmt) {
 static QString matrixToLatex(const MatrixA& M, const DisplayFormat& fmt) {
     const std::size_t R = M.rows(), C = M.cols();
     if (R == 0 || C == 0) return QStringLiteral("[]");
-    // JKQTMathText 对单列 \begin{array} 有渲染 bug；单列时用对称 ghost {rcl}，
-    // 两侧各一个空列避免数字偏向括号一侧（单侧 ghost 会导致偏移）。
+    // JKQTMathText 对单列 \begin{array} 有渲染 bug, 添加 ghost 列绕过.
     const bool ghost = (C == 1);
-    QString cols = ghost ? QStringLiteral("rcl")
+    QString cols = ghost ? QStringLiteral("cr")
                          : QString(static_cast<int>(C), QLatin1Char('c'));
     QString body;
     for (std::size_t i = 0; i < R; ++i) {
-        if (ghost) body += QStringLiteral(" & ");
         for (std::size_t j = 0; j < C; ++j) {
             if (j) body += QStringLiteral(" & ");
             body += scalarToLatex(M(i, j), fmt, /*compact=*/true);
@@ -951,15 +948,18 @@ static QPixmap renderLatexPixmap(const QString& latex, const RenderTheme& th,
 // 前置声明: URL -> LaTeX 映射表 (同一 namespace 下供 embedLatexAsImg 调用)
 QHash<QString, QString>& g_latexByUrl_();
 
-// 矢量化入口：走 LatexRenderer::embedAsImg 生成 latex-vec:// 占位图，
-// InteractivePage 在 append 后会调 LatexRenderer::postProcessDocument(doc) 把占
-// 位替换为矢量 inline object。同时为保证本文件原有的“calc-tex:// URL 反
-// 查”路径仍然有效（其他路径仍可能生成 calc-vec:// / calc-nm:// 等估计路径），
-// 这里也走 g_latexByUrl_() 补一份。
 static QString embedLatexAsImg(const QString& latex, const RenderTheme& th,
                                QTextDocument* doc, int fontPt = 15) {
-    return AlgeMate::Latex::LatexRenderer::embedAsImg(
-        doc, latex, /*displayStyle=*/false, fontPt, QColor(th.text));
+    QPixmap px = renderLatexPixmap(latex, th, fontPt);
+    static long long counter = 0;
+    const QString url = QStringLiteral("calc-tex://%1").arg(++counter);
+    doc->addResource(QTextDocument::ImageResource, QUrl(url), px);
+    // 保存 URL -> LaTeX 映射, 输出区复制时反查还原为源码
+    g_latexByUrl_()[url] = latex;
+    int logicalW = int(px.width()  / px.devicePixelRatio());
+    int logicalH = int(px.height() / px.devicePixelRatio());
+    return QStringLiteral("<img src=\"%1\" width=\"%2\" height=\"%3\" />")
+        .arg(url).arg(logicalW).arg(logicalH);
 }
 
 QHash<QString, QString>& g_latexByUrl_() {

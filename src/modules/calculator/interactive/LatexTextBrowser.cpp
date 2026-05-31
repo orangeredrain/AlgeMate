@@ -2,8 +2,6 @@
 #include "LatexTextBrowser.h"
 
 #include "expr/Value.h"  // latexForImageUrl
-#include "latex/LatexInlineHandler.h"
-#include "latex/LatexRenderer.h"
 
 #include <QMimeData>
 #include <QTextBlock>
@@ -28,21 +26,9 @@ QMimeData* LatexTextBrowser::createMimeDataFromSelection() const {
             const int fe = fs + frag.length();
             if (fe <= selStart || fs >= selEnd) continue;
             const QTextCharFormat cf = frag.charFormat();
-            // 矢量化路径：kLatexObjectType inline object 优先从其 property 读原始 LaTeX
-            if (cf.objectType() == AlgeMate::Latex::kLatexObjectType) {
-                QString src = cf.property(AlgeMate::Latex::kLatexOrigSourceProp).toString();
-                if (src.isEmpty())
-                    src = cf.property(AlgeMate::Latex::kLatexSourceProp).toString();
-                if (!src.isEmpty()) {
-                    out += src;
-                    continue;
-                }
-            }
             if (cf.isImageFormat()) {
                 const QString url = cf.toImageFormat().name();
-                // 优先试 Latex::LatexRenderer 全局表（latex-vec://），再试本模块表（calc-tex:// 等）
-                QString latex = AlgeMate::Latex::LatexRenderer::latexForUrl(url);
-                if (latex.isEmpty()) latex = latexForImageUrl(url);
+                const QString latex = latexForImageUrl(url);
                 if (!latex.isEmpty()) {
                     out += latex;
                     continue;

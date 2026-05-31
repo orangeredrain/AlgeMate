@@ -1,7 +1,6 @@
 #include "WrongBookPage.h"
 #include "latex/LatexRenderer.h"
 #include "latex/LatexTextBrowser.h"
-#include "core/ThemeManager.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -25,10 +24,7 @@ namespace AlgeMate::Learning {
 static QPushButton* makeBackBtn(QWidget* parent = nullptr) {
     auto* btn = new QPushButton(QStringLiteral("← 返回"), parent);
     btn->setObjectName(QStringLiteral("LearnBackBtn"));
-    const bool dark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
-    btn->setStyleSheet(dark
-        ? "QPushButton { background: transparent; border: 1px solid #3B395A; padding: 6px 12px; border-radius: 6px; color: #C9C9DC;} QPushButton:hover { background: #28263F; }"
-        : "QPushButton { background: transparent; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; color: #4a5568;} QPushButton:hover { background: #edf2f7; }");
+    btn->setStyleSheet("QPushButton { background: transparent; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; color: #4a5568;} QPushButton:hover { background: #edf2f7; }");
     return btn;
 }
 
@@ -38,9 +34,7 @@ WrongDetailDialog::WrongDetailDialog(const Question& q, const QString& time, int
 {
     setWindowTitle(isRedoMode ? QStringLiteral("🎯 错题盲盒重做中...") : QStringLiteral("错题解析精研报告"));
     resize(620, 560);
-    const bool dark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
-    setStyleSheet(dark ? "QDialog { background-color: #1C1B2E; color: #E6E7F0; } QLabel { color: #E6E7F0; } LatexTextBrowser { background: #28263F; color: #E6E7F0; border: 1px solid #3B395A; }"
-                       : "QDialog { background-color: #ffffff; }");
+    setStyleSheet("QDialog { background-color: #ffffff; }");
 
     auto* lay = new QVBoxLayout(this);
     lay->setContentsMargins(20, 20, 20, 20);
@@ -63,8 +57,7 @@ WrongDetailDialog::WrongDetailDialog(const Question& q, const QString& time, int
     qBrowser->setFrameShape(QFrame::NoFrame);
     qBrowser->setMinimumHeight(100);
     if (renderer) {
-        // 不能 clearCache: 会清空全局 latex-vec:// 映射, 影响其他页面
-        // 未异步替换的公式; 这里重复 render 会命中 JKQTMathText 实例池。
+        renderer->clearCache();
         qBrowser->setHtml(renderer->render(QStringLiteral("### 📌 【题目题干】\n") + q.content, qBrowser->document()));
     }
     lay->addWidget(qBrowser);
@@ -74,8 +67,7 @@ WrongDetailDialog::WrongDetailDialog(const Question& q, const QString& time, int
         auto* optBrowser = new Latex::LatexTextBrowser(this);
         optBrowser->setFrameShape(QFrame::NoFrame);
         optBrowser->setMinimumHeight(60);
-    optBrowser->setStyleSheet(dark ? "background: #28263F; color: #E6E7F0; padding: 8px; border-radius: 6px;"
-                                   : "background: #f8fafc; padding: 8px; border-radius: 6px;");
+        optBrowser->setStyleSheet("background: #f8fafc; padding: 8px; border-radius: 6px;");
         QString opts;
         for (int i = 0; i < q.choices.size(); ++i) {
             opts += QString("%1. %2<br/>").arg(QChar('A' + i)).arg(q.choices[i]);
@@ -182,10 +174,7 @@ WrongBookPage::WrongBookPage(QWidget* parent)
     connect(back, &QPushButton::clicked, this, &WrongBookPage::backRequested);
 
     auto* title = new QLabel(QStringLiteral("错题本"), this);
-    const bool dark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
-    if (dark) this->setStyleSheet("WrongBookPage { background-color: #1C1B2E; }");
-    title->setStyleSheet(dark ? "font-size: 26px; font-weight: 800; color: #E6E7F0;"
-                              : "font-size: 26px; font-weight: 800; color: #111827;");
+    title->setStyleSheet("font-size: 26px; font-weight: 800; color: #111827;");
 
     top->addWidget(back); top->addWidget(title); top->addStretch();
 
@@ -196,17 +185,11 @@ WrongBookPage::WrongBookPage(QWidget* parent)
     auto* redoAllBtn = new QPushButton(QStringLiteral("🔄 错题重做 (乱序)"), this);
     auto* clearAllBtn = new QPushButton(QStringLiteral("🗑️ 清空所有错题"), this);
 
-    QString sortStyle = dark
-        ? "QPushButton { background: #28263F; border: 1px solid #3B395A; padding: 6px 12px; border-radius: 6px; font-size: 12px; color: #C9C9DC; } QPushButton:hover { background: #312F4A; }"
-        : "QPushButton { background: white; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; font-size: 12px; color: #4a5568; } QPushButton:hover { background: #f7fafc; }";
+    QString sortStyle = "QPushButton { background: white; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; font-size: 12px; color: #4a5568; } QPushButton:hover { background: #f7fafc; }";
     sortTimeBtn->setStyleSheet(sortStyle); sortCountBtn->setStyleSheet(sortStyle);
 
-    redoAllBtn->setStyleSheet(dark
-        ? "QPushButton { background: #312F4A; border: 1px solid #3B395A; padding: 6px 14px; border-radius: 6px; font-size: 12px; color: #8FA1FF; font-weight: bold; } QPushButton:hover { background: #3B395A; }"
-        : "QPushButton { background: #ebf8ff; border: 1px solid #bee3f8; padding: 6px 14px; border-radius: 6px; font-size: 12px; color: #2b6cb0; font-weight: bold; } QPushButton:hover { background: #e2e8f0; }");
-    clearAllBtn->setStyleSheet(dark
-        ? "QPushButton { background: #3B2230; border: 1px solid #6B2A3A; padding: 6px 14px; border-radius: 6px; font-size: 12px; color: #f87171; font-weight: 500; } QPushButton:hover { background: #4A2935; }"
-        : "QPushButton { background: #fff5f5; border: 1px solid #feb2b2; padding: 6px 14px; border-radius: 6px; font-size: 12px; color: #c53030; font-weight: 500; } QPushButton:hover { background: #fee2e2; }");
+    redoAllBtn->setStyleSheet("QPushButton { background: #ebf8ff; border: 1px solid #bee3f8; padding: 6px 14px; border-radius: 6px; font-size: 12px; color: #2b6cb0; font-weight: bold; } QPushButton:hover { background: #e2e8f0; }");
+    clearAllBtn->setStyleSheet("QPushButton { background: #fff5f5; border: 1px solid #feb2b2; padding: 6px 14px; border-radius: 6px; font-size: 12px; color: #c53030; font-weight: 500; } QPushButton:hover { background: #fee2e2; }");
 
     this->setProperty("sort_mode", "time");
     connect(sortTimeBtn, &QPushButton::clicked, this, [this]() { this->setProperty("sort_mode", "time"); reload(); });
@@ -235,9 +218,7 @@ WrongBookPage::WrongBookPage(QWidget* parent)
     scrollArea->setFrameShape(QFrame::NoFrame);
 
     auto* container = new QWidget;
-    container->setStyleSheet(dark
-        ? QStringLiteral("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #1F1E33,stop:1 #1C1B2E);")
-        : QStringLiteral("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #f8fafc,stop:1 #eef2ff);"));
+    container->setStyleSheet(R"(background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #f8fafc,stop:1 #eef2ff);)");
     contentLayout = new QGridLayout(container);
     contentLayout->setContentsMargins(4, 4, 4, 4);
     contentLayout->setHorizontalSpacing(24);
@@ -357,10 +338,7 @@ void WrongBookPage::loadWrongQuestions()
         m_wrongQuestionCount = 0;
         emit wrongCountChanged(m_wrongQuestionCount);
         auto* emptyLabel = new QLabel(QStringLiteral("🎉 还没有任何错题记录，继续保持！"), this);
-        emptyLabel->setAlignment(Qt::AlignCenter);
-        const bool _dk = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
-        emptyLabel->setStyleSheet(_dk ? "font-size: 18px; color: #C9C9DC; padding: 80px;"
-                                      : "font-size: 18px; color: #6b7280; padding: 80px;");
+        emptyLabel->setAlignment(Qt::AlignCenter); emptyLabel->setStyleSheet("font-size: 18px; color: #6b7280; padding: 80px;");
         contentLayout->addWidget(emptyLabel, 0, 0); return;
     }
 
@@ -371,10 +349,7 @@ void WrongBookPage::loadWrongQuestions()
     emit wrongCountChanged(m_wrongQuestionCount);
     if (arr.isEmpty()) {
         auto* emptyLabel = new QLabel(QStringLiteral("🎉 还没有任何错题记录，继续保持！"), this);
-        emptyLabel->setAlignment(Qt::AlignCenter);
-        const bool _dk2 = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
-        emptyLabel->setStyleSheet(_dk2 ? "font-size: 18px; color: #C9C9DC; padding: 80px;"
-                                       : "font-size: 18px; color: #6b7280; padding: 80px;");
+        emptyLabel->setAlignment(Qt::AlignCenter); emptyLabel->setStyleSheet("font-size: 18px; color: #6b7280; padding: 80px;");
         contentLayout->addWidget(emptyLabel, 0, 0); return;
     }
 
@@ -415,14 +390,14 @@ void WrongBookPage::loadWrongQuestions()
 
 void WrongBookPage::addWrongQuestionCard(const Question& q, const QString& time, int wrongCount, int index)
 {
-    const bool dark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
     auto* card = new QFrame(this);
     card->setMinimumHeight(200);
     card->setMaximumWidth(520);
     card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    card->setStyleSheet(dark
-        ? "QFrame { background: #28263F; border-radius: 22px; border: 1px solid #3B395A; } QFrame:hover { border: 1px solid #6F77FF; background: #312F4A; }"
-        : "QFrame { background: rgba(255,255,255,0.96); border-radius: 22px; border: 1px solid #e5e7eb; } QFrame:hover { border: 1px solid #c7d2fe; background: white; }");
+    card->setStyleSheet(R"(
+    QFrame { background: rgba(255,255,255,0.96); border-radius: 22px; border: 1px solid #e5e7eb; }
+    QFrame:hover { border: 1px solid #c7d2fe; background: white; }
+    )");
     auto* shadow = new QGraphicsDropShadowEffect(card);
     shadow->setBlurRadius(30); shadow->setOffset(0, 8); shadow->setColor(QColor(15, 23, 42, 20));
     card->setGraphicsEffect(shadow);
@@ -432,18 +407,15 @@ void WrongBookPage::addWrongQuestionCard(const Question& q, const QString& time,
 
     auto* topRow = new QHBoxLayout;
     auto* typeLabel = new QLabel(QString("[%1]").arg((q.type == QuestionType::Single) ? "单选题" : ((q.type == QuestionType::Fill) ? "填空题" : "解答题")));
-    typeLabel->setStyleSheet(dark ? "QLabel{ background:#312F4A; color:#8FA1FF; border-radius:10px; padding:4px 10px; font-weight:700; font-size:11px; }"
-                                  : "QLabel{ background:#eef2ff; color:#4f46e5; border-radius:10px; padding:4px 10px; font-weight:700; font-size:11px; }");
+    typeLabel->setStyleSheet("QLabel{ background:#eef2ff; color:#4f46e5; border-radius:10px; padding:4px 10px; font-weight:700; font-size:11px; }");
     auto* countLabel = new QLabel(QStringLiteral("🔥 错误 %1 次").arg(wrongCount));
-    countLabel->setStyleSheet(dark ? "QLabel{ color:#C9C9DC; font-size:12px; font-weight:600; }"
-                                   : "QLabel{ color:#64748b; font-size:12px; font-weight:600; }");
+    countLabel->setStyleSheet("QLabel{ color:#64748b; font-size:12px; font-weight:600; }");
     topRow->addWidget(typeLabel); topRow->addStretch(); topRow->addWidget(countLabel);
     lay->addLayout(topRow);
 
     auto* qBrowser = new Latex::LatexTextBrowser(card);
     qBrowser->setFrameShape(QFrame::NoFrame);
-    qBrowser->setStyleSheet(dark ? "background:#1F1E33; color:#E6E7F0; border-radius:14px; padding:12px;"
-                                 : "background:#f8fafc; border-radius:14px; padding:12px;");
+    qBrowser->setStyleSheet("background:#f8fafc; border-radius:14px; padding:12px;");
     qBrowser->setMinimumHeight(95);
     qBrowser->setAttribute(Qt::WA_TransparentForMouseEvents, false);
     qBrowser->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -451,23 +423,26 @@ void WrongBookPage::addWrongQuestionCard(const Question& q, const QString& time,
 
     auto* renderer = static_cast<Latex::LatexRenderer*>(this->property("latex_renderer").value<void*>());
     if (renderer) {
-        // 不能 clearCache: postProcessDocument 异步调度, 循环里清
-        // 会干掉前面卡片刚注册的 latex-vec:// 映射。
+        renderer->clearCache();
         qBrowser->setHtml(renderer->render(q.content, qBrowser->document()));
     }
     lay->addWidget(qBrowser, 1);
 
     auto* timeLabel = new QLabel(QString("🕒 %1").arg(time), card);
-    timeLabel->setStyleSheet(dark ? "QLabel{ color:#7B7B96; font-size:11px; }"
-                                  : "QLabel{ color:#94a3b8; font-size:11px; }");
+    timeLabel->setStyleSheet("QLabel{ color:#94a3b8; font-size:11px; }");
     lay->addWidget(timeLabel);
 
     auto* detailBtn = new QPushButton(QStringLiteral("查看解析 →"), card);
     detailBtn->setFixedHeight(30);
     detailBtn->setCursor(Qt::PointingHandCursor);
-    detailBtn->setStyleSheet(dark
-        ? "QPushButton{ background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #312F4A,stop:1 #3B395A); color:#B0BBFF; border:1px solid #4B4970; border-radius:14px; font-size:13px; font-weight:700; padding:9px 12px; } QPushButton:hover{ background:#3B395A; border:1px solid #6F77FF; }"
-        : "QPushButton{ background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #f5f3ff,stop:1 #ede9fe); color:#7c3aed; border:1px solid #ddd6fe; border-radius:14px; font-size:13px; font-weight:700; padding:9px 12px; } QPushButton:hover{ background:#ede9fe; border:1px solid #c4b5fd; }");
+    detailBtn->setStyleSheet(R"(
+    QPushButton{
+        background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #f5f3ff,stop:1 #ede9fe);
+        color:#7c3aed; border:1px solid #ddd6fe; border-radius:14px;
+        font-size:13px; font-weight:700; padding:9px 12px;
+    }
+    QPushButton:hover{ background:#ede9fe; border:1px solid #c4b5fd; }
+    )");
     lay->addWidget(detailBtn);
 
     // 💡【看解析连接修复】：显式按值传递题目独立的 q.id 副本锁死闭包，切断与外部引用的联系

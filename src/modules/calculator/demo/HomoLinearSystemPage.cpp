@@ -134,7 +134,6 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
 
     // -- result browser --
     resultBrowser_ = new QTextBrowser;
-        attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setOpenLinks(false);
     resultBrowser_->setMinimumHeight(400);
     resultBrowser_->setStyleSheet(QStringLiteral(

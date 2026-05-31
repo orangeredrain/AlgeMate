@@ -152,7 +152,6 @@ GSOPage::GSOPage(QWidget* parent) : QWidget(parent) {
     cLay->addWidget(demoBtn);
 
     resultBrowser_ = new QTextBrowser;
-        attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setOpenLinks(false);
     resultBrowser_->setMinimumHeight(400);
     resultBrowser_->setStyleSheet(QStringLiteral(

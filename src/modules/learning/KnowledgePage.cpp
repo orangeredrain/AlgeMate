@@ -2,17 +2,14 @@
 
 #include "latex/LatexRenderer.h"
 #include "latex/LatexTextBrowser.h"
-#include "core/ThemeManager.h"
 
 #include <QFile>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QRegularExpression>
 #include <QSplitter>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
-#include <QUrl>
 #include <QVBoxLayout>
 
 namespace AlgeMate::Learning {
@@ -41,14 +38,7 @@ QPushButton* makePrimaryBtn(const QString& text, QWidget* parent = nullptr) {
 KnowledgePage::KnowledgePage(QWidget* parent) : QWidget(parent)
 {
     m_renderer = new Latex::LatexRenderer;
-    // LaTeX 公式图片的颜色需要随主题切换 (默认黑色, 暗色背景下不可读).
-    // 参考计算交互/演示模块 RenderTheme::forCurrent + setTextColor 的做法.
-    auto themeTextColor = []() {
-        const bool dark = AlgeMate::ThemeManager::instance().currentTheme()
-                          == AlgeMate::ThemeManager::Theme::Dark;
-        return dark ? QColor("#F3F3FA") : QColor("#1F2033");
-    };
-    m_renderer->setTextColor(themeTextColor());
+    // 不设 textColor, 数学颜色走 QSS, 文本颜色由 QSS #KnowledgeContent 控制
     m_renderer->addMathMacro(QStringLiteral("F"),  QStringLiteral("\\mathbb{F}"));
     m_renderer->addMathMacro(QStringLiteral("R"),  QStringLiteral("\\mathbb{R}"));
     m_renderer->addMathMacro(QStringLiteral("C"),  QStringLiteral("\\mathbb{C}"));
@@ -84,12 +74,7 @@ KnowledgePage::KnowledgePage(QWidget* parent) : QWidget(parent)
 
     m_contentView = new Latex::LatexTextBrowser;
     m_contentView->setObjectName(QStringLiteral("KnowledgeContent"));
-    // 关闭 QTextBrowser 默认的链接导航, 错开我们在 anchorClicked 里自己处理 "切换答案" 伪链接
-    m_contentView->setOpenLinks(false);
     m_contentView->setOpenExternalLinks(true);
-    connect(m_contentView, &QTextBrowser::anchorClicked,
-            this, &KnowledgePage::onAnchorClicked);
-
     m_splitter->addWidget(m_chapterTree);
     m_splitter->addWidget(m_contentView);
     m_splitter->setStretchFactor(0, 0);
@@ -103,8 +88,7 @@ KnowledgePage::KnowledgePage(QWidget* parent) : QWidget(parent)
                 const QString path =
                     current->data(0, kRoleMarkdownResource).toString();
                 if (path.isEmpty()) {
-                    // 不 clearCache: 提示文本不含公式, 且清池会影响其他页面已注册的 latex-vec:// 映射。
-                    m_currentResource.clear();
+                    m_renderer->clearCache();
                     m_contentView->setHtml(QStringLiteral(
                         "<div style='font-family:Microsoft YaHei,sans-serif; "
                         "font-size:14pt; color:#8A8FA3;'>"
@@ -112,18 +96,6 @@ KnowledgePage::KnowledgePage(QWidget* parent) : QWidget(parent)
                     return;
                 }
                 loadContentFromResource(path);
-            });
-
-    // 主题切换: 更新 LaTeX 渲染色, 并清缓存重新渲染当前小节内容.
-    connect(&AlgeMate::ThemeManager::instance(),
-            &AlgeMate::ThemeManager::themeChanged,
-            this, [this, themeTextColor](AlgeMate::ThemeManager::Theme){
-                if (!m_renderer) return;
-                m_renderer->setTextColor(themeTextColor());
-                m_renderer->clearCache();
-                if (!m_currentResource.isEmpty()) {
-                    loadContentFromResource(m_currentResource);
-                }
             });
 
     // 默认选中第一个叶子
@@ -265,70 +237,17 @@ void KnowledgePage::buildChapterTree()
 
 void KnowledgePage::loadContentFromResource(const QString& resourcePath)
 {
-    m_currentResource = resourcePath;
     QFile file(resourcePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        m_mainHtml = QStringLiteral("<p style='color:red;'>无法打开资源文件：%1</p>")
-                         .arg(resourcePath);
-        m_answerHtml.clear();
-        m_answerVisible = false;
-        m_contentView->setHtml(m_mainHtml);
+        m_contentView->setHtml(
+            QStringLiteral("<p style='color:red;'>无法打开资源文件：%1</p>")
+            .arg(resourcePath));
         return;
     }
-    // 不能 clearCache: 会清空全局 latex-vec:// 映射, 影响其他页面
-    // 未异步替换的公式; 同公式重复渲染会命中实例池。
+    m_renderer->clearCache();
     QString source = QString::fromUtf8(file.readAll());
-
-    // 拆分 ### 思考题答案 标记: 主体与答案分别预渲染为 HTML, 答案默认隐藏
-    static const QRegularExpression kAnswerMarker(
-        QStringLiteral("^\\s*###\\s*思考题答案\\s*$"),
-        QRegularExpression::MultilineOption);
-    QString mainPart = source;
-    QString answerPart;
-    auto mm = kAnswerMarker.match(source);
-    if (mm.hasMatch()) {
-        const int markerStart = mm.capturedStart();
-        mainPart = source.left(markerStart);
-        answerPart = source.mid(markerStart); // 保留 ### 思考题答案 标题
-    }
-
-    m_mainHtml = m_renderer->render(mainPart, m_contentView->document());
-    m_answerHtml = answerPart.isEmpty()
-                       ? QString()
-                       : m_renderer->render(answerPart, m_contentView->document());
-    m_answerVisible = false;
-    refreshContentHtml();
-}
-
-void KnowledgePage::refreshContentHtml()
-{
-    QString html = m_mainHtml;
-    if (!m_answerHtml.isEmpty()) {
-        const QString linkText = m_answerVisible
-            ? QStringLiteral("▲ 收起思考题答案")
-            : QStringLiteral("▼ 查看思考题答案");
-        // 小号灰色文字链接: 紧跟在 思考题 后面, 嵌入主面板同一个框内
-        html += QStringLiteral(
-                    "<p style=\"margin:6px 0 0; "
-                    "font-size:12pt; "
-                    "color:#6b7280;\">"
-                    "<a href=\"algemate://toggle-answer\" "
-                    "style=\"color:#6b7280; text-decoration:none;\">%1</a></p>")
-                    .arg(linkText);
-        if (m_answerVisible) {
-            html += m_answerHtml;
-        }
-    }
+    QString html = m_renderer->render(source, m_contentView->document());
     m_contentView->setHtml(html);
-}
-
-void KnowledgePage::onAnchorClicked(const QUrl& url)
-{
-    if (url.toString() == QLatin1String("algemate://toggle-answer")) {
-        if (m_answerHtml.isEmpty()) return;
-        m_answerVisible = !m_answerVisible;
-        refreshContentHtml();
-    }
 }
 
 } // namespace AlgeMate::Learning

@@ -167,7 +167,6 @@ PolyGCDPage::PolyGCDPage(QWidget* parent) : QWidget(parent) {
     cLay->addLayout(btnRow);
 
     resultBrowser_ = new QTextBrowser; resultBrowser_->setOpenLinks(false); resultBrowser_->setMinimumHeight(400);
-        attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setStyleSheet(QStringLiteral("QTextBrowser { border:1px solid #3A3D4A; border-radius:8px; padding:12px; }"));
     cLay->addWidget(resultBrowser_, 1);
     scroll->setWidget(content);

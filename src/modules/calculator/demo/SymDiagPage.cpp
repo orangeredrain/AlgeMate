@@ -208,7 +208,6 @@ SymDiagPage::SymDiagPage(QWidget* parent) : QWidget(parent) {
     cLay->addWidget(demoBtn);
 
     resultBrowser_ = new QTextBrowser; resultBrowser_->setOpenLinks(false); resultBrowser_->setMinimumHeight(400);
-        attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setStyleSheet(QStringLiteral("QTextBrowser { border:1px solid #3A3D4A; border-radius:8px; padding:12px; }"));
     cLay->addWidget(resultBrowser_, 1);
     scroll->setWidget(content);
@@ -556,17 +555,16 @@ void SymDiagPage::onSolve() {
                 for (std::size_t j = 0; j < k; ++j) {
                     Fraction num = dotProd(alphas[k], betas[j]);
                     Fraction den = dotProd(betas[j], betas[j]);
-                    rhs += QStringLiteral(" - \\frac{%1}{%2}\\beta_{%3}")
-                        .arg(fracLtx(num), fracLtx(den))
-                        .arg(alphaIdx - static_cast<int>(geom) + static_cast<int>(j));
+                    rhs += QStringLiteral(" - \\frac{%1}{%2}\\beta_{%1}")
+                        .arg(fracLtx(num), fracLtx(den)).arg(alphaIdx - static_cast<int>(geom) + static_cast<int>(j));
                     for (std::size_t i = 0; i < beta.rows(); ++i)
                         beta(i, 0) -= num * betas[j](i, 0) / den;
                 }
                 betas.push_back(beta);
 
                 // Show detailed step
-                QString detail = QStringLiteral("\\beta_{%1}")
-                    .arg(alphaIdx - static_cast<int>(geom) + static_cast<int>(k));
+                QString detail = QStringLiteral("\\beta_{%1} = %2")
+                    .arg(alphaIdx - static_cast<int>(geom) + static_cast<int>(k) + 1);
                 detail += QStringLiteral(" = %1").arg(matLtx(alphas[k]));
                 for (std::size_t j = 0; j < k; ++j) {
                     Fraction num = dotProd(alphas[k], betas[j]);
