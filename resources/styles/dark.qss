@@ -79,6 +79,54 @@ QFrame#Card, QWidget#Card {
     border-radius: 14px;
 }
 
+/* ---------- HomePage 功能卡片 ---------- */
+QFrame#QuickCard {
+    background-color: #28263F;
+    border: 1px solid #3A3754;
+    border-radius: 16px;
+}
+QFrame#QuickCard:hover {
+    background-color: #312F4A;
+    border: 1px solid #8B7BFF;
+}
+QLabel#QuickCardTitle {
+    font-size: 16px;
+    font-weight: 700;
+    color: #F3F3FA;
+    background: transparent;
+}
+QLabel#QuickCardDesc {
+    font-size: 12px;
+    color: #A0A3C0;
+    background: transparent;
+}
+
+/* ---------- HomePage 学习计划卡片 ---------- */
+QFrame#GoalFrame {
+    background-color: #28263F;
+    border: 1px solid #3A3754;
+    border-radius: 16px;
+}
+QFrame#GoalFrame:hover {
+    border: 1px solid #8B7BFF;
+    background-color: #312F4A;
+}
+QLabel#GoalTitle {
+    font-size: 16px; font-weight: 700; color: #F3F3FA;
+    background: transparent; border: none;
+}
+QLabel#GoalPercent {
+    font-size: 14px; font-weight: 700; color: #B8ACFF;
+    background: transparent; border: none;
+}
+QPushButton#GoalSecondaryBtn {
+    background: #2C2A45; border: 1px solid #3A3754; color: #C9CCE6;
+    font-size: 12px; font-weight: bold; border-radius: 14px; padding: 6px 12px;
+}
+QPushButton#GoalSecondaryBtn:hover {
+    background: #312F4A; border: 1px solid #8B7BFF; color: #F3F3FA;
+}
+
 QLabel#PageTitle {
     font-size: 22px;
     font-weight: 700;
@@ -253,6 +301,78 @@ QToolTip {
     border: none;
     padding: 4px 8px;
     border-radius: 4px;
+}
+
+/* ================= AI 解题模块 ================= */
+QLabel#AiPageTitle {
+    font-size: 20px;
+    font-weight: bold;
+    color: #B8ACFF;
+    background: transparent;
+}
+QLabel#AiPageSubtitle {
+    color: #A0A3C0;
+    font-size: 13px;
+    background: transparent;
+}
+QLabel#AiStatusLabel {
+    color: #34D399;
+    font-size: 12px;
+    font-weight: bold;
+    background: transparent;
+}
+LatexTextBrowser#AiResultView, QTextBrowser#AiResultView, QTextEdit#AiResultView {
+    background-color: #1F1E31;
+    border: 1px solid #312F4A;
+    border-radius: 12px;
+    padding: 12px;
+    color: #E6E7F0;
+    selection-background-color: #8B7BFF;
+    selection-color: #1C1B2E;
+}
+QTextEdit#AiInputEdit {
+    background-color: #242338;
+    border: 1px solid #3A3754;
+    border-radius: 8px;
+    padding: 6px;
+    color: #F3F3FA;
+    selection-background-color: #8B7BFF;
+    selection-color: #1C1B2E;
+}
+QTextEdit#AiInputEdit:focus {
+    border: 1px solid #8B7BFF;
+}
+QPushButton#AiClearBtn {
+    background-color: #312F4A;
+    color: #D8DAE8;
+    border: 1px solid #3A3754;
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+QPushButton#AiClearBtn:hover {
+    background-color: #3B3462;
+    color: #B8ACFF;
+}
+QPushButton#AiCopyAllBtn {
+    background-color: #312F4A;
+    color: #B8ACFF;
+    border: 1px solid #4338ca;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+QPushButton#AiCopyAllBtn:hover {
+    background-color: #3B3462;
+}
+QPushButton#AiSendBtn {
+    background-color: #8B7BFF;
+    color: #1C1B2E;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+}
+QPushButton#AiSendBtn:hover {
+    background-color: #9E90FF;
 }
 
 /* ================= Calculator 模块 ================= */

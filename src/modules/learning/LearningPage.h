@@ -45,6 +45,7 @@ private:
     void loadTodayStudyTime();
     void saveTodayStudyTime() const;
     void saveModuleStudyTime(const QString& moduleKey, int seconds) const;
+    void saveHourStudyTime(int hour, int seconds) const;
     void startStudyTimer();
     void stopStudyTimer();
     void handleStudyTimerTick();
@@ -84,6 +85,7 @@ private:
     QTimer*  m_studyTimer = nullptr;
     QDate    m_studyDate;
     QDateTime m_lastStudyTick;
+    qint64    m_pendingStudyMs = 0;   // 不足 1 秒的残余毫秒 (避免 QTimer 999ms 抖动导致 secsTo 永返 0)
     int      m_todayStudySeconds = 0;
     bool     m_todayAutoCheckedIn = false;
 

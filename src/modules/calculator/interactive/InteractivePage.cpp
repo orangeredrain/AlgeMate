@@ -3,6 +3,7 @@
 #include "HelpDialog.h"
 #include "LatexTextBrowser.h"
 #include "core/ThemeManager.h"
+#include "latex/LatexRenderer.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -25,6 +26,8 @@
 #include <QTextEdit>
 #include <QTextFragment>
 #include <QMimeData>
+#include <QPointer>
+#include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -631,6 +634,8 @@ InteractivePage::InteractivePage(QWidget* parent) : QWidget(parent) {
     history_->setOpenLinks(false);
     history_->setOpenExternalLinks(false);
     history_->setFrameShape(QFrame::NoFrame);
+    // 矢量化：让 LaTeX 公式在 history_ 里走 LatexInlineHandler 重绘
+    AlgeMate::Latex::attachLatexAutoPostProcess(history_);
     QFont historyFont(QStringLiteral("Cascadia Mono"));
     historyFont.setStyleHint(QFont::Monospace);
     historyFont.setPointSize(11);
@@ -895,6 +900,22 @@ void InteractivePage::appendHtml(const QString& html) {
     history_->append(html);
     auto* sb = history_->verticalScrollBar();
     sb->setValue(sb->maximum());
+    // 矢量化路径：postProcessDocument 由 attachLatexAutoPostProcess 通过
+    // QTimer::singleShot(0) 异步执行，那时 latex-vec:// 占位会从 8x8 撑开为真实
+    // 矩阵尺寸，文档高度增加。这里再排一次延迟滚动，确保新内容完整可见。
+    QPointer<QTextBrowser> guard(history_);
+    QTimer::singleShot(0, history_, [guard]() {
+        if (!guard) return;
+        auto* s = guard->verticalScrollBar();
+        s->setValue(s->maximum());
+    });
+    // postProcessDocument 内部会再次发 contentsChanged（被 inProc 拦掉），但
+    // 文档布局可能要等下一帧才稳定，再保险一次（极廉价的空操作如果已经到底）。
+    QTimer::singleShot(16, history_, [guard]() {
+        if (!guard) return;
+        auto* s = guard->verticalScrollBar();
+        s->setValue(s->maximum());
+    });
 }
 
 // ======================== 单元渲染 ========================

@@ -511,15 +511,12 @@ private:
 
 static QFrame* makeQuickCard(const QString& emoji, const QString& title, const QString& desc, const QString& accent) {
     auto* card = new QFrame;
-    card->setObjectName(QStringLiteral("Card"));
+    card->setObjectName(QStringLiteral("QuickCard"));
 
     card->setMinimumHeight(130);
     card->setMaximumHeight(150);
 
-    card->setStyleSheet(
-        "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; }"
-        "QFrame#Card:hover { border-color: #6B7CFF; background-color: #F8F9FC; }"
-        );
+    // 背景 / 边框 / hover 由全局 QSS (QFrame#QuickCard) 接管, 以便跟随主题切换。
 
     card->setCursor(Qt::PointingHandCursor);
     auto* lay = new QVBoxLayout(card);
@@ -530,12 +527,12 @@ static QFrame* makeQuickCard(const QString& emoji, const QString& title, const Q
     icon->setFixedSize(44, 44);
     icon->setAlignment(Qt::AlignCenter);
     icon->setStyleSheet(QStringLiteral(
-                            "background-color:%1; border-radius:12px; font-size:22px;").arg(accent));
+                            "background-color:%1; border-radius:12px; font-size:22px; color:#1F2033;").arg(accent));
 
     auto* t = new QLabel(title);
-    t->setStyleSheet("font-size:16px; font-weight:700;");
+    t->setObjectName(QStringLiteral("QuickCardTitle"));
     auto* d = new QLabel(desc);
-    d->setStyleSheet("color:#8A8FA3; font-size:12px;");
+    d->setObjectName(QStringLiteral("QuickCardDesc"));
     d->setWordWrap(true);
 
     lay->addWidget(icon);
@@ -582,7 +579,8 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
 
     auto* settingsBtn = new QPushButton();
     settingsBtn->setCursor(Qt::PointingHandCursor);
-    settingsBtn->setFixedSize(118, 42);
+    // 宽度从 118 提到 150，以完整容纳 “⚙ 设置中心” 四字标题（原 118 会裁掉末字 “心”）
+    settingsBtn->setFixedSize(150, 42);
 
     auto* btnLay = new QHBoxLayout(settingsBtn);
     btnLay->setContentsMargins(12, 0, 12, 0);
@@ -619,8 +617,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     // ---------------- [目标区域大框 (GoalFrame)] ----------------
     auto* goalFrame = new QFrame;
     goalFrame->setObjectName("GoalFrame");
-    goalFrame->setStyleSheet("QFrame#GoalFrame { background-color: #FAFAFC; border: 1px solid #E2E8F0; border-radius: 16px; }"
-                             "QFrame#GoalFrame:hover { border-color: #6B7CFF; background-color: #F8F9FC; }");
+    // 背景 / 边框 / hover 交给全局 QSS (QFrame#GoalFrame), 以便随主题切换.
     goalFrame->setMinimumHeight(270);
 
     // ====== 【核心修改】让大框具备可点击的视觉反馈并安装过滤器 ======
@@ -642,9 +639,9 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     auto* titleCol = new QVBoxLayout;
     titleCol->setSpacing(6);
     goalTitleLabel_ = new QLabel();
-    goalTitleLabel_->setStyleSheet("font-size: 16px; font-weight: 700; color: #333333; border: none;");
+    goalTitleLabel_->setObjectName(QStringLiteral("GoalTitle"));
     goalPercentLabel_ = new QLabel();
-    goalPercentLabel_->setStyleSheet("font-size: 14px; font-weight: 700; color: #6B7CFF; border: none;");
+    goalPercentLabel_->setObjectName(QStringLiteral("GoalPercent"));
 
     auto* titleAndPercentRow = new QHBoxLayout;
     titleAndPercentRow->addWidget(goalTitleLabel_);
@@ -661,22 +658,16 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     topGoalRow->addLayout(titleCol, 1);
 
     auto* historyBtn = new QPushButton(QStringLiteral("🕒 历史记录"));
+    historyBtn->setObjectName(QStringLiteral("GoalSecondaryBtn"));
     historyBtn->setCursor(Qt::PointingHandCursor);
-    historyBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #FFFFFF; border: 1px solid #E2E8F0; color: #4A5568; font-size: 12px; font-weight: bold; border-radius: 14px; padding: 6px 12px; }"
-        "QPushButton:hover { background: #F7FAFC; color: #6B7CFF; border-color: #6B7CFF; }"
-        ));
     connect(historyBtn, &QPushButton::clicked, this, [this]() {
         HistoryGoalsDialog dlg(this);
         dlg.exec();
     });
 
     auto* editBtn = new QPushButton(QStringLiteral("✏️ 编辑目标"));
+    editBtn->setObjectName(QStringLiteral("GoalSecondaryBtn"));
     editBtn->setCursor(Qt::PointingHandCursor);
-    editBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #FFFFFF; border: 1px solid #E2E8F0; color: #4A5568; font-size: 12px; font-weight: bold; border-radius: 14px; padding: 6px 12px; }"
-        "QPushButton:hover { background: #F7FAFC; color: #6B7CFF; border-color: #6B7CFF; }"
-        ));
     connect(editBtn, &QPushButton::clicked, this, &HomePage::onEditGoalsClicked);
 
     topGoalRow->addWidget(historyBtn, 0, Qt::AlignTop);

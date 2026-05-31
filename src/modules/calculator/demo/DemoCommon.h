@@ -13,18 +13,23 @@
 #include "math/trace/StepSequence.h"
 #include "modules/calculator/interactive/expr/RenderSettings.h"
 #include "modules/calculator/interactive/expr/Value.h"
+#include "latex/LatexRenderer.h"
 
 #include <jkqtmathtext/jkqtmathtext.h>
 
 #include <QGuiApplication>
+#include <QObject>
 #include <QPainter>
 #include <QPixmap>
 #include <QScreen>
 #include <QString>
+#include <QTextBrowser>
 #include <QTextDocument>
+#include <QTimer>
 #include <QUrl>
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -82,19 +87,23 @@ inline QPixmap renderLatex(const QString& latex, const Interactive::RenderTheme&
 }
 
 // =========================================================================
-//  LaTeX → <img> HTML 片段（注册到 QTextDocument 资源）
+//  LaTeX → <img> HTML 片段（矢量化：走 LatexRenderer::embedAsImg占位，
+//  调用方在 setHtml() 后需调 Latex::LatexRenderer::postProcessDocument(doc)。）
 // =========================================================================
 inline QString embedImg(const QString& latex, const Interactive::RenderTheme& th,
                         QTextDocument* doc, int fontPt = 18)
 {
-    QPixmap px = renderLatex(latex, th, fontPt);
-    static long long ctr = 0;
-    const QString url = QStringLiteral("demo-tex://%1").arg(++ctr);
-    doc->addResource(QTextDocument::ImageResource, QUrl(url), px);
-    int w = int(px.width()  / px.devicePixelRatio());
-    int h = int(px.height() / px.devicePixelRatio());
-    return QStringLiteral("<img src=\"%1\" width=\"%2\" height=\"%3\" style=\"vertical-align:text-bottom; margin-bottom:-2px;\" />")
-        .arg(url).arg(w).arg(h);
+    return Latex::LatexRenderer::embedAsImg(
+        doc, latex, /*displayStyle=*/false, fontPt, QColor(th.text));
+}
+
+// =========================================================================
+//  为一个 QTextBrowser 挂上“内容变化 → 自动 postProcessDocument”的 hook。
+//  forward 到 Latex::attachLatexAutoPostProcess，demo/interactive/ai_solver 公用同一实现。
+// =========================================================================
+inline void attachLatexAutoPostProcess(QTextBrowser* browser)
+{
+    Latex::attachLatexAutoPostProcess(browser);
 }
 
 // =========================================================================
@@ -295,17 +304,19 @@ inline QString matComplexLtx(const algemate::math::Matrix<algemate::math::Comple
 }
 
 // Matrix<Fraction> → parenthesised LaTeX (array 环境)
-// JKQTMathText 单列 \begin{array} 有渲染 bug，单列时追加 ghost 列。
+// JKQTMathText 单列 \begin{array} 有渲染 bug；单列时用对称 ghost {rcl}，
+// 两侧各一个空列，避免数字偏向括号一侧。
 inline QString matLtx(const algemate::math::Matrix<algemate::math::Fraction>& M)
 {
     using algemate::math::Fraction;
     const auto R = M.rows(), C = M.cols();
     if (R == 0 || C == 0) return QStringLiteral("()");
     const bool ghost = (C == 1);
-    QString cols = ghost ? QStringLiteral("cr")
+    QString cols = ghost ? QStringLiteral("rcl")
                          : QString(static_cast<int>(C), QLatin1Char('c'));
     QString body;
     for (std::size_t i = 0; i < R; ++i) {
+        if (ghost) body += QStringLiteral(" & ");
         for (std::size_t j = 0; j < C; ++j) {
             if (j) body += QStringLiteral(" & ");
             body += fracLtx(M(i, j));
@@ -317,7 +328,7 @@ inline QString matLtx(const algemate::math::Matrix<algemate::math::Fraction>& M)
         .arg(cols, body);
 }
 
-// 向量各分量除以 √k（单位化结果，化简根式），用 array 规避 JKQTMathText 单列 bug
+// 向量各分量除以 √k（单位化结果，化简根式），用对称 ghost {rcl} 避免偏移
 inline QString normVecLtx(const algemate::math::Matrix<algemate::math::Fraction>& v,
                           const algemate::math::Fraction& k) {
     const auto R = v.rows();
@@ -325,10 +336,11 @@ inline QString normVecLtx(const algemate::math::Matrix<algemate::math::Fraction>
     QString body;
     for (std::size_t i = 0; i < R; ++i) {
         if (i) body += QStringLiteral(" \\\\\\\\ ");
+        body += QStringLiteral(" & ");
         body += fracDivSqrtLtx(v(i, 0), k);
         body += QStringLiteral(" & ");
     }
-    return QStringLiteral("\\left(\\begin{array}{cr}%1\\end{array}\\right)").arg(body);
+    return QStringLiteral("\\left(\\begin{array}{rcl}%1\\end{array}\\right)").arg(body);
 }
 
 // 齐次方程组 → cases-like LaTeX

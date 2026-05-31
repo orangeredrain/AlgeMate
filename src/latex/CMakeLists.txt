@@ -3,6 +3,8 @@ qt_add_library(algemate_latex STATIC
     LatexRenderer.cpp
     LatexTextBrowser.h
     LatexTextBrowser.cpp
+    LatexInlineHandler.h
+    LatexInlineHandler.cpp
 )
 
 target_link_libraries(algemate_latex
