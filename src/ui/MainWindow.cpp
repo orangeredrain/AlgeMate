@@ -17,6 +17,9 @@
 #include <QStackedWidget>
 #include <QStatusBar>
 
+#include <QShortcut>
+#include <QSettings>
+
 namespace AlgeMate {
 
 MainWindow::MainWindow(QWidget* parent)
@@ -58,15 +61,19 @@ void MainWindow::composeLayout() {
 
 void MainWindow::registerModules() {
     struct Item { QString icon; QString title; QWidget* page; };
+
+    // 把主页、学习中心和设置页面单独提出来，方便后面绑定快捷键和信号
     auto* home = new Home::HomePage(this);
     auto* learningPage = new Learning::LearningPage(this);
+    auto* settingsPage = new Settings::SettingsPage(this); // <-- 单独拿出设置页
+
     const QList<Item> items{
         { QStringLiteral("🏠"), QStringLiteral("首页"),         home },
         { QStringLiteral("🧮"), QStringLiteral("计算助手"),     new Calculator::CalculatorPage(this) },
         { QStringLiteral("🤖"), QStringLiteral("AI 智能解题"), new AiSolver::AiSolverPage(this) },
         { QStringLiteral("📈"), QStringLiteral("学习中心"),     learningPage },
         { QStringLiteral("🧪"), QStringLiteral("测试中心"),     new TestCenter::TestCenterPage(this) },
-        { QStringLiteral("⚙"),  QStringLiteral("设置中心"),     new Settings::SettingsPage(this) },
+        { QStringLiteral("⚙"),  QStringLiteral("设置中心"),     settingsPage }, // <-- 用刚刚创建的变量
     };
 
     for (const auto& it : items) {
@@ -77,6 +84,7 @@ void MainWindow::registerModules() {
     stack_->setCurrentIndex(0);
     learningPage_ = learningPage;
 
+    // --- 页面原有跳转逻辑 ---
     connect(home, &Home::HomePage::requestNavigate,
             this, [this](int target) {
                 int index = 0;
@@ -93,15 +101,58 @@ void MainWindow::registerModules() {
                 if (target == Home::HomePage::Knowledge)
                     learningPage_->showKnowledge();
             });
+
     connect(learningPage, &Learning::LearningPage::requestNavigateToHomeGoalDetail,
             this, [this, home]() {
-                // 1. 切换左侧导航高亮到“首页” (索引 0)
                 nav_->setCurrentIndex(0);
-                // 2. 切换主视图到“首页” (索引 0)
                 stack_->setCurrentIndex(0);
-                // 3. 调用首页内部的方法，展开全量目标
                 home->showGoalDetail();
             });
+
+
+    // ================== 新增：全局快捷键逻辑 ==================
+
+    auto* shortcutAi = new QShortcut(this);
+    auto* shortcutWrongBook = new QShortcut(this);
+    auto* shortcutUnfinished = new QShortcut(this);
+
+    // 1. 快捷键：唤醒 AI 助手 (索引 2)
+    connect(shortcutAi, &QShortcut::activated, this, [this]() {
+        nav_->setCurrentIndex(2);
+        stack_->setCurrentIndex(2);
+    });
+
+    // 2. 快捷键：错题本 (跳转到学习中心，索引 3)
+    connect(shortcutWrongBook, &QShortcut::activated, this, [this]() {
+        nav_->setCurrentIndex(3);
+        stack_->setCurrentIndex(3);
+        if (learningPage_) {
+            learningPage_->showWrongBook();
+        }
+    });
+
+    // 3. 快捷键：未完成的目标 (跳转到首页并展开目标列表)
+    connect(shortcutUnfinished, &QShortcut::activated, this, [this, home]() {
+        nav_->setCurrentIndex(0);
+        stack_->setCurrentIndex(0);
+        home->showGoalDetail(); // 完美复用你已有的展现目标方法
+    });
+
+    // 定义一个刷新快捷键的 Lambda 函数
+    auto reloadShortcuts = [=]() {
+        QSettings settings("AlgeMate", "AlgeMateApp");
+        shortcutAi->setKey(QKeySequence::fromString(settings.value("Shortcuts/AiChat").toString()));
+        shortcutWrongBook->setKey(QKeySequence::fromString(settings.value("Shortcuts/WrongBook").toString()));
+        shortcutUnfinished->setKey(QKeySequence::fromString(settings.value("Shortcuts/Unfinished").toString()));
+    };
+
+    // 软件启动时加载一次快捷键
+    reloadShortcuts();
+
+    // 监听设置页面发出的保存信号，动态刷新快捷键
+    connect(settingsPage, &Settings::SettingsPage::shortcutsChanged, this, reloadShortcuts);
+
+    // ========================================================
 }
 
 }
