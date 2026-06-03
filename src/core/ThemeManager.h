@@ -40,6 +40,9 @@ private:
     Theme   theme_       = Theme::Light;
     double  fontScale_   = 1.0;
     QFont   baseFont_;
+    QString m_lightQssCache;
+    QString m_darkQssCache;
+    bool m_qssLoaded = false;
 };
 
 }

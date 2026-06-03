@@ -4,8 +4,7 @@ project(AlgeMate LANGUAGES CXX VERSION 1.0.0)
 # ---------- C++ 标准 ----------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# 注: JKQtPlotter 依赖若干 POSIX 数学函数 (Bessel y0/y1/jn/yn),
-# 必须开启 GNU 扩展 (-std=gnu++17) 才能编过.
+# 注: JKQtPlotter 依赖若干 POSIX 数学函数, 必须开启 GNU 扩展
 set(CMAKE_CXX_EXTENSIONS ON)
 
 # ---------- 默认 Release ----------
@@ -15,7 +14,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # ---------- Release 优化 ----------
-# 链接时优化 (LTO)
 include(CheckIPOSupported)
 check_ipo_supported(RESULT IPO_OK OUTPUT IPO_MSG)
 if(IPO_OK)
@@ -24,21 +22,16 @@ if(IPO_OK)
 endif()
 
 if(MSVC)
-    # UTF-8 源码、并行编译
     add_compile_options(/utf-8 /MP /permissive-)
-    # Release 专属：最大速度、内建函数内联、全程序优化
-    add_compile_options($<$<CONFIG:Release>:/O2>
-                       $<$<CONFIG:Release>:/Oi>
-                       $<$<CONFIG:Release>:/GL>
-                       $<$<CONFIG:Release>:/DNDEBUG>)
-    add_link_options($<$<CONFIG:Release>:/LTCG>
-                     $<$<CONFIG:Release>:/OPT:REF>
-                     $<$<CONFIG:Release>:/OPT:ICF>)
+    add_compile_options($<$<CONFIG:Release>:/O2> $<$<CONFIG:Release>:/Oi> $<$<CONFIG:Release>:/GL> $<$<CONFIG:Release>:/DNDEBUG>)
+    add_link_options($<$<CONFIG:Release>:/LTCG> $<$<CONFIG:Release>:/OPT:REF> $<$<CONFIG:Release>:/OPT:ICF>)
 else()
-    add_compile_options($<$<CONFIG:Release>:-O3>
-                       $<$<CONFIG:Release>:-DNDEBUG>)
+    add_compile_options($<$<CONFIG:Release>:-O3> $<$<CONFIG:Release>:-DNDEBUG>)
 endif()
 
+# ==========================================
+# 关键：必须先找 Qt，CMake 才会认识 qt_add_executable！
+# ==========================================
 # ---------- Qt 6 ----------
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui Svg Xml OpenGL OpenGLWidgets Network)
 qt_standard_project_setup()
@@ -46,9 +39,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-# ---------- third_party: JKQTMathText (LaTeX 数学渲染) ----------
-# 关闭所有非数学渲染的目标, 减少编译时间、以静态库形式嵌入,
-# 库名不附带 _Debug/_Release 后缀, 方便链接.
+# ---------- third_party: JKQTMathText ----------
 set(JKQtPlotter_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(JKQtPlotter_BUILD_STATIC_LIBS ON  CACHE BOOL "" FORCE)
 set(JKQtPlotter_BUILD_EXAMPLES    OFF CACHE BOOL "" FORCE)
@@ -63,10 +54,7 @@ set(ALGEMATE_SRC_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(ALGEMATE_RES_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 set(ALGEMATE_MODULES_DIR    ${ALGEMATE_SRC_DIR}/modules)
 
-# 数学核心静态库（纯 C++，不依赖 Qt）
 add_subdirectory(${ALGEMATE_SRC_DIR}/math)
-
-# 各模块静态库（组内各成员独立开发区）
 add_subdirectory(${ALGEMATE_MODULES_DIR}/home)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/calculator)
 add_subdirectory(${ALGEMATE_MODULES_DIR}/ai_solver)
@@ -77,11 +65,10 @@ add_subdirectory(${ALGEMATE_SRC_DIR}/latex)
 
 # ---------- 核心壳目标 ----------
 set(MACOS_APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/resources/images/icon.icns")
-# 告诉 CMake 把这个文件拷贝到 App 包的 Resources 目录下
 set_source_files_properties(${MACOS_APP_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-qt_add_executable(AlgeMate
-    WIN32 MACOSX_BUNDLE
-    ${MACOS_APP_ICON}
+
+# 1. 定义源文件
+set(ALGEMATE_SOURCES
     main.cpp
     # core
     src/core/ThemeManager.h
@@ -101,8 +88,20 @@ qt_add_executable(AlgeMate
     src/ui/UserProfileDialog.h
     src/ui/UserProfileDialog.cpp
     resources/resources.qrc
-    resources/icon.rc
 )
+
+# 2. 如果是 Windows 才添加 rc 资源
+if(WIN32)
+    list(APPEND ALGEMATE_SOURCES resources/icon.rc)
+endif()
+
+# 3. 添加执行文件
+qt_add_executable(AlgeMate
+    WIN32 MACOSX_BUNDLE
+    ${MACOS_APP_ICON}
+    ${ALGEMATE_SOURCES}
+)
+
 target_include_directories(AlgeMate PRIVATE ${ALGEMATE_SRC_DIR})
 
 target_link_libraries(AlgeMate

@@ -95,6 +95,23 @@ QWidget* SettingsPage::createThemeCard() {
     btnLight->setCursor(Qt::PointingHandCursor);
     btnDark->setCursor(Qt::PointingHandCursor);
 
+    // ================== 【新增】设置专属的高亮样式 ==================
+    // 亮色模式按钮选中：白底 + 亮黄字
+    QString lightStyle =
+        "QPushButton { padding: 6px 16px; border-radius: 6px; border: 1px solid #8A8FA3; color: #8A8FA3; background: transparent; font-weight: bold; }"
+        "QPushButton:hover { background: rgba(138, 143, 163, 0.15); }"
+        "QPushButton:checked { background: #FFFFFF; color: #F59E0B; border: 1px solid #F59E0B; }";
+
+    // 暗色模式按钮选中：黑底 + 亮紫/蓝字
+    QString darkStyle =
+        "QPushButton { padding: 6px 16px; border-radius: 6px; border: 1px solid #8A8FA3; color: #8A8FA3; background: transparent; font-weight: bold; }"
+        "QPushButton:hover { background: rgba(138, 143, 163, 0.15); }"
+        "QPushButton:checked { background: #1C1B2E; color: #8FA1FF; border: 1px solid #1C1B2E; }";
+
+    btnLight->setStyleSheet(lightStyle);
+    btnDark->setStyleSheet(darkStyle);
+    // =============================================================
+
     auto sync = [=]() {
         bool dark = ThemeManager::instance().currentTheme() == ThemeManager::Theme::Dark;
         btnLight->setChecked(!dark);

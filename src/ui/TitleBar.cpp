@@ -35,6 +35,7 @@ static QPushButton* makeIconBtn(const QString& text, const QString& tip) {
     b->setCursor(Qt::PointingHandCursor);
     b->setToolTip(tip);
     b->setCheckable(true);
+
     return b;
 }
 
