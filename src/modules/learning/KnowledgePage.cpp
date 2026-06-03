@@ -320,6 +320,7 @@ void KnowledgePage::refreshContentHtml()
         }
     }
     m_contentView->setHtml(html);
+    Latex::LatexRenderer::postProcessDocument(m_contentView->document());
 }
 
 void KnowledgePage::onAnchorClicked(const QUrl& url)
