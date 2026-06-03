@@ -1,47 +1,12 @@
 #include "NavigationBar.h"
+#include "core/ThemeManager.h"
 #include <QGraphicsDropShadowEffect>
 
 #include <QListWidget>
 #include <QVBoxLayout>
 #include <QLabel>
-#include <QApplication>
-#include <QEvent>
-#include <QPalette>
-#include <functional>
 
 namespace AlgeMate {
-
-// --- 核心魔法：不修改头文件，在内部创建一个事件监听器来捕捉主题切换 ---
-class ThemeEventFilter : public QObject {
-public:
-    ThemeEventFilter(std::function<void()> cb, QObject* parent = nullptr)
-        : QObject(parent), callback(cb) {}
-protected:
-    bool eventFilter(QObject* obj, QEvent* event) override {
-        // 捕获系统调色板变化（深色/浅色模式切换）
-        if (event->type() == QEvent::PaletteChange ||
-            event->type() == QEvent::ApplicationPaletteChange ||
-            event->type() == QEvent::ThemeChange) {
-
-            // ==========================================
-            // 【核心修复】：加锁，防止 setStyleSheet 触发无限递归
-            // ==========================================
-            static bool isUpdating = false;
-            if (isUpdating) return false;
-            isUpdating = true;
-
-            callback();
-
-            isUpdating = false;
-            return false; // 拦截完毕，不再向下传递
-            // ==========================================
-        }
-        return QObject::eventFilter(obj, event);
-    }
-private:
-    std::function<void()> callback;
-};
-// -------------------------------------------------------------
 
 NavigationBar::NavigationBar(QWidget* parent) : QWidget(parent) {
     setObjectName(QStringLiteral("NavigationBar"));
@@ -104,8 +69,7 @@ void NavigationBar::buildUi() {
     // [动态主题切换逻辑]：使用 Lambda 绑定深浅色不同样式
     // ==============================================================
     auto applyTheme = [=]() {
-        // 根据全局窗口背景颜色的亮度来判断是否是深色模式 (明度 < 128 视为深色)
-        bool isDark = qApp->palette().color(QPalette::Window).lightness() < 128;
+        bool isDark = ThemeManager::instance().currentTheme() == ThemeManager::Theme::Dark;
 
         if (isDark) {
             // 【深色模式】：暗夜紫，降低亮度和刺眼的白边
@@ -161,11 +125,9 @@ void NavigationBar::buildUi() {
         }
     };
 
-    // 1. 初始化时调用一次，设置当前系统的样式
     applyTheme();
-
-    // 2. 安装事件过滤器，当程序运行中切换深浅色时，自动更新！
-    qApp->installEventFilter(new ThemeEventFilter(applyTheme, this));
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this,
+            [applyTheme](ThemeManager::Theme){ applyTheme(); });
 
 
     // ---------- 信号与核心联动逻辑 ---------- //

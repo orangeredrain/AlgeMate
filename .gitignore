@@ -32,6 +32,7 @@ qrc_*.cpp
 Thumbs.db
 *.res
 *.rc
+!resources/icon.rc
 /.qmake.cache
 /.qmake.stash
 
@@ -104,7 +105,7 @@ cmake_install.cmake
 # 个人本地资料 / 图标素材 / 临时脚本（不上传到 GitHub）
 icon.ico
 icon.png
-resources/icon.ico
+!resources/icon.ico
 seticon.c
 一些资料/
 _cleanup.ps1

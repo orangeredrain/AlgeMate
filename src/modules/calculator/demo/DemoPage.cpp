@@ -26,6 +26,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
+#include <QShowEvent>
 #include <cmath>
 #include <functional> // 引入 std::function
 
@@ -229,6 +230,28 @@ private:
     }
 };
 
+class LazyPage : public QWidget {
+public:
+    explicit LazyPage(std::function<QWidget*()> factory, QWidget* parent = nullptr)
+        : QWidget(parent), m_factory(std::move(factory)) {
+        auto* lay = new QVBoxLayout(this);
+        lay->setContentsMargins(0, 0, 0, 0);
+        lay->setSpacing(0);
+    }
+protected:
+    void showEvent(QShowEvent* e) override {
+        if (!m_loaded) {
+            m_loaded = true;
+            QWidget* inner = m_factory();
+            if (inner) layout()->addWidget(inner);
+        }
+        QWidget::showEvent(e);
+    }
+private:
+    std::function<QWidget*()> m_factory;
+    bool m_loaded = false;
+};
+
 } // anonymous namespace
 
 
@@ -240,49 +263,65 @@ DemoPage::DemoPage(QWidget* parent) : QWidget(parent) {
     stack_ = new QStackedWidget;
     buildCatalog();
 
-    auto* homoPage = new HomoLinearSystemPage;
-    connect(homoPage, &HomoLinearSystemPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(homoPage);
+    auto addLazy = [this](std::function<QWidget*()> factory) {
+        stack_->addWidget(new LazyPage(std::move(factory)));
+    };
 
-    auto* nonhomoPage = new NonhomoLinearSystemPage;
-    connect(nonhomoPage, &NonhomoLinearSystemPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(nonhomoPage);
-
-    auto* maxIndepPage = new MaxIndepPage;
-    connect(maxIndepPage, &MaxIndepPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(maxIndepPage);
-
-    auto* inversePage = new InversePage;
-    connect(inversePage, &InversePage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(inversePage);
-
-    auto* gsoPage = new GSOPage;
-    connect(gsoPage, &GSOPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(gsoPage);
-
-    auto* eigenPage = new EigenPage;
-    connect(eigenPage, &EigenPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(eigenPage);
-
-    auto* symDiagPage = new SymDiagPage;
-    connect(symDiagPage, &SymDiagPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(symDiagPage);
-
-    auto* quadFormPage = new QuadFormPage;
-    connect(quadFormPage, &QuadFormPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(quadFormPage);
-
-    auto* polyGCDPage = new PolyGCDPage;
-    connect(polyGCDPage, &PolyGCDPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(polyGCDPage);
-
-    auto* symReducePage = new SymReducePage;
-    connect(symReducePage, &SymReducePage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(symReducePage);
-
-    auto* jordanFormPage = new JordanFormPage;
-    connect(jordanFormPage, &JordanFormPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
-    stack_->addWidget(jordanFormPage);
+    addLazy([this]() -> QWidget* {
+        auto* p = new HomoLinearSystemPage;
+        connect(p, &HomoLinearSystemPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new NonhomoLinearSystemPage;
+        connect(p, &NonhomoLinearSystemPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new MaxIndepPage;
+        connect(p, &MaxIndepPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new InversePage;
+        connect(p, &InversePage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new GSOPage;
+        connect(p, &GSOPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new EigenPage;
+        connect(p, &EigenPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new SymDiagPage;
+        connect(p, &SymDiagPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new QuadFormPage;
+        connect(p, &QuadFormPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new PolyGCDPage;
+        connect(p, &PolyGCDPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new SymReducePage;
+        connect(p, &SymReducePage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
+    addLazy([this]() -> QWidget* {
+        auto* p = new JordanFormPage;
+        connect(p, &JordanFormPage::backRequested, this, [this]{ stack_->setCurrentIndex(0); });
+        return p;
+    });
 
     root->addWidget(stack_, 1);
 }

@@ -7,22 +7,17 @@
 #include <QSurfaceFormat> // 引入 QSurfaceFormat
 
 int main(int argc, char* argv[]) {
-    // ------------------ 【针对 Qt 6 / Mac 的核心配置】 ------------------
-
-    // 1. 配置 macOS 上的 OpenGL 现代渲染管线版本
-    // 许多 Qt 6 的 3D 组件在 Mac 上必须显式指定 Core Profile 才能正常初始化底层视口
+#ifdef Q_OS_MAC
     QSurfaceFormat format;
     format.setVersion(3, 3);
     format.setProfile(QSurfaceFormat::CoreProfile);
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
     QSurfaceFormat::setDefaultFormat(format);
+#endif
 
-    // 2. 保持你原有的高 DPI 缩放圆整策略（Qt 6 支持此策略）
     QApplication::setHighDpiScaleFactorRoundingPolicy(
         Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
-
-    // -------------------------------------------------------------------------
 
     QApplication app(argc, argv);
 
