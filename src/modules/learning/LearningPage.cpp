@@ -5,6 +5,7 @@
 #include "ExamPage.h"
 #include "WrongBookPage.h"
 #include "LearningCenterPage.h"
+#include <QGraphicsDropShadowEffect>
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -126,25 +127,34 @@ static ClickableCard* makeStatCard(const QString& label, const QString& value,
                                    QLabel** subLabelOut = nullptr)
 {
     auto* card = new ClickableCard(parent);
-    card->setMinimumHeight(100);
-    auto* lay = new QVBoxLayout(card);
-    lay->setContentsMargins(20, 16, 20, 14);
-    lay->setSpacing(4);
+    card->setMinimumHeight(120); // 稍微调高一点，让呼吸感更好
 
+    // 【修改点】：给卡片加软阴影
+    auto* shadow = new QGraphicsDropShadowEffect(card);
+    shadow->setOffset(0, 6);
+    shadow->setBlurRadius(20);
+    shadow->setColor(QColor(0, 0, 0, 12)); // 极浅阴影
+    card->setGraphicsEffect(shadow);
+    // 【修改点】：利用 QSS 的 radial-gradient 在卡片右上角画一个模糊的彩色光晕作为点缀
+    // 模拟那种不规则的玻璃拟态反光感
+    card->setStyleSheet(R"(
+        ClickableCard {
+            background-color: #FFFFFF;
+            border-radius: 20px;
+            background-image: radial-gradient(circle at top right, #EBE5FF 0%, transparent 70%);
+        }
+    )");
+    auto* lay = new QVBoxLayout(card);
+    lay->setContentsMargins(20, 20, 20, 20); // 加大内边距
+    lay->setSpacing(4);
     auto* lb = new QLabel(label);
-    lb->setStyleSheet("font-size:13px; color:#8A8FA3; background:transparent;");
+    lb->setStyleSheet("font-size:14px; font-weight:600; color:#8A8FA3; background:transparent;");
     auto* vl = new QLabel(value);
-    vl->setStyleSheet("font-size:28px; font-weight:700; color:#6A5AE0; background:transparent;");
+    vl->setStyleSheet("font-size:32px; font-weight:800; color:#6A5AE0; background:transparent;"); // 突出大数字
     auto* sb = new QLabel(sub);
     sb->setStyleSheet("font-size:12px; color:#B4B8CC; background:transparent;");
-
-    if (valueLabelOut) {
-        *valueLabelOut = vl;
-    }
-    if (subLabelOut) {
-        *subLabelOut = sb;
-    }
-
+    if (valueLabelOut) *valueLabelOut = vl;
+    if (subLabelOut) *subLabelOut = sb;
     lay->addWidget(lb);
     lay->addWidget(vl);
     lay->addStretch();
@@ -557,9 +567,11 @@ void LearningPage::refreshProgressCard()
     if (m_progressValueLabel) {
         m_progressValueLabel->setText(QStringLiteral("%1%").arg(avgPercent));
         if (avgPercent >= 100) {
-            m_progressValueLabel->setStyleSheet("font-size:28px; font-weight:700; color:#4CAF50; background:transparent;");
+            // 【修改点】：字体统一为和其他卡片一样的 32px 和 800字重
+            m_progressValueLabel->setStyleSheet("font-size:32px; font-weight:800; color:#4CAF50; background:transparent;");
         } else {
-            m_progressValueLabel->setStyleSheet("font-size:28px; font-weight:700; color:#6A5AE0; background:transparent;");
+            // 【修改点】：字体统一为和其他卡片一样的 32px 和 800字重
+            m_progressValueLabel->setStyleSheet("font-size:32px; font-weight:800; color:#6A5AE0; background:transparent;");
         }
     }
 

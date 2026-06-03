@@ -1,4 +1,5 @@
 #include "LearningCenterPage.h"
+#include "core/ThemeManager.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -22,8 +23,8 @@
 #include <QToolButton>
 #include <QComboBox>
 #include <QMouseEvent>
-#include <QDateEdit>         // <-- 引入日期输入框控件
-#include <QDialogButtonBox>  // <-- 引入对话框按钮组控件
+#include <QDateEdit>
+#include <QDialogButtonBox>
 
 namespace AlgeMate::Learning {
 
@@ -41,17 +42,11 @@ struct ModuleStat {
 static QVector<ModuleStat> moduleDefinitions()
 {
     return {
-        // 主色调紫
         {QStringLiteral("overview"), QStringLiteral("学习中心"), QColor(QStringLiteral("#6A5AE0")), 0},
-        // 柔和的天空蓝
         {QStringLiteral("knowledge"), QStringLiteral("知识点学习"), QColor(QStringLiteral("#5C9CE6")), 0},
-        // 温暖的珊瑚橘
         {QStringLiteral("practice"), QStringLiteral("练习模式"), QColor(QStringLiteral("#F28E63")), 0},
-        // 优雅的玫瑰粉
         {QStringLiteral("exam"), QStringLiteral("考试模式"), QColor(QStringLiteral("#E8618C")), 0},
-        // 清新的薄荷绿
         {QStringLiteral("wrongbook"), QStringLiteral("错题本"), QColor(QStringLiteral("#4CB3A4")), 0},
-        // 浪漫的丁香紫
         {QStringLiteral("management"), QStringLiteral("学习管理"), QColor(QStringLiteral("#9B72E6")), 0}
     };
 }
@@ -91,7 +86,6 @@ static QString formatMinutes(int seconds)
 static QVector<ModuleStat> moduleStatsForDate(const QDate& date)
 {
     QVector<ModuleStat> stats = moduleDefinitions();
-
     QSettings settings;
     settings.beginGroup(QStringLiteral("learning/moduleSecondsByDate"));
     settings.beginGroup(dateKey(date));
@@ -109,7 +103,6 @@ static QVector<ModuleStat> moduleStatsForDate(const QDate& date)
     if (totalSeconds > knownSeconds && !stats.isEmpty()) {
         stats[0].seconds += totalSeconds - knownSeconds;
     }
-
     return stats;
 }
 
@@ -123,7 +116,6 @@ static QString moduleSummaryForDate(const QDate& date)
         }
         parts << QStringLiteral("%1 %2").arg(stat.label, formatMinutes(stat.seconds));
     }
-
     return parts.isEmpty() ? QStringLiteral("暂无模块分布") : parts.join(QStringLiteral(" · "));
 }
 
@@ -158,8 +150,6 @@ static QVector<ModuleStat> moduleStatsForDateRange(const QDate& startDate, const
     return stats;
 }
 
-
-// 1. 详细趋势柱状图组件（供弹窗使用）
 class TrendBarChartWidget : public QWidget {
 public:
     enum Mode { Daily, Weekly, Monthly };
@@ -174,6 +164,7 @@ public:
 
 protected:
     void paintEvent(QPaintEvent*) override {
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.fillRect(rect(), Qt::transparent);
@@ -197,7 +188,7 @@ protected:
         for (int i = 0; i <= 2; ++i) {
             int y = padTop + chartH - (chartH * i / 2);
 
-            painter.setPen(QPen(QColor(QStringLiteral("#E2E8F0")), 1, Qt::DashLine));
+            painter.setPen(QPen(QColor(isDark ? "#3B395A" : "#E2E8F0"), 1, Qt::DashLine));
             painter.drawLine(padLeft, y, width() - padRight, y);
 
             painter.setPen(QColor(QStringLiteral("#8A8FA3")));
@@ -222,10 +213,10 @@ protected:
 
             QPainterPath path;
             path.addRoundedRect(barRect, 4, 4);
-            painter.fillPath(path, QColor(QStringLiteral("#6A5AE0")));
+            painter.fillPath(path, QColor(isDark ? "#8FA1FF" : "#6A5AE0"));
 
             if (sec > 0 && count <= 7) {
-                painter.setPen(QColor(QStringLiteral("#6A5AE0")));
+                painter.setPen(QColor(isDark ? "#8FA1FF" : "#6A5AE0"));
                 painter.drawText(QRectF(cx - slotW / 2, barRect.top() - 20, slotW, 20), Qt::AlignCenter, QString::number(qRound(min)));
             }
 
@@ -260,14 +251,14 @@ private:
     QVector<int> m_data;
 };
 
-
-// 2. 详细趋势分析弹窗 (修改了日期跳转组件)
 class StudyTrendDialog : public QDialog {
 public:
     explicit StudyTrendDialog(QWidget* parent = nullptr) : QDialog(parent) {
         setWindowTitle(QStringLiteral("学习趋势分析"));
         setFixedSize(700, 480);
-        setStyleSheet(QStringLiteral("background-color: #FFFFFF;"));
+
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
+        setStyleSheet(isDark ? QStringLiteral("background-color: #1C1B2E;") : QStringLiteral("background-color: #FFFFFF;"));
 
         m_currentDate = QDate::currentDate();
         m_mode = TrendBarChartWidget::Daily;
@@ -276,36 +267,38 @@ public:
         layout->setSpacing(20);
         layout->setContentsMargins(30, 30, 30, 30);
 
-        // --- 顶部控制栏 ---
         auto* topLayout = new QHBoxLayout();
 
         m_modeCombo = new QComboBox(this);
         m_modeCombo->addItems({QStringLiteral("每日 (按小时)"), QStringLiteral("每周 (按日)"), QStringLiteral("每月 (按日)")});
-        m_modeCombo->setStyleSheet(QStringLiteral(
-            "QComboBox { border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 12px; font-size: 14px; background: #F8F9FC; color: #24253D; }"
-            "QComboBox::drop-down { border: none; }"
-            ));
+        m_modeCombo->setStyleSheet(isDark ?
+                                       "QComboBox { border: 1px solid #3B395A; border-radius: 6px; padding: 4px 12px; font-size: 14px; background: #28263F; color: #E6E7F0; }"
+                                       "QComboBox::drop-down { border: none; }"
+                                          :
+                                       "QComboBox { border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 12px; font-size: 14px; background: #F8F9FC; color: #24253D; }"
+                                       "QComboBox::drop-down { border: none; }"
+                                   );
         m_modeCombo->setCursor(Qt::PointingHandCursor);
 
         auto* prevBtn = new QToolButton(this);
         prevBtn->setText(QStringLiteral("<"));
-        prevBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;"));
+        prevBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;" : "color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;");
         prevBtn->setCursor(Qt::PointingHandCursor);
 
-        // 使用 Button 伪装成标题
         m_dateBtn = new QPushButton(this);
         m_dateBtn->setFont(QFont(m_dateBtn->font().family(), 16, QFont::Bold));
-        m_dateBtn->setStyleSheet(QStringLiteral(
-            "QPushButton { color: #24253D; border: none; background: transparent; padding: 4px; }"
-            "QPushButton:hover { color: #6A5AE0; }"
-            ));
+        m_dateBtn->setStyleSheet(isDark ?
+                                     "QPushButton { color: #E6E7F0; border: none; background: transparent; padding: 4px; } QPushButton:hover { color: #8FA1FF; }"
+                                        :
+                                     "QPushButton { color: #24253D; border: none; background: transparent; padding: 4px; } QPushButton:hover { color: #6A5AE0; }"
+                                 );
         m_dateBtn->setCursor(Qt::PointingHandCursor);
         m_dateBtn->setToolTip(QStringLiteral("点击输入跳转至指定日期"));
         m_dateBtn->setMinimumWidth(240);
 
         auto* nextBtn = new QToolButton(this);
         nextBtn->setText(QStringLiteral(">"));
-        nextBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;"));
+        nextBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;" : "color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;");
         nextBtn->setCursor(Qt::PointingHandCursor);
 
         topLayout->addWidget(prevBtn);
@@ -316,11 +309,9 @@ public:
 
         layout->addLayout(topLayout);
 
-        // --- 图表区域 ---
         m_chartWidget = new TrendBarChartWidget(this);
         layout->addWidget(m_chartWidget, 1);
 
-        // --- 事件绑定 ---
         connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
             m_mode = static_cast<TrendBarChartWidget::Mode>(index);
             updateData();
@@ -329,12 +320,11 @@ public:
         connect(prevBtn, &QToolButton::clicked, this, [this]() { shiftDate(-1); });
         connect(nextBtn, &QToolButton::clicked, this, [this]() { shiftDate(1); });
 
-        // 【核心修改点】点击标题弹出带输入框的日期选择器
-        connect(m_dateBtn, &QPushButton::clicked, this, [this]() {
+        connect(m_dateBtn, &QPushButton::clicked, this, [this, isDark]() {
             QDialog dialog(this);
             dialog.setWindowTitle(QStringLiteral("跳转至指定日期"));
             dialog.setFixedSize(300, 160);
-            dialog.setStyleSheet(QStringLiteral("background-color: #FFFFFF;"));
+            dialog.setStyleSheet(isDark ? QStringLiteral("background-color: #1C1B2E;") : QStringLiteral("background-color: #FFFFFF;"));
 
             auto* dLayout = new QVBoxLayout(&dialog);
             dLayout->setContentsMargins(20, 20, 20, 20);
@@ -343,27 +333,32 @@ public:
             auto* label = new QLabel(QStringLiteral("您可以直接输入日期或展开日历："), &dialog);
             label->setStyleSheet(QStringLiteral("color: #8A8FA3; font-size: 13px;"));
 
-            // 使用 QDateEdit 允许直接键入
             auto* dateEdit = new QDateEdit(&dialog);
             dateEdit->setDate(m_currentDate);
             dateEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
-            dateEdit->setCalendarPopup(true); // 开启右侧日历下拉按钮
-            dateEdit->setStyleSheet(QStringLiteral(
-                "QDateEdit { border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px; font-size: 15px; color: #24253D; background: #F8F9FC; }"
-                "QDateEdit::drop-down { border: none; width: 30px; }"
-                "QDateEdit QAbstractItemView { selection-background-color: #6A5AE0; selection-color: white; }"
-                ));
+            dateEdit->setCalendarPopup(true);
+            dateEdit->setStyleSheet(isDark ?
+                                        "QDateEdit { border: 1px solid #3B395A; border-radius: 6px; padding: 8px 10px; font-size: 15px; color: #E6E7F0; background: #28263F; }"
+                                        "QDateEdit::drop-down { border: none; width: 30px; }"
+                                        "QDateEdit QAbstractItemView { selection-background-color: #3B395A; selection-color: #8FA1FF; background: #1C1B2E; color: #E6E7F0; }"
+                                           :
+                                        "QDateEdit { border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px; font-size: 15px; color: #24253D; background: #F8F9FC; }"
+                                        "QDateEdit::drop-down { border: none; width: 30px; }"
+                                        "QDateEdit QAbstractItemView { selection-background-color: #6A5AE0; selection-color: white; background: #FFFFFF; color: #24253D; }"
+                                    );
 
             auto* btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
             btnBox->button(QDialogButtonBox::Ok)->setText(QStringLiteral("确定"));
             btnBox->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
 
-            // 美化按钮
-            dialog.setStyleSheet(dialog.styleSheet() + QStringLiteral(
-                                     "QPushButton { padding: 6px 16px; border-radius: 4px; border: none; background: #F4F5FA; color: #24253D; font-weight: bold; }"
-                                     "QPushButton:hover { background: #E2E8F0; }"
-                                     ));
-            btnBox->button(QDialogButtonBox::Ok)->setStyleSheet(QStringLiteral("background: #6A5AE0; color: white;"));
+            dialog.setStyleSheet(dialog.styleSheet() + (isDark ?
+                                                            "QPushButton { padding: 6px 16px; border-radius: 4px; border: none; background: #28263F; color: #E6E7F0; font-weight: bold; }"
+                                                            "QPushButton:hover { background: #3B395A; }"
+                                                               :
+                                                            "QPushButton { padding: 6px 16px; border-radius: 4px; border: none; background: #F4F5FA; color: #24253D; font-weight: bold; }"
+                                                            "QPushButton:hover { background: #E2E8F0; }"
+                                                        ));
+            btnBox->button(QDialogButtonBox::Ok)->setStyleSheet(isDark ? "background: #312F4A; color: #8FA1FF;" : "background: #6A5AE0; color: white;");
             btnBox->button(QDialogButtonBox::Ok)->setCursor(Qt::PointingHandCursor);
             btnBox->button(QDialogButtonBox::Cancel)->setCursor(Qt::PointingHandCursor);
 
@@ -375,7 +370,6 @@ public:
             connect(btnBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
             connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
-            // 自动获得焦点并全选，方便直接打字覆盖
             dateEdit->setFocus();
             dateEdit->selectAll();
 
@@ -426,7 +420,7 @@ private:
             }
 
         } else if (m_mode == TrendBarChartWidget::Weekly) {
-            QDate start = m_currentDate.addDays(-(m_currentDate.dayOfWeek() - 1)); // 找回周一
+            QDate start = m_currentDate.addDays(-(m_currentDate.dayOfWeek() - 1));
             QDate end = start.addDays(6);
             labelText = QStringLiteral("%1 ~ %2").arg(start.toString("MM.dd"), end.toString("MM.dd"));
 
@@ -452,13 +446,11 @@ private:
 
     TrendBarChartWidget::Mode m_mode;
     QDate m_currentDate;
-    QPushButton* m_dateBtn; // 修改为按钮
+    QPushButton* m_dateBtn;
     QComboBox* m_modeCombo;
     TrendBarChartWidget* m_chartWidget;
 };
 
-
-// 3. 界面原本的图表卡片，支持点击右上角打开弹窗
 class StudyTrendChart : public QWidget {
 public:
     explicit StudyTrendChart(QWidget* parent = nullptr) : QWidget(parent) {
@@ -493,6 +485,7 @@ protected:
     }
 
     void paintEvent(QPaintEvent*) override {
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.fillRect(rect(), Qt::transparent);
@@ -501,16 +494,12 @@ protected:
         painter.setFont(QFont(painter.font().family(), 11));
         painter.drawText(QRect(0, 0, width(), 24), Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("最近 7 天 · 单位：分钟"));
 
-        painter.setPen(QColor(QStringLiteral("#6A5AE0")));
+        painter.setPen(QColor(isDark ? "#8FA1FF" : "#6A5AE0"));
         painter.setFont(QFont(painter.font().family(), 11, QFont::Bold));
         painter.drawText(QRect(0, 0, width(), 24), Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("详细趋势 >"));
 
         const QDate today = QDate::currentDate();
-        struct DayData {
-            QDate date;
-            int seconds;
-            int minutes;
-        };
+        struct DayData { QDate date; int seconds; int minutes; };
         QVector<DayData> days;
         QSettings settings;
         int maxMinutes = 0;
@@ -519,9 +508,7 @@ protected:
             int secs = settings.value(QStringLiteral("learning/studySecondsByDate/") + dateKey(d), 0).toInt();
             int mins = secs / 60;
             days.append({d, secs, mins});
-            if (mins > maxMinutes) {
-                maxMinutes = mins;
-            }
+            if (mins > maxMinutes) maxMinutes = mins;
         }
         const int safeMaxMinutes = qMax(10, maxMinutes + 5);
         const int count = days.size();
@@ -533,13 +520,13 @@ protected:
         const qreal slotWidth = count > 0 ? static_cast<qreal>(chartRect.width()) / count : 0;
         const qreal barWidth = std::min<qreal>(42.0, slotWidth * 0.44);
 
-        painter.setPen(QPen(QColor(QStringLiteral("#F4F5FA")), 1));
+        painter.setPen(QPen(QColor(isDark ? "#28263F" : "#F4F5FA"), 1));
         painter.drawLine(QPointF(chartRect.left(), baselineY - chartHeight / 2),
                          QPointF(chartRect.right(), baselineY - chartHeight / 2));
         painter.drawLine(QPointF(chartRect.left(), baselineY - chartHeight),
                          QPointF(chartRect.right(), baselineY - chartHeight));
 
-        painter.setPen(QColor(QStringLiteral("#E2E8F0")));
+        painter.setPen(QColor(isDark ? "#3B395A" : "#E2E8F0"));
         painter.drawLine(QPointF(chartRect.left(), baselineY), QPointF(chartRect.right(), baselineY));
 
         painter.setFont(QFont(painter.font().family(), 12, QFont::DemiBold));
@@ -548,9 +535,7 @@ protected:
             const DayData& day = days.at(i);
             const qreal centerX = chartRect.left() + slotWidth * i + slotWidth / 2;
             const qreal ratio = static_cast<qreal>(day.minutes) / safeMaxMinutes;
-            const qreal barHeight = day.seconds > 0
-                                        ? std::max<qreal>(8.0, ratio * (chartHeight - 18))
-                                        : 0;
+            const qreal barHeight = day.seconds > 0 ? std::max<qreal>(8.0, ratio * (chartHeight - 18)) : 0;
 
             QRectF barRect(centerX - barWidth / 2, baselineY - barHeight, barWidth, barHeight);
 
@@ -560,19 +545,19 @@ protected:
             const bool isToday = day.date == today;
 
             painter.fillPath(path, isToday
-                                       ? QColor(QStringLiteral("#6A5AE0"))
-                                       : QColor(QStringLiteral("#D4D0F5")));
+                                       ? QColor(isDark ? "#8FA1FF" : "#6A5AE0")
+                                       : QColor(isDark ? "#312F4A" : "#D4D0F5"));
 
             if (day.seconds == 0) {
-                painter.setPen(QColor(QStringLiteral("#C8CBE0")));
+                painter.setPen(QColor(isDark ? "#4B4970" : "#C8CBE0"));
             } else {
-                painter.setPen(isToday ? QColor(QStringLiteral("#6A5AE0")) : QColor(QStringLiteral("#5A48D6")));
+                painter.setPen(isToday ? QColor(isDark ? "#8FA1FF" : "#6A5AE0") : QColor(isDark ? "#6F77FF" : "#5A48D6"));
             }
 
             const QString valueText = day.seconds > 0 && day.minutes < 1 ? QStringLiteral("<1") : QString::number(day.minutes);
             painter.drawText(QRectF(centerX - slotWidth / 2, barRect.top() - 22, slotWidth, 18), Qt::AlignCenter, valueText);
 
-            painter.setPen(isToday ? QColor(QStringLiteral("#6A5AE0")) : QColor(QStringLiteral("#8A8FA3")));
+            painter.setPen(isToday ? QColor(isDark ? "#8FA1FF" : "#6A5AE0") : QColor("#8A8FA3"));
             const QString dayText = isToday ? QStringLiteral("今天") : day.date.toString(QStringLiteral("MM/dd"));
             painter.drawText(QRectF(centerX - slotWidth / 2, baselineY + 10, slotWidth, 20), Qt::AlignCenter, dayText);
         }
@@ -585,6 +570,7 @@ public:
     void setMonth(int year, int month) { m_displayDate = QDate(year, month, 1); update(); }
 protected:
     void paintEvent(QPaintEvent*) override {
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.fillRect(rect(), Qt::transparent);
@@ -594,12 +580,7 @@ protected:
         const int daysInMonth = firstDay.daysInMonth();
         const int firstColumn = firstDay.dayOfWeek() - 1;
 
-        const QStringList weekDays = {
-            QStringLiteral("一"), QStringLiteral("二"), QStringLiteral("三"),
-            QStringLiteral("四"), QStringLiteral("五"), QStringLiteral("六"),
-            QStringLiteral("日")
-        };
-
+        const QStringList weekDays = {QStringLiteral("一"), QStringLiteral("二"), QStringLiteral("三"), QStringLiteral("四"), QStringLiteral("五"), QStringLiteral("六"), QStringLiteral("日")};
         const QRectF gridRect = rect();
         const qreal cellWidth = gridRect.width() / 7.0;
         const qreal headerHeight = 24;
@@ -625,36 +606,36 @@ protected:
             cellPath.addRoundedRect(cellRect, 8, 8);
 
             if (isToday && checkedIn) {
-                painter.fillPath(cellPath, QColor(QStringLiteral("#6A5AE0")));
+                painter.fillPath(cellPath, QColor(isDark ? "#8FA1FF" : "#6A5AE0"));
             } else if (isToday && !checkedIn) {
-                painter.fillPath(cellPath, QColor(QStringLiteral("#F5F3FF")));
-                QPen borderPen(QColor(QStringLiteral("#6A5AE0")));
+                painter.fillPath(cellPath, QColor(isDark ? "#28263F" : "#F5F3FF"));
+                QPen borderPen(QColor(isDark ? "#8FA1FF" : "#6A5AE0"));
                 borderPen.setWidth(2);
                 painter.setPen(borderPen);
                 painter.drawPath(cellPath);
             } else if (!isToday && checkedIn) {
-                painter.fillPath(cellPath, QColor(QStringLiteral("#EBE7FF")));
+                painter.fillPath(cellPath, QColor(isDark ? "#312F4A" : "#EBE7FF"));
             } else {
-                painter.fillPath(cellPath, QColor(QStringLiteral("#F8F9FC")));
+                painter.fillPath(cellPath, QColor(isDark ? "#1F1E33" : "#F8F9FC"));
             }
 
             if (isToday && checkedIn) {
-                painter.setPen(QColor(QStringLiteral("#FFFFFF")));
+                painter.setPen(QColor(isDark ? "#1C1B2E" : "#FFFFFF"));
             } else if (checkedIn) {
-                painter.setPen(QColor(QStringLiteral("#5A48D6")));
+                painter.setPen(QColor(isDark ? "#B0BBFF" : "#5A48D6"));
             } else if (isToday) {
-                painter.setPen(QColor(QStringLiteral("#6A5AE0")));
+                painter.setPen(QColor(isDark ? "#8FA1FF" : "#6A5AE0"));
             } else {
-                painter.setPen(QColor(QStringLiteral("#3A3B52")));
+                painter.setPen(QColor(isDark ? "#E6E7F0" : "#3A3B52"));
             }
 
             painter.drawText(cellRect.adjusted(0, 3, 0, 0), Qt::AlignHCenter | Qt::AlignTop, QString::number(day));
 
             if (checkedIn) {
                 if (isToday) {
-                    painter.setPen(QColor(255, 255, 255, 240));
+                    painter.setPen(isDark ? QColor(28, 27, 46, 240) : QColor(255, 255, 255, 240));
                 } else {
-                    painter.setPen(QColor(106, 90, 224, 210));
+                    painter.setPen(isDark ? QColor(143, 161, 255, 210) : QColor(106, 90, 224, 210));
                 }
 
                 if (cellRect.height() > 20) {
@@ -673,22 +654,24 @@ class YearlyCalendarDialog : public QDialog {
 public:
     explicit YearlyCalendarDialog(int year, QWidget* parent = nullptr) : QDialog(parent), m_currentYear(year) {
         setFixedSize(920, 720);
-        setStyleSheet(QStringLiteral("background-color: #FFFFFF;"));
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
+        setStyleSheet(isDark ? QStringLiteral("background-color: #1C1B2E;") : QStringLiteral("background-color: #FFFFFF;"));
+
         auto* mainLayout = new QVBoxLayout(this);
         mainLayout->setSpacing(16);
         auto* headerLayout = new QHBoxLayout();
         auto* prevBtn = new QToolButton(this);
         prevBtn->setText(QStringLiteral("<"));
-        prevBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;"));
+        prevBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;" : "color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;");
         prevBtn->setCursor(Qt::PointingHandCursor);
         m_yearLabel = new QLabel(this);
         m_yearLabel->setFont(QFont(m_yearLabel->font().family(), 18, QFont::Bold));
-        m_yearLabel->setStyleSheet(QStringLiteral("color: #24253D;"));
+        m_yearLabel->setStyleSheet(isDark ? QStringLiteral("color: #E6E7F0;") : QStringLiteral("color: #24253D;"));
         m_yearLabel->setAlignment(Qt::AlignCenter);
         m_yearLabel->setMinimumWidth(120);
         auto* nextBtn = new QToolButton(this);
         nextBtn->setText(QStringLiteral(">"));
-        nextBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;"));
+        nextBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;" : "color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;");
         nextBtn->setCursor(Qt::PointingHandCursor);
         headerLayout->addStretch();
         headerLayout->addWidget(prevBtn);
@@ -707,7 +690,7 @@ public:
             auto* monthLayout = new QVBoxLayout(monthWidget);
             auto* title = new QLabel(QStringLiteral("%1 月").arg(i + 1), monthWidget);
             title->setFont(QFont(title->font().family(), 12, QFont::Bold));
-            title->setStyleSheet(QStringLiteral("color: #24253D;"));
+            title->setStyleSheet(isDark ? QStringLiteral("color: #E6E7F0;") : QStringLiteral("color: #24253D;"));
             title->setAlignment(Qt::AlignCenter);
             auto* grid = new CalendarGridWidget(monthWidget);
             grid->setMinimumHeight(150);
@@ -726,9 +709,7 @@ private:
     void updateYearView() {
         setWindowTitle(QStringLiteral("%1 年度打卡总览").arg(m_currentYear));
         m_yearLabel->setText(QStringLiteral("%1 年").arg(m_currentYear));
-        for (int i = 0; i < 12; ++i) {
-            m_monthGrids[i]->setMonth(m_currentYear, i + 1);
-        }
+        for (int i = 0; i < 12; ++i) m_monthGrids[i]->setMonth(m_currentYear, i + 1);
     }
     int m_currentYear;
     QLabel* m_yearLabel;
@@ -747,33 +728,35 @@ public:
         auto* headerLayout = new QHBoxLayout();
         m_monthLabel = new QLabel(this);
         m_monthLabel->setFont(QFont(m_monthLabel->font().family(), 16, QFont::Bold));
-        m_monthLabel->setStyleSheet(QStringLiteral("color: #24253D;"));
+        m_monthLabel->setObjectName("CalendarMonthLabel");
+
         auto* prevBtn = new QToolButton(this);
         prevBtn->setText(QStringLiteral("<"));
-        prevBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 14px; border: none;"));
         prevBtn->setCursor(Qt::PointingHandCursor);
+        prevBtn->setObjectName("CalPrevBtn");
         auto* nextBtn = new QToolButton(this);
         nextBtn->setText(QStringLiteral(">"));
-        nextBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 14px; border: none;"));
         nextBtn->setCursor(Qt::PointingHandCursor);
+        nextBtn->setObjectName("CalNextBtn");
         auto* yearViewBtn = new QPushButton(QStringLiteral("全年概览"), this);
-        yearViewBtn->setStyleSheet(QStringLiteral(
-            "QPushButton { background-color: #F5F3FF; color: #6A5AE0; border-radius: 4px; padding: 4px 10px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #EBE7FF; }"
-            ));
+        yearViewBtn->setObjectName("CalYearBtn");
         yearViewBtn->setCursor(Qt::PointingHandCursor);
+
         headerLayout->addWidget(prevBtn);
         headerLayout->addWidget(m_monthLabel);
         headerLayout->addWidget(nextBtn);
         headerLayout->addStretch();
         headerLayout->addWidget(yearViewBtn);
+
         auto* tipLabel = new QLabel(QStringLiteral("学习超过五分钟自动打卡"), this);
         tipLabel->setFont(QFont(tipLabel->font().family(), 11));
-        tipLabel->setStyleSheet(QStringLiteral("color: #6A5AE0;"));
+        tipLabel->setObjectName("CalTipLabel");
         m_calendarGrid = new CalendarGridWidget(this);
+
         mainLayout->addLayout(headerLayout);
         mainLayout->addWidget(tipLabel);
         mainLayout->addWidget(m_calendarGrid, 1);
+
         connect(prevBtn, &QToolButton::clicked, this, [this]() { m_currentDate = m_currentDate.addMonths(-1); updateView(); });
         connect(nextBtn, &QToolButton::clicked, this, [this]() { m_currentDate = m_currentDate.addMonths(1); updateView(); });
         connect(yearViewBtn, &QPushButton::clicked, this, [this]() { YearlyCalendarDialog dialog(m_currentDate.year(), this); dialog.exec(); });
@@ -789,19 +772,13 @@ private:
     CalendarGridWidget* m_calendarGrid;
 };
 
-
-// 独立的模块分布饼图组件
 class DistributionPieWidget : public QWidget {
 public:
     explicit DistributionPieWidget(QWidget* parent = nullptr) : QWidget(parent) {}
-
-    void setStats(const QVector<ModuleStat>& stats) {
-        m_stats = stats;
-        update();
-    }
-
+    void setStats(const QVector<ModuleStat>& stats) { m_stats = stats; update(); }
 protected:
     void paintEvent(QPaintEvent*) override {
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
         int totalSeconds = 0;
         for (const auto& s : m_stats) totalSeconds += s.seconds;
 
@@ -813,8 +790,8 @@ protected:
         const QRectF pieRect(20, (height() - size) / 2, size, size);
 
         if (totalSeconds <= 0) {
-            painter.setPen(QColor(QStringLiteral("#B4B8CC")));
-            painter.setBrush(QColor(QStringLiteral("#F4F5FA")));
+            painter.setPen(QColor(isDark ? "#3B395A" : "#B4B8CC"));
+            painter.setBrush(QColor(isDark ? "#28263F" : "#F4F5FA"));
             painter.drawEllipse(pieRect);
             painter.drawText(pieRect, Qt::AlignCenter, QStringLiteral("暂无数据"));
             return;
@@ -832,10 +809,10 @@ protected:
 
         const qreal innerSize = size * 0.55;
         const QRectF innerRect = pieRect.adjusted((size - innerSize)/2, (size - innerSize)/2, -(size - innerSize)/2, -(size - innerSize)/2);
-        painter.setBrush(QColor(QStringLiteral("#FFFFFF")));
+        painter.setBrush(QColor(isDark ? "#1C1B2E" : "#FFFFFF"));
         painter.drawEllipse(innerRect);
 
-        painter.setPen(QColor(QStringLiteral("#24253D")));
+        painter.setPen(QColor(isDark ? "#E6E7F0" : "#24253D"));
         painter.setFont(QFont(painter.font().family(), 12, QFont::Bold));
         painter.drawText(innerRect, Qt::AlignCenter, formatMinutes(totalSeconds));
 
@@ -855,12 +832,10 @@ protected:
             painter.setBrush(stat.color);
             painter.drawRoundedRect(QRectF(legendX, legendY + 8, 14, 14), 4, 4);
 
-            painter.setPen(QColor(QStringLiteral("#3A3B52")));
+            painter.setPen(QColor(isDark ? "#C9C9DC" : "#3A3B52"));
             painter.drawText(QRect(legendX + 26, legendY, width() - legendX - 26, 30),
                              Qt::AlignLeft | Qt::AlignVCenter,
-                             QStringLiteral("%1 · %2 · %3%")
-                                 .arg(stat.label, formatMinutes(stat.seconds))
-                                 .arg(percent));
+                             QStringLiteral("%1 · %2 · %3%").arg(stat.label, formatMinutes(stat.seconds)).arg(percent));
             legendY += 30;
         }
     }
@@ -868,13 +843,13 @@ private:
     QVector<ModuleStat> m_stats;
 };
 
-// 详细模块分布弹窗 (修改了日期跳转组件)
 class ModuleDistributionDialog : public QDialog {
 public:
     explicit ModuleDistributionDialog(QWidget* parent = nullptr) : QDialog(parent) {
         setWindowTitle(QStringLiteral("详细模块统计"));
         setFixedSize(650, 450);
-        setStyleSheet(QStringLiteral("background-color: #FFFFFF;"));
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
+        setStyleSheet(isDark ? QStringLiteral("background-color: #1C1B2E;") : QStringLiteral("background-color: #FFFFFF;"));
 
         m_currentDate = QDate::currentDate();
         m_mode = Mode::Daily;
@@ -883,35 +858,38 @@ public:
         layout->setSpacing(20);
         layout->setContentsMargins(30, 30, 30, 30);
 
-        // --- 顶部控制栏 ---
         auto* topLayout = new QHBoxLayout();
 
         m_modeCombo = new QComboBox(this);
         m_modeCombo->addItems({QStringLiteral("每日"), QStringLiteral("每周"), QStringLiteral("每月"), QStringLiteral("每年")});
-        m_modeCombo->setStyleSheet(QStringLiteral(
-            "QComboBox { border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 12px; font-size: 14px; background: #F8F9FC; color: #24253D; }"
-            "QComboBox::drop-down { border: none; }"
-            ));
+        m_modeCombo->setStyleSheet(isDark ?
+                                       "QComboBox { border: 1px solid #3B395A; border-radius: 6px; padding: 4px 12px; font-size: 14px; background: #28263F; color: #E6E7F0; }"
+                                       "QComboBox::drop-down { border: none; }"
+                                          :
+                                       "QComboBox { border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 12px; font-size: 14px; background: #F8F9FC; color: #24253D; }"
+                                       "QComboBox::drop-down { border: none; }"
+                                   );
         m_modeCombo->setCursor(Qt::PointingHandCursor);
 
         auto* prevBtn = new QToolButton(this);
         prevBtn->setText(QStringLiteral("<"));
-        prevBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;"));
+        prevBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;" : "color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;");
         prevBtn->setCursor(Qt::PointingHandCursor);
 
         m_dateBtn = new QPushButton(this);
         m_dateBtn->setFont(QFont(m_dateBtn->font().family(), 16, QFont::Bold));
-        m_dateBtn->setStyleSheet(QStringLiteral(
-            "QPushButton { color: #24253D; border: none; background: transparent; padding: 4px; }"
-            "QPushButton:hover { color: #6A5AE0; }"
-            ));
+        m_dateBtn->setStyleSheet(isDark ?
+                                     "QPushButton { color: #E6E7F0; border: none; background: transparent; padding: 4px; } QPushButton:hover { color: #8FA1FF; }"
+                                        :
+                                     "QPushButton { color: #24253D; border: none; background: transparent; padding: 4px; } QPushButton:hover { color: #6A5AE0; }"
+                                 );
         m_dateBtn->setCursor(Qt::PointingHandCursor);
         m_dateBtn->setToolTip(QStringLiteral("点击输入跳转至指定日期"));
         m_dateBtn->setMinimumWidth(240);
 
         auto* nextBtn = new QToolButton(this);
         nextBtn->setText(QStringLiteral(">"));
-        nextBtn->setStyleSheet(QStringLiteral("color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;"));
+        nextBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;" : "color: #6A5AE0; font-weight: bold; font-size: 18px; border: none; padding: 4px 12px;");
         nextBtn->setCursor(Qt::PointingHandCursor);
 
         topLayout->addWidget(prevBtn);
@@ -922,11 +900,9 @@ public:
 
         layout->addLayout(topLayout);
 
-        // --- 饼图区域 ---
         m_pieWidget = new DistributionPieWidget(this);
         layout->addWidget(m_pieWidget, 1);
 
-        // --- 事件绑定 ---
         connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
             m_mode = static_cast<Mode>(index);
             updateData();
@@ -935,12 +911,11 @@ public:
         connect(prevBtn, &QToolButton::clicked, this, [this]() { shiftDate(-1); });
         connect(nextBtn, &QToolButton::clicked, this, [this]() { shiftDate(1); });
 
-        // 【核心修改点】点击标题弹出带输入框的日期选择器
-        connect(m_dateBtn, &QPushButton::clicked, this, [this]() {
+        connect(m_dateBtn, &QPushButton::clicked, this, [this, isDark]() {
             QDialog dialog(this);
             dialog.setWindowTitle(QStringLiteral("跳转至指定日期"));
             dialog.setFixedSize(300, 160);
-            dialog.setStyleSheet(QStringLiteral("background-color: #FFFFFF;"));
+            dialog.setStyleSheet(isDark ? QStringLiteral("background-color: #1C1B2E;") : QStringLiteral("background-color: #FFFFFF;"));
 
             auto* dLayout = new QVBoxLayout(&dialog);
             dLayout->setContentsMargins(20, 20, 20, 20);
@@ -949,27 +924,32 @@ public:
             auto* label = new QLabel(QStringLiteral("您可以直接输入日期或展开日历："), &dialog);
             label->setStyleSheet(QStringLiteral("color: #8A8FA3; font-size: 13px;"));
 
-            // 使用 QDateEdit 允许直接键入
             auto* dateEdit = new QDateEdit(&dialog);
             dateEdit->setDate(m_currentDate);
             dateEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
-            dateEdit->setCalendarPopup(true); // 开启右侧日历下拉按钮
-            dateEdit->setStyleSheet(QStringLiteral(
-                "QDateEdit { border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px; font-size: 15px; color: #24253D; background: #F8F9FC; }"
-                "QDateEdit::drop-down { border: none; width: 30px; }"
-                "QDateEdit QAbstractItemView { selection-background-color: #6A5AE0; selection-color: white; }"
-                ));
+            dateEdit->setCalendarPopup(true);
+            dateEdit->setStyleSheet(isDark ?
+                                        "QDateEdit { border: 1px solid #3B395A; border-radius: 6px; padding: 8px 10px; font-size: 15px; color: #E6E7F0; background: #28263F; }"
+                                        "QDateEdit::drop-down { border: none; width: 30px; }"
+                                        "QDateEdit QAbstractItemView { selection-background-color: #3B395A; selection-color: #8FA1FF; background: #1C1B2E; color: #E6E7F0; }"
+                                           :
+                                        "QDateEdit { border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px; font-size: 15px; color: #24253D; background: #F8F9FC; }"
+                                        "QDateEdit::drop-down { border: none; width: 30px; }"
+                                        "QDateEdit QAbstractItemView { selection-background-color: #6A5AE0; selection-color: white; background: #FFFFFF; color: #24253D; }"
+                                    );
 
             auto* btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
             btnBox->button(QDialogButtonBox::Ok)->setText(QStringLiteral("确定"));
             btnBox->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
 
-            // 美化按钮
-            dialog.setStyleSheet(dialog.styleSheet() + QStringLiteral(
-                                     "QPushButton { padding: 6px 16px; border-radius: 4px; border: none; background: #F4F5FA; color: #24253D; font-weight: bold; }"
-                                     "QPushButton:hover { background: #E2E8F0; }"
-                                     ));
-            btnBox->button(QDialogButtonBox::Ok)->setStyleSheet(QStringLiteral("background: #6A5AE0; color: white;"));
+            dialog.setStyleSheet(dialog.styleSheet() + (isDark ?
+                                                            "QPushButton { padding: 6px 16px; border-radius: 4px; border: none; background: #28263F; color: #E6E7F0; font-weight: bold; }"
+                                                            "QPushButton:hover { background: #3B395A; }"
+                                                               :
+                                                            "QPushButton { padding: 6px 16px; border-radius: 4px; border: none; background: #F4F5FA; color: #24253D; font-weight: bold; }"
+                                                            "QPushButton:hover { background: #E2E8F0; }"
+                                                        ));
+            btnBox->button(QDialogButtonBox::Ok)->setStyleSheet(isDark ? "background: #312F4A; color: #8FA1FF;" : "background: #6A5AE0; color: white;");
             btnBox->button(QDialogButtonBox::Ok)->setCursor(Qt::PointingHandCursor);
             btnBox->button(QDialogButtonBox::Cancel)->setCursor(Qt::PointingHandCursor);
 
@@ -981,7 +961,6 @@ public:
             connect(btnBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
             connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
-            // 自动获得焦点并全选，方便直接打字覆盖
             dateEdit->setFocus();
             dateEdit->selectAll();
 
@@ -1018,7 +997,7 @@ private:
             labelText = m_currentDate.toString(QStringLiteral("yyyy 年 MM 月 dd 日"));
             break;
         case Mode::Weekly: {
-            start = m_currentDate.addDays(-(m_currentDate.dayOfWeek() - 1)); // 找回周一
+            start = m_currentDate.addDays(-(m_currentDate.dayOfWeek() - 1));
             end = start.addDays(6);
             labelText = QStringLiteral("%1 ~ %2").arg(start.toString("MM.dd"), end.toString("MM.dd"));
             break;
@@ -1036,20 +1015,17 @@ private:
             break;
         }
         }
-
         m_dateBtn->setText(labelText + QStringLiteral(" ▾"));
         m_pieWidget->setStats(moduleStatsForDateRange(start, end));
     }
 
     Mode m_mode;
     QDate m_currentDate;
-    QPushButton* m_dateBtn; // 修改为按钮
+    QPushButton* m_dateBtn;
     QComboBox* m_modeCombo;
     DistributionPieWidget* m_pieWidget;
 };
 
-
-// 界面原本的图表卡片
 class ModuleDistributionChart : public QWidget {
 public:
     explicit ModuleDistributionChart(QWidget* parent = nullptr) : QWidget(parent) {
@@ -1057,7 +1033,6 @@ public:
         setCursor(Qt::PointingHandCursor);
         setToolTip(QStringLiteral("点击查看详细统计"));
     }
-
 protected:
     void mouseReleaseEvent(QMouseEvent* event) override {
         if (event->button() == Qt::LeftButton) {
@@ -1066,35 +1041,29 @@ protected:
         }
         QWidget::mouseReleaseEvent(event);
     }
-
     void paintEvent(QPaintEvent*) override {
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
         const QDate today = QDate::currentDate();
         const QVector<ModuleStat> stats = moduleStatsForDate(today);
         int totalSeconds = 0;
-        for (const ModuleStat& stat : stats) {
-            totalSeconds += stat.seconds;
-        }
+        for (const ModuleStat& stat : stats) totalSeconds += stat.seconds;
 
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.fillRect(rect(), Qt::transparent);
 
-        painter.setPen(QColor(QStringLiteral("#24253D")));
+        painter.setPen(QColor(isDark ? "#E6E7F0" : "#24253D"));
         painter.setFont(QFont(painter.font().family(), 14, QFont::Bold));
-        painter.drawText(QRect(0, 0, width(), 24),
-                         Qt::AlignLeft | Qt::AlignVCenter,
-                         QStringLiteral("今日模块分布"));
+        painter.drawText(QRect(0, 0, width(), 24), Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("今日模块分布"));
 
-        painter.setPen(QColor(QStringLiteral("#6A5AE0")));
+        painter.setPen(QColor(isDark ? "#8FA1FF" : "#6A5AE0"));
         painter.setFont(QFont(painter.font().family(), 11, QFont::Bold));
-        painter.drawText(QRect(0, 0, width(), 24),
-                         Qt::AlignRight | Qt::AlignVCenter,
-                         QStringLiteral("详细统计 >"));
+        painter.drawText(QRect(0, 0, width(), 24), Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("详细统计 >"));
 
         const QRectF pieRect(4, 58, 116, 116);
         if (totalSeconds <= 0) {
-            painter.setPen(QColor(QStringLiteral("#B4B8CC")));
-            painter.setBrush(QColor(QStringLiteral("#F4F5FA")));
+            painter.setPen(QColor(isDark ? "#3B395A" : "#B4B8CC"));
+            painter.setBrush(QColor(isDark ? "#28263F" : "#F4F5FA"));
             painter.drawEllipse(pieRect);
             painter.drawText(pieRect, Qt::AlignCenter, QStringLiteral("暂无"));
             return;
@@ -1110,11 +1079,11 @@ protected:
             startAngle += spanAngle;
         }
 
-        painter.setPen(QColor(QStringLiteral("#FFFFFF")));
-        painter.setBrush(QColor(QStringLiteral("#FFFFFF")));
+        painter.setPen(QColor(isDark ? "#28263F" : "#FFFFFF"));
+        painter.setBrush(QColor(isDark ? "#28263F" : "#FFFFFF"));
         painter.drawEllipse(pieRect.adjusted(32, 32, -32, -32));
 
-        painter.setPen(QColor(QStringLiteral("#24253D")));
+        painter.setPen(QColor(isDark ? "#E6E7F0" : "#24253D"));
         painter.setFont(QFont(painter.font().family(), 11, QFont::Bold));
         painter.drawText(pieRect.adjusted(26, 30, -26, -30), Qt::AlignCenter, formatMinutes(totalSeconds));
 
@@ -1128,7 +1097,7 @@ protected:
             painter.setBrush(stat.color);
             painter.drawRoundedRect(QRectF(legendX, legendY + 4, 10, 10), 3, 3);
 
-            painter.setPen(QColor(QStringLiteral("#3A3B52")));
+            painter.setPen(QColor(isDark ? "#C9C9DC" : "#3A3B52"));
             painter.drawText(QRect(legendX + 18, legendY, width() - legendX - 18, 18),
                              Qt::AlignLeft | Qt::AlignVCenter,
                              QStringLiteral("%1 · %2 · %3%").arg(stat.label, formatMinutes(stat.seconds)).arg(percent));
@@ -1156,8 +1125,7 @@ static QFrame* makeTrendPanel(QWidget* parent = nullptr)
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel(QStringLiteral("学习时长趋势"), panel);
-    titleLabel->setStyleSheet(QStringLiteral(
-        "font-size:16px; font-weight:700; color:#24253D; background:transparent;"));
+    titleLabel->setObjectName("TrendTitle");
 
     layout->addWidget(titleLabel);
     layout->addWidget(new StudyTrendChart(panel), 1);
@@ -1216,16 +1184,13 @@ static QFrame* makeRecordPanel(QListWidget** recordsOut, QWidget** chartOut,
     recordLayout->setSpacing(10);
 
     auto* recordTitle = new QLabel(QStringLiteral("学习记录"), recordPanel);
-    recordTitle->setStyleSheet(QStringLiteral(
-        "font-size:16px; font-weight:700; color:#24253D; background:transparent;"));
+    recordTitle->setObjectName("RecordTitle");
 
     auto* moduleChart = new ModuleDistributionChart(recordPanel);
 
     auto* records = new QListWidget(recordPanel);
     records->setFrameShape(QFrame::NoFrame);
-    records->setStyleSheet(QStringLiteral(
-        "QListWidget { background:transparent; color:#8A8FA3; font-size:13px; }"
-        "QListWidget::item { padding:6px 0; }"));
+
     populateStudyRecords(records);
     if (recordsOut) {
         *recordsOut = records;
@@ -1270,6 +1235,49 @@ LearningCenterPage::LearningCenterPage(QWidget* parent) : QWidget(parent)
     lay->addLayout(top);
     lay->addWidget(trendPanel, 1);
     lay->addLayout(bottomRow);
+
+    // ==============================================================
+    // ==================== 统一应用暗色主题样式的 Lambda 函数 =========
+    auto applyTheme = [this]() {
+        bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
+        if (auto* btn = findChild<QPushButton*>(QStringLiteral("LearnBackBtn"))) {
+            btn->setStyleSheet(isDark
+                                   ? "QPushButton { background: transparent; border: 1px solid #3B395A; padding: 6px 12px; border-radius: 6px; color: #C9C9DC;} QPushButton:hover { background: #28263F; }"
+                                   : "QPushButton { background: transparent; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; color: #4a5568;} QPushButton:hover { background: #edf2f7; }");
+        }
+        if (auto* tr = findChild<QLabel*>(QStringLiteral("TrendTitle"))) {
+            tr->setStyleSheet(isDark ? "font-size:16px; font-weight:700; color:#E6E7F0; background:transparent;" : "font-size:16px; font-weight:700; color:#24253D; background:transparent;");
+        }
+        if (auto* rr = findChild<QLabel*>(QStringLiteral("RecordTitle"))) {
+            rr->setStyleSheet(isDark ? "font-size:16px; font-weight:700; color:#E6E7F0; background:transparent;" : "font-size:16px; font-weight:700; color:#24253D; background:transparent;");
+        }
+        if (m_records) {
+            m_records->setStyleSheet(isDark ? "QListWidget { background:transparent; color:#C9C9DC; font-size:13px; } QListWidget::item { padding:6px 0; }"
+                                            : "QListWidget { background:transparent; color:#8A8FA3; font-size:13px; } QListWidget::item { padding:6px 0; }");
+        }
+        if (auto* mLabel = findChild<QLabel*>("CalendarMonthLabel")) {
+            mLabel->setStyleSheet(isDark ? "color: #E6E7F0;" : "color: #24253D;");
+        }
+        if (auto* pBtn = findChild<QToolButton*>("CalPrevBtn")) {
+            pBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 14px; border: none;" : "color: #6A5AE0; font-weight: bold; font-size: 14px; border: none;");
+        }
+        if (auto* nBtn = findChild<QToolButton*>("CalNextBtn")) {
+            nBtn->setStyleSheet(isDark ? "color: #8FA1FF; font-weight: bold; font-size: 14px; border: none;" : "color: #6A5AE0; font-weight: bold; font-size: 14px; border: none;");
+        }
+        if (auto* yBtn = findChild<QPushButton*>("CalYearBtn")) {
+            yBtn->setStyleSheet(isDark
+                                    ? "QPushButton { background-color: #312F4A; color: #8FA1FF; border-radius: 4px; padding: 4px 10px; font-weight: bold; } QPushButton:hover { background-color: #3B395A; }"
+                                    : "QPushButton { background-color: #F5F3FF; color: #6A5AE0; border-radius: 4px; padding: 4px 10px; font-weight: bold; } QPushButton:hover { background-color: #EBE7FF; }");
+        }
+        if (auto* tipL = findChild<QLabel*>("CalTipLabel")) {
+            tipL->setStyleSheet(isDark ? "color: #8FA1FF;" : "color: #6A5AE0;");
+        }
+        update();
+    };
+
+    applyTheme();
+    connect(&AlgeMate::ThemeManager::instance(), &AlgeMate::ThemeManager::themeChanged, this, [applyTheme](AlgeMate::ThemeManager::Theme){ applyTheme(); });
+    // ==============================================================
 }
 
 void LearningCenterPage::showEvent(QShowEvent* event)
