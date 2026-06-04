@@ -23,6 +23,7 @@
 #include <QPointer>
 #include <QMessageBox>
 #include <QFile>
+#include <QSettings>
 #include <QTextStream>
 #include <QCoreApplication>
 #include <QNetworkAccessManager>
@@ -1991,21 +1992,12 @@ void ChapterPracticePage::onAiGradeSubjective() {
 
     q.userAnswer = textEdit->toPlainText().trimmed();
 
-    QString configPath = QCoreApplication::applicationDirPath() + "/algemate_ai.conf";
-    QFile file(configPath);
-    QString apiKey = "";
-
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&file);
-        QString encoded = in.readLine().trimmed(); // 只读第一行！
-        if (!encoded.isEmpty()) {
-            apiKey = QString(QByteArray::fromBase64(encoded.toUtf8()));
-        }
-    }
+    QSettings settings(QStringLiteral("AlgeMate"), QStringLiteral("AlgeMateApp"));
+    QString apiKey = settings.value(QStringLiteral("AI/DeepSeekApiKey"), QString()).toString().trimmed();
 
     if (apiKey.isEmpty()) {
         QMessageBox::critical(this, QStringLiteral("未检测到 API Key"),
-                              QStringLiteral("AI 智能判卷需复用您的解题模块凭据。\n请前往【AI智能解题】页面配置并保存您的 DeepSeek API Key 再返回重试。"));
+                              QStringLiteral("AI 智能判卷需要 DeepSeek 凭据。\n请前往【设置中心】配置并保存您的 DeepSeek API Key 再返回重试。"));
         return;
     }
 

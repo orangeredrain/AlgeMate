@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QFile>
+#include <QSettings>
 #include <QScrollArea>
 #include <QProgressBar>
 #include <QMessageBox>
@@ -920,20 +921,14 @@ void ExamProgressPage::onSubmitExam() {
 // 调用 DeepSeek AI 批改单道题
 void ExamProgressPage::gradeSubjectiveWithAI(int index) {
     Question& q = questions[index];
-    QString configPath = QCoreApplication::applicationDirPath() + "/algemate_ai.conf";
-    QFile file(configPath);
-    QString apiKey = "";
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&file);
-        QString encoded = in.readLine().trimmed(); // 只读第一行
-        if (!encoded.isEmpty()) apiKey = QString(QByteArray::fromBase64(encoded.toUtf8()));
-    }
+    QSettings settings(QStringLiteral("AlgeMate"), QStringLiteral("AlgeMateApp"));
+    QString apiKey = settings.value(QStringLiteral("AI/DeepSeekApiKey"), QString()).toString().trimmed();
 
     // 未配置 Key 或未作答的保底直接判 0 分
     if (apiKey.isEmpty() || q.userAnswer.trimmed().isEmpty()) {
         q.isCorrect = false;
         q.earnedScore = 0;
-        q.aiReport = q.userAnswer.trimmed().isEmpty() ? QStringLiteral("学生未作答，自动判 0 分。") : QStringLiteral("未检测到 API 凭证，无法出分。");
+        q.aiReport = q.userAnswer.trimmed().isEmpty() ? QStringLiteral("学生未作答，自动判 0 分。") : QStringLiteral("未检测到 DeepSeek API 凭据（请前往设置中心配置），无法出分。");
         m_pendingAITasks--;
         if (m_pendingAITasks == 0) finishExamAndSave();
         return;

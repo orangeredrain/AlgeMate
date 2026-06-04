@@ -21,6 +21,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPushButton>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QUrl>
@@ -109,15 +110,8 @@ bool OcrAttachWidget::hasPending() const
 
 QString OcrAttachWidget::loadDoubaoKey() const
 {
-    const QString path = QCoreApplication::applicationDirPath()
-                         + QStringLiteral("/algemate_ai.conf");
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return {};
-    QTextStream in(&f);
-    in.readLine(); // 第一行：DeepSeek key（跳过）
-    const QString dbEnc = in.readLine().trimmed();
-    if (dbEnc.isEmpty()) return {};
-    return QString::fromUtf8(QByteArray::fromBase64(dbEnc.toUtf8()));
+    QSettings settings(QStringLiteral("AlgeMate"), QStringLiteral("AlgeMateApp"));
+    return settings.value(QStringLiteral("AI/DoubaoApiKey"), QString()).toString().trimmed();
 }
 
 void OcrAttachWidget::setHint(const QString& text, bool isError)
@@ -273,7 +267,7 @@ void OcrAttachWidget::startOcr()
 
     const QString key = loadDoubaoKey();
     if (key.isEmpty()) {
-        setHint(QStringLiteral("❌ 未找到豆包 API Key，请先在【AI智能解题】页面配置并保存"), true);
+        setHint(QStringLiteral("❌ 未找到豆包 API Key，请先在【设置中心】配置并保存"), true);
         emit ocrFailed(QStringLiteral("未配置豆包 API Key"));
         // 保留缩略图，让用户看到挂载状态；用户可以 × 取消
         return;

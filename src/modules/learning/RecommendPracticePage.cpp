@@ -7,6 +7,7 @@
 #include <QScrollArea>
 #include <QMessageBox>
 #include <QFile>
+#include <QSettings>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -342,15 +343,11 @@ void RecommendPracticePage::onAiGradeSubjective() {
     }
     q.userAnswer = textEdit->toPlainText().trimmed();
 
-    QString configPath = QCoreApplication::applicationDirPath() + "/algemate_ai.conf";
-    QFile file(configPath);
-    QString apiKey = "";
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        apiKey = QString(QByteArray::fromBase64(file.readLine().trimmed()));
-    }
+    QSettings settings(QStringLiteral("AlgeMate"), QStringLiteral("AlgeMateApp"));
+    QString apiKey = settings.value(QStringLiteral("AI/DeepSeekApiKey"), QString()).toString().trimmed();
 
     if (apiKey.isEmpty()) {
-        QMessageBox::critical(this, QStringLiteral("提示"), QStringLiteral("未检测到 API Key，请去 AI 模块配置。"));
+        QMessageBox::critical(this, QStringLiteral("提示"), QStringLiteral("未检测到 DeepSeek API Key，请前往【设置中心】配置。"));
         return;
     }
 
