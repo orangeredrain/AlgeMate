@@ -835,6 +835,43 @@ void ExamProgressPage::saveWrongQuestions() {
     }
 }
 
+// void ExamProgressPage::onSubmitExam() {
+//     auto* msgBox = new QMessageBox(this);
+//     msgBox->setText(QStringLiteral("确定要交卷吗？提交后不可更改答案\n交卷后客观题将立即出分，解答题将交由 DeepSeek AI 智能批阅。"));
+//     msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+
+//     if (msgBox->exec() == QMessageBox::Yes) {
+//         if (m_examTimer) m_examTimer->stop();
+//         this->setEnabled(false); // 避免判卷期间二次点击
+
+//         m_pendingAITasks = 0;
+
+//         // 1. 自动批改客观题，并初始化得分；筛选出主观题交由 AI 处理
+//         for (int i = 0; i < questions.size(); ++i) {
+//             auto& q = questions[i];
+//             if (q.type == QuestionType::Single) {
+//                 q.isCorrect = (q.userAnswer == q.correctAnswer);
+//                 q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
+//             } else if (q.type == QuestionType::Fill) {
+//                 bool ok1, ok2;
+//                 double userValue = q.userAnswer.toDouble(&ok1);
+//                 double correctValue = q.correctAnswer.toDouble(&ok2);
+//                 q.isCorrect = ok1 && ok2 && std::abs(userValue - correctValue) < 0.0001;
+//                 q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
+//             } else {
+//                 // 主观题累计进入 AI 异步流
+//                 m_pendingAITasks++;
+//                 gradeSubjectiveWithAI(i);
+//             }
+//         }
+
+//         // 如果整张试卷没有主观题，直接进入收尾保存
+//         if (m_pendingAITasks == 0) {
+//             finishExamAndSave();
+//         }
+//     }
+// }
+
 void ExamProgressPage::onSubmitExam() {
     auto* msgBox = new QMessageBox(this);
     msgBox->setText(QStringLiteral("确定要交卷吗？提交后不可更改答案\n交卷后客观题将立即出分，解答题将交由 DeepSeek AI 智能批阅。"));
@@ -846,28 +883,36 @@ void ExamProgressPage::onSubmitExam() {
 
         m_pendingAITasks = 0;
 
-        // 1. 自动批改客观题，并初始化得分；筛选出主观题交由 AI 处理
+        // 1. 先遍历一遍，完成客观题批改，并【预先统计】主观题总数
         for (int i = 0; i < questions.size(); ++i) {
             auto& q = questions[i];
             if (q.type == QuestionType::Single) {
                 q.isCorrect = (q.userAnswer == q.correctAnswer);
-                q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
+                q.earnedScore = q.isCorrect ? q.score : 0;
             } else if (q.type == QuestionType::Fill) {
                 bool ok1, ok2;
                 double userValue = q.userAnswer.toDouble(&ok1);
                 double correctValue = q.correctAnswer.toDouble(&ok2);
                 q.isCorrect = ok1 && ok2 && std::abs(userValue - correctValue) < 0.0001;
-                q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
+                q.earnedScore = q.isCorrect ? q.score : 0;
             } else {
-                // 主观题累计进入 AI 异步流
+                // 只统计数量，先不执行 AI
                 m_pendingAITasks++;
-                gradeSubjectiveWithAI(i);
             }
         }
 
-        // 如果整张试卷没有主观题，直接进入收尾保存
+        // 2. 如果整张试卷没有主观题，直接进入收尾保存
         if (m_pendingAITasks == 0) {
             finishExamAndSave();
+            return; // 结束函数，避免往下走
+        }
+
+        // 3. 开始统一派发 AI 判卷任务
+        // 此时 m_pendingAITasks 已经是总数（比如 8），哪怕遇到空答案立刻 --，也不会马上变成 0 触发提前交卷
+        for (int i = 0; i < questions.size(); ++i) {
+            if (questions[i].type == QuestionType::Subjective) {
+                gradeSubjectiveWithAI(i);
+            }
         }
     }
 }
