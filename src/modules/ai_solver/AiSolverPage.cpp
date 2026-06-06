@@ -421,6 +421,10 @@ void AiSolverPage::onSendButtonClicked() {
         QMessageBox::warning(this, QStringLiteral("缺少配置"), QStringLiteral("请先在【设置中心】填写【DeepSeek 密钥】！"));
         return;
     }
+    if (dbApiKey.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("缺少配置"), QStringLiteral("请先在【设置中心】填写【豆包 API Key】！"));
+        return;
+    }
 
     // UI 显示用户输入
     resultEdit_->moveCursor(QTextCursor::End);
@@ -547,13 +551,9 @@ void AiSolverPage::sendToDeepSeek(const QString& finalPrompt) {
         updateStatusLabel(statusLabel_, QStringLiteral("⏳ DeepSeek 正在深度思考解题中..."), "#f59e0b", "#ED8936");
     }
 
-    resultEdit_->moveCursor(QTextCursor::End);
-    resultEdit_->insertPlainText(QStringLiteral("\n【AlgeMate AI】\n"));
-    rawMarkdown_ += QStringLiteral("\n【AlgeMate AI】\n");
-
     QString promptToSend = finalPrompt;
     if (deepThinkEnabled_) {
-        promptToSend += QStringLiteral("\n\n请在内部充分思考、整理好结果后再输出。不要在输出里夾带自我修正的表述。");
+        promptToSend += QStringLiteral("\n\n请在内部充分思考、整理好结果后再输出。不要在输出里夹带自我修正的表述。");
     }
 
     QJsonObject userMsg;
@@ -571,21 +571,127 @@ void AiSolverPage::sendToDeepSeek(const QString& finalPrompt) {
     QJsonObject requestBody;
     requestBody["model"] = deepThinkEnabled_ ? QStringLiteral("deepseek-reasoner") : QStringLiteral("deepseek-chat");
     requestBody["messages"] = chatHistory_;
-    requestBody["stream"] = true;
+    requestBody["stream"] = false;
 
     if (!deepThinkEnabled_) {
         requestBody["temperature"] = 0.7;
     }
 
     currentReply_ = networkManager_->post(request, QJsonDocument(requestBody).toJson());
-    connect(currentReply_, &QNetworkReply::readyRead, this, &AiSolverPage::onReplyReadyRead);
     connect(currentReply_, &QNetworkReply::finished, this, &AiSolverPage::onReplyFinished);
 }
 
-void AiSolverPage::onReplyReadyRead() {
+void AiSolverPage::onReplyFinished() {
     if (!currentReply_) return;
 
-    QString strData = QString::fromUtf8(currentReply_->readAll());
+    QString aiAnswer;
+    bool ok = (currentReply_->error() == QNetworkReply::NoError);
+    QString errorMsg;
+
+    QByteArray respData = currentReply_->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(respData);
+
+    if (!ok) {
+        errorMsg = currentReply_->errorString();
+        if (doc.isObject() && doc.object().contains("error")) {
+            QString apiError = doc.object()["error"].toObject()["message"].toString();
+            if (!apiError.isEmpty()) errorMsg = apiError;
+        }
+    } else {
+        if (doc.isObject()) {
+            QJsonArray choices = doc.object()["choices"].toArray();
+            if (!choices.isEmpty()) {
+                aiAnswer = choices[0].toObject()["message"].toObject()["content"].toString();
+            }
+        }
+        if (aiAnswer.trimmed().isEmpty()) {
+            ok = false;
+            errorMsg = QStringLiteral("DeepSeek 未返回有效内容");
+        }
+    }
+
+    currentReply_->deleteLater();
+    currentReply_ = nullptr;
+
+    if (!ok) {
+        resultEdit_->moveCursor(QTextCursor::End);
+        resultEdit_->insertPlainText(QStringLiteral("\n\n❌ 错误: ") + errorMsg);
+        rawMarkdown_ += QStringLiteral("\n\n❌ 错误: ") + errorMsg;
+        updateStatusLabel(statusLabel_, QStringLiteral("❌ 错误: ") + errorMsg, "#ef4444", "#FC8181");
+        enableInputs(true);
+        isLoading_ = false;
+        return;
+    }
+
+    pendingAiAnswer_ = aiAnswer;
+    sendToPolish(aiAnswer);
+}
+
+void AiSolverPage::sendToPolish(const QString& aiAnswer) {
+    QSettings settings("AlgeMate", "AlgeMateApp");
+    QString dbApiKey = settings.value("AI/DoubaoApiKey", "").toString();
+
+    if (dbApiKey.isEmpty()) {
+        resultEdit_->moveCursor(QTextCursor::End);
+        resultEdit_->insertPlainText(QStringLiteral("\n\n❌ 错误: 请先在【设置中心】配置【豆包 API Key】，否则无法整理输出。"));
+        updateStatusLabel(statusLabel_, QStringLiteral("❌ 缺少豆包 API Key"), "#ef4444", "#FC8181");
+        enableInputs(true);
+        isLoading_ = false;
+        pendingAiAnswer_.clear();
+        return;
+    }
+
+    updateStatusLabel(statusLabel_, QStringLiteral("⏳ 正在整理输出..."), "#f59e0b", "#ED8936");
+
+    rawMarkdown_ += QStringLiteral("\n【AlgeMate AI】\n");
+    resultEdit_->moveCursor(QTextCursor::End);
+    resultEdit_->insertPlainText(QStringLiteral("\n【AlgeMate AI】\n"));
+
+    QNetworkRequest request{QUrl(DOUBAO_API_URL)};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", QStringLiteral("Bearer %1").arg(dbApiKey).toUtf8());
+
+    QJsonObject requestBody;
+    requestBody["model"] = QStringLiteral("doubao-seed-2-0-pro-260215");
+    requestBody["stream"] = true;
+    QJsonObject thinkingObj;
+    thinkingObj["type"] = "disabled";
+    requestBody["thinking"] = thinkingObj;
+
+    QString sysPrompt = QStringLiteral(
+        "你是一个严格的 LaTeX/Markdown 语法校对器，只输出修正后的 markdown 文本，不输出任何解释、绝对不要用代码块（``` ）包裹整段输出、不要追加说明。\n"
+        "校对规则：\n"
+        "1. 行内公式必须 $...$ 包裹，独立公式必须 $$...$$ 包裹；禁止裸出 \\begin{align*} / \\begin{equation} / \\begin{aligned} 等环境（必须放进 $$...$$ 内）。\n"
+        "2. 矩阵和列向量统一写成 \\begin{pmatrix}...\\end{pmatrix}，行间用 \\\\ 分隔，列间用 & 分隔；禁止 \\begin{array}{c} 写单列。\n"
+        "3. 检查并补全所有缺失的反斜杠（\\）、花括号（{}）、$ 符号、\\begin / \\end 配对、\\left / \\right 配对。\n"
+        "4. 不允许 markdown 加粗与公式嵌套：**$x$** 改为 $\\mathbf{x}$。\n"
+        "5. 保留原文所有解题步骤、文字、代码块和分点结构，只修语法错误，不改语义。\n"
+        "6. 不要在文本中改写中文字符；只修改公式与 markdown 标记。\n"
+        "现在请校对下面这段 markdown，并直接输出完整修正版："
+    );
+
+    QJsonArray messagesArray;
+    QJsonObject sysMsg;
+    sysMsg["role"] = "system";
+    sysMsg["content"] = sysPrompt;
+    messagesArray.append(sysMsg);
+
+    QJsonObject userMsg;
+    userMsg["role"] = "user";
+    userMsg["content"] = aiAnswer;
+    messagesArray.append(userMsg);
+
+    requestBody["messages"] = messagesArray;
+
+    polishReply_ = networkManager_->post(request, QJsonDocument(requestBody).toJson());
+    connect(polishReply_, &QNetworkReply::readyRead, this, &AiSolverPage::onPolishReadyRead);
+    connect(polishReply_, &QNetworkReply::finished, this, &AiSolverPage::onPolishFinished);
+}
+
+void AiSolverPage::onPolishReadyRead() {
+    if (!polishReply_) return;
+
+    QString strData = QString::fromUtf8(polishReply_->readAll());
     QStringList lines = strData.split("\n", Qt::SkipEmptyParts);
 
     for (const QString& line : lines) {
@@ -609,53 +715,60 @@ void AiSolverPage::onReplyReadyRead() {
     }
 }
 
-void AiSolverPage::onReplyFinished() {
-    if (!currentReply_) return;
+void AiSolverPage::onPolishFinished() {
+    if (!polishReply_) return;
 
-    if (currentReply_->error() != QNetworkReply::NoError) {
-        QString errorMsg = currentReply_->errorString();
-        QJsonDocument doc = QJsonDocument::fromJson(currentReply_->readAll());
+    bool ok = (polishReply_->error() == QNetworkReply::NoError);
+    QString errorMsg;
 
+    if (!ok) {
+        errorMsg = polishReply_->errorString();
+        QJsonDocument doc = QJsonDocument::fromJson(polishReply_->readAll());
         if (doc.isObject() && doc.object().contains("error")) {
             QString apiError = doc.object()["error"].toObject()["message"].toString();
             if (!apiError.isEmpty()) errorMsg = apiError;
         }
-
-        resultEdit_->moveCursor(QTextCursor::End);
-        resultEdit_->insertPlainText(QStringLiteral("\n\n❌ 错误: ") + errorMsg);
-        updateStatusLabel(statusLabel_, QStringLiteral("❌ 错误: ") + errorMsg, "#ef4444", "#FC8181");
-    } else {
-        QString allText = rawMarkdown_;
-        int lastAiPos = allText.lastIndexOf(QStringLiteral("【AlgeMate AI】\n"));
-
-        if (lastAiPos != -1) {
-            QString fullResponse = allText.mid(lastAiPos + 15).trimmed();
-            if (!fullResponse.isEmpty()) {
-                QJsonObject assistantMsg;
-                assistantMsg["role"] = "assistant";
-                assistantMsg["content"] = fullResponse;
-                chatHistory_.append(assistantMsg);
-            }
-        }
-
-        // LaTeX 重新渲染
-        renderer_->clearCache();
-        QString html = renderer_->render(rawMarkdown_, resultEdit_->document());
-        resultEdit_->setHtml(html);
-        Latex::LatexRenderer::postProcessDocument(resultEdit_->document());
-        resultEdit_->setSourceMarkdown(rawMarkdown_);
-
-        QTextCursor cursor = resultEdit_->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        resultEdit_->setTextCursor(cursor);
-
-        updateStatusLabel(statusLabel_, QStringLiteral("✅ 完成"), "#10b981", "#48BB78");
     }
 
+    polishReply_->deleteLater();
+    polishReply_ = nullptr;
+
+    if (!ok) {
+        resultEdit_->moveCursor(QTextCursor::End);
+        resultEdit_->insertPlainText(QStringLiteral("\n\n❌ 错误: ") + errorMsg + QStringLiteral("，请在【设置中心】检查【豆包 API Key】是否已正确配置。"));
+        updateStatusLabel(statusLabel_, QStringLiteral("❌ 输出整理失败"), "#ef4444", "#FC8181");
+        enableInputs(true);
+        isLoading_ = false;
+        pendingAiAnswer_.clear();
+        return;
+    }
+
+    const QString marker = QStringLiteral("【AlgeMate AI】\n");
+    int lastAiPos = rawMarkdown_.lastIndexOf(marker);
+    if (lastAiPos != -1) {
+        QString fullResponse = rawMarkdown_.mid(lastAiPos + marker.length()).trimmed();
+        if (!fullResponse.isEmpty()) {
+            QJsonObject assistantMsg;
+            assistantMsg["role"] = "assistant";
+            assistantMsg["content"] = fullResponse;
+            chatHistory_.append(assistantMsg);
+        }
+    }
+
+    renderer_->clearCache();
+    QString html = renderer_->render(rawMarkdown_, resultEdit_->document());
+    resultEdit_->setHtml(html);
+    Latex::LatexRenderer::postProcessDocument(resultEdit_->document());
+    resultEdit_->setSourceMarkdown(rawMarkdown_);
+
+    QTextCursor cursor = resultEdit_->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    resultEdit_->setTextCursor(cursor);
+
+    updateStatusLabel(statusLabel_, QStringLiteral("✅ 完成"), "#10b981", "#48BB78");
     enableInputs(true);
     isLoading_ = false;
-    currentReply_->deleteLater();
-    currentReply_ = nullptr;
+    pendingAiAnswer_.clear();
 }
 
 void AiSolverPage::onClearHistoryClicked() {

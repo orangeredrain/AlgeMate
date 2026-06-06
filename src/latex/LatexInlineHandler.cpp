@@ -3,6 +3,7 @@
 #include <jkqtmathtext/jkqtmathtext.h>
 
 #include <QFontDatabase>
+#include <QGuiApplication>
 #include <QHash>
 #include <QPainter>
 #include <QPixmap>
@@ -19,6 +20,11 @@ static const QString& cjkFontName()
             QStringLiteral("Source Han Serif SC"),
             QStringLiteral("Source Han Serif CN"),
             QStringLiteral("Noto Serif CJK SC"),
+            QStringLiteral("PingFang SC"),
+            QStringLiteral("Hiragino Sans GB"),
+            QStringLiteral("STSong"),
+            QStringLiteral("Heiti SC"),
+            QStringLiteral("STHeiti"),
             QStringLiteral("SimSun"),
             QStringLiteral("宋体"),
             QStringLiteral("Microsoft YaHei")
@@ -29,7 +35,7 @@ static const QString& cjkFontName()
                 if (f.compare(p, Qt::CaseInsensitive) == 0) return p;
             }
         }
-        return QStringLiteral("Microsoft YaHei");
+        return QGuiApplication::font().family();
     }();
     return name;
 }

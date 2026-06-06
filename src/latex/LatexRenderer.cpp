@@ -213,6 +213,11 @@ static QPixmap renderMathPixmap(const QString& latex, int fontSize,
             QStringLiteral("Source Han Serif SC"),
             QStringLiteral("Source Han Serif CN"),
             QStringLiteral("Noto Serif CJK SC"),
+            QStringLiteral("PingFang SC"),
+            QStringLiteral("Hiragino Sans GB"),
+            QStringLiteral("STSong"),
+            QStringLiteral("Heiti SC"),
+            QStringLiteral("STHeiti"),
             QStringLiteral("SimSun"),
             QStringLiteral("宋体"),
             QStringLiteral("Microsoft YaHei")
@@ -223,7 +228,7 @@ static QPixmap renderMathPixmap(const QString& latex, int fontSize,
                 if (f.compare(p, Qt::CaseInsensitive) == 0) return p;
             }
         }
-        return QStringLiteral("Microsoft YaHei");
+        return QGuiApplication::font().family();
     }();
 
     JKQTMathText mt;

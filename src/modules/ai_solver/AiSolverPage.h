@@ -39,9 +39,10 @@ protected:
 private slots:
     void onSendButtonClicked();
     void onClearHistoryClicked();
-    void onReplyReadyRead();
     void onReplyFinished();
     void onDoubaoOcrFinished(); // 豆包 OCR 完成的槽函数
+    void onPolishReadyRead();
+    void onPolishFinished();
     void onUploadImageClicked();
     void onClearImageClicked(); // 点 × 取消已挂载的图片
     void onCopyAllClicked();    // 一键复制全部 markdown（类似豆包复制按钮）
@@ -50,6 +51,7 @@ private:
     void setupUI();
     void enableInputs(bool enabled);
     void sendToDeepSeek(const QString& finalPrompt); // 豆包发给 deepseek
+    void sendToPolish(const QString& aiAnswer);
 
     // 拖拽辅助：从 QMimeData 中提取图片并挂载到 currentImagePath_
     bool extractImageFromMime(const QMimeData *mime);
@@ -79,6 +81,7 @@ private:
     std::unique_ptr<QNetworkAccessManager> networkManager_;
     QNetworkReply* currentReply_ = nullptr;
     QNetworkReply* ocrReply_ = nullptr; // 专门管理豆包的请求
+    QNetworkReply* polishReply_ = nullptr;
 
     // State
     QJsonArray chatHistory_;
@@ -86,6 +89,7 @@ private:
     QString currentImagePath_; // 保存当前选中的图片路径
     QString rawMarkdown_; // 用于保存完整且未被破坏的 Markdown 源码
     QString pendingUserInput_; // 在豆包识图期间，暂存用户的打字输入
+    QString pendingAiAnswer_;
 };
 
 }
