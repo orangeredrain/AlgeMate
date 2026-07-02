@@ -89,8 +89,8 @@ void SymReducePage::onSolve() {
     QStringList parts;
 
     if (generalMode) {
-        // ---- 一般形式 (待定系数法) ----
-        int effN = std::max(n, 4); // 至少 4 元才能捕捉 σ_4
+
+        int effN = std::max(n, 4); 
         algemate::math::mpoly::GeneralResult result;
         try {
             result = algemate::math::mpoly::generalSymmetricReduction(input, effN);
@@ -133,7 +133,6 @@ void SymReducePage::onSolve() {
                 .arg(i+1).arg(coefName).arg(QString::fromStdString(result.sigmaExprs[i])), th, doc, 14);
         }
 
-        // Show final result
         parts << paraHtml(QStringLiteral("解得："), th, doc);
         for (std::size_t i = 0; i < result.coefficients.size(); ++i) {
             QString coefName = QString::fromStdString(std::string(1, 'a' + static_cast<char>(i)));
@@ -146,7 +145,7 @@ void SymReducePage::onSolve() {
             .arg(QString::fromStdString(result.finalExpr)), th, doc);
 
     } else {
-        // ---- 具体多项式 (字典序降次法) ----
+
         algemate::math::mpoly::MPolynomial poly;
         try {
             poly = algemate::math::mpoly::parseSymmetricPoly(input, n);
@@ -211,15 +210,15 @@ void SymReducePage::onSolve() {
 
 void SymReducePage::onDemo() {
     if (modeCombo_->currentIndex() == 1) {
-        // 一般形式
+
         spinN_->setValue(4);
         inputPoly_->setText(QStringLiteral("x1^2x2^2"));
     } else {
-        // 具体多项式
+
         spinN_->setValue(3);
         inputPoly_->setText(QStringLiteral("x1^2*x2^2+x1^2*x3^2+x2^2*x3^2"));
     }
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

@@ -1,6 +1,4 @@
-// DemoCommon.h
-// 算法演示页共享工具：LaTeX 渲染、解析、LaTeX 字符串生成。
-// 所有函数均为 inline，避免链接时多重定义。
+
 #ifndef ALGEMATE_DEMO_COMMON_H
 #define ALGEMATE_DEMO_COMMON_H
 
@@ -35,9 +33,6 @@
 
 namespace AlgeMate::Calculator::Demo {
 
-// =========================================================================
-//  LaTeX → QPixmap（JKQTMathText, 3× 超采样, 屏幕 DPR 自适应）
-// =========================================================================
 inline QPixmap renderLatex(const QString& latex, const Interactive::RenderTheme& th,
                            int fontPt = 18)
 {
@@ -86,29 +81,18 @@ inline QPixmap renderLatex(const QString& latex, const Interactive::RenderTheme&
     return scaled;
 }
 
-// =========================================================================
-//  LaTeX → <img> HTML 片段（矢量化：走 LatexRenderer::embedAsImg占位，
-//  调用方在 setHtml() 后需调 Latex::LatexRenderer::postProcessDocument(doc)。）
-// =========================================================================
 inline QString embedImg(const QString& latex, const Interactive::RenderTheme& th,
                         QTextDocument* doc, int fontPt = 18)
 {
     return Latex::LatexRenderer::embedAsImg(
-        doc, latex, /*displayStyle=*/false, fontPt, QColor(th.text));
+        doc, latex, false, fontPt, QColor(th.text));
 }
 
-// =========================================================================
-//  为一个 QTextBrowser 挂上“内容变化 → 自动 postProcessDocument”的 hook。
-//  forward 到 Latex::attachLatexAutoPostProcess，demo/interactive/ai_solver 公用同一实现。
-// =========================================================================
 inline void attachLatexAutoPostProcess(QTextBrowser* browser)
 {
     Latex::attachLatexAutoPostProcess(browser);
 }
 
-// =========================================================================
-//  文本 → Fraction 解析  (整数 / 分数 "a/b" / 小数)
-// =========================================================================
 inline algemate::math::Fraction parseFraction(const QString& text)
 {
     using algemate::math::BigInt;
@@ -137,11 +121,6 @@ inline algemate::math::Fraction parseFraction(const QString& text)
     return Fraction(BigInt(s.toStdString()));
 }
 
-// =========================================================================
-//  LaTeX 字符串生成
-// =========================================================================
-
-// Fraction → LaTeX（负号提到分数外面: -1/2 → -\frac{1}{2}）
 inline QString fracLtx(const algemate::math::Fraction& f) {
     if (f.sign() < 0 && f.denominator() > algemate::math::BigInt(1)) {
         algemate::math::Fraction pos = algemate::math::Fraction(-1) * f;
@@ -150,7 +129,6 @@ inline QString fracLtx(const algemate::math::Fraction& f) {
     return QString::fromStdString(f.toLatex());
 }
 
-// 向量点积 (α, β) = Σ αᵢβᵢ
 inline algemate::math::Fraction dotProd(const algemate::math::Matrix<algemate::math::Fraction>& a,
                                          const algemate::math::Matrix<algemate::math::Fraction>& b) {
     algemate::math::Fraction sum(0);
@@ -159,12 +137,10 @@ inline algemate::math::Fraction dotProd(const algemate::math::Matrix<algemate::m
     return sum;
 }
 
-// 向量范数平方 ‖v‖²
 inline algemate::math::Fraction normSq(const algemate::math::Matrix<algemate::math::Fraction>& v) {
     return dotProd(v, v);
 }
 
-// 从正整数 n 中提取最大平方因子: n = s² × sf, sf 无平方因子
 inline long long extractSquareFactor(long long n) {
     if (n <= 1) return 1;
     long long s = 1;
@@ -178,8 +154,6 @@ inline long long extractSquareFactor(long long n) {
     return s;
 }
 
-// Fraction a / √ns 化简为最简根式 LaTeX
-// ns = 范数平方 (Fraction, 已约分), 返回形如 "(2√5)/5" 或 "2/3" 的 LaTeX
 inline QString fracDivSqrtLtx(const algemate::math::Fraction& a,
                                const algemate::math::Fraction& ns) {
     using algemate::math::BigInt;
@@ -190,11 +164,9 @@ inline QString fracDivSqrtLtx(const algemate::math::Fraction& a,
     BigInt P = ns.numerator();
     BigInt Q = ns.denominator();
 
-    // Result = A * √(P*Q) / (B * P)
     BigInt radicand = P * Q;
     BigInt denom = B * P;
 
-    // 提取平方因子
     long long s = 1, sf = 1;
     long long R = radicand.toLongLong();
     if (R > 1 && R < 100000000000000LL) {
@@ -204,10 +176,8 @@ inline QString fracDivSqrtLtx(const algemate::math::Fraction& a,
         sf = R;
     }
 
-    // 分子 = A * s * √sf
     BigInt numCoeff = A * BigInt(s);
 
-    // 约分: numCoeff 和 denom 同时除以 gcd
     BigInt g = BigInt::gcd(numCoeff, denom);
     numCoeff = numCoeff / g;
     denom = denom / g;
@@ -218,14 +188,14 @@ inline QString fracDivSqrtLtx(const algemate::math::Fraction& a,
     bool denomOne = denom == BigInt(1);
 
     if (hasSqrt && denomOne) {
-        // (a√sf) / 1 = a√sf
+
         if (numCoeff == BigInt(1))
             return sign + QStringLiteral("\\sqrt{%1}").arg(sf);
         return sign + QStringLiteral("%1\\sqrt{%2}")
             .arg(QString::fromStdString(numCoeff.toString())).arg(sf);
     }
     if (hasSqrt && !denomOne) {
-        // (a√sf) / b
+
         QString numStr;
         if (numCoeff == BigInt(1))
             numStr = QStringLiteral("\\sqrt{%1}").arg(sf);
@@ -235,7 +205,7 @@ inline QString fracDivSqrtLtx(const algemate::math::Fraction& a,
         return sign + QStringLiteral("\\frac{%1}{%2}")
             .arg(numStr, QString::fromStdString(denom.toString()));
     }
-    // No sqrt (sf == 1): pure rational
+
     if (denomOne)
         return sign + QString::fromStdString(numCoeff.toString());
     return sign + QStringLiteral("\\frac{%1}{%2}")
@@ -243,8 +213,6 @@ inline QString fracDivSqrtLtx(const algemate::math::Fraction& a,
              QString::fromStdString(denom.toString()));
 }
 
-// Polynomial<Fraction> → LaTeX（以 λ 为变量）
-// 高位优先输出: a_n λ^n + ... + a_1 λ + a_0
 inline QString polyLtx(const algemate::math::Polynomial<algemate::math::Fraction>& p) {
     using algemate::math::Fraction;
     if (p.isZero()) return QStringLiteral("0");
@@ -276,14 +244,12 @@ inline QString polyLtx(const algemate::math::Polynomial<algemate::math::Fraction
     return result;
 }
 
-// Complex → LaTeX（利用 Complex::toLatex()，纯实数不显示虚部）
 inline QString complexLtx(const algemate::math::Complex& z) {
     if (z.isReal())
         return QString::fromStdString(z.real().toLatex());
     return QString::fromStdString(z.toLatex());
 }
 
-// Matrix<Complex> → parenthesised LaTeX
 inline QString matComplexLtx(const algemate::math::Matrix<algemate::math::Complex>& M) {
     const auto R = M.rows(), C = M.cols();
     if (R == 0 || C == 0) return QStringLiteral("()");
@@ -303,9 +269,6 @@ inline QString matComplexLtx(const algemate::math::Matrix<algemate::math::Comple
         .arg(cols, body);
 }
 
-// Matrix<Fraction> → parenthesised LaTeX (array 环境)
-// JKQTMathText 单列 \begin{array} 有渲染 bug；单列时用对称 ghost {rcl}，
-// 两侧各一个空列，避免数字偏向括号一侧。
 inline QString matLtx(const algemate::math::Matrix<algemate::math::Fraction>& M)
 {
     using algemate::math::Fraction;
@@ -328,7 +291,6 @@ inline QString matLtx(const algemate::math::Matrix<algemate::math::Fraction>& M)
         .arg(cols, body);
 }
 
-// 向量各分量除以 √k（单位化结果，化简根式），用对称 ghost {rcl} 避免偏移
 inline QString normVecLtx(const algemate::math::Matrix<algemate::math::Fraction>& v,
                           const algemate::math::Fraction& k) {
     const auto R = v.rows();
@@ -343,8 +305,6 @@ inline QString normVecLtx(const algemate::math::Matrix<algemate::math::Fraction>
     return QStringLiteral("\\left(\\begin{array}{rcl}%1\\end{array}\\right)").arg(body);
 }
 
-// 齐次方程组 → cases-like LaTeX
-// 使用 2 列 {ll} 绕过 JKQTMathText 单列 bug。
 inline QString eqnSysLtx(const algemate::math::Matrix<algemate::math::Fraction>& A)
 {
     using algemate::math::Fraction;
@@ -379,7 +339,6 @@ inline QString eqnSysLtx(const algemate::math::Matrix<algemate::math::Fraction>&
     return QStringLiteral("\\left\\{\\begin{array}{ll}%1\\end{array}\\right.").arg(body);
 }
 
-// 非齐次方程组 → cases-like LaTeX（含常数项 b）
 inline QString eqnSysLtx(const algemate::math::Matrix<algemate::math::Fraction>& A,
                          const algemate::math::Matrix<algemate::math::Fraction>& b)
 {
@@ -415,11 +374,6 @@ inline QString eqnSysLtx(const algemate::math::Matrix<algemate::math::Fraction>&
     return QStringLiteral("\\left\\{\\begin{array}{ll}%1\\end{array}\\right.").arg(body);
 }
 
-// =========================================================================
-//  Trace 工具
-// =========================================================================
-
-// 从 StepSequence 中提取关键里程碑快照（Initial / SelectPivot 前 / Conclude）
 inline std::vector<algemate::math::Matrix<algemate::math::Fraction>>
 milestones(const algemate::math::StepSequence& trace)
 {
@@ -441,7 +395,6 @@ milestones(const algemate::math::StepSequence& trace)
     return ms;
 }
 
-// 列向量缩放为整数向量（各分量乘以分母的 LCM）
 inline algemate::math::Matrix<algemate::math::Fraction>
 scaleInt(const algemate::math::Matrix<algemate::math::Fraction>& v)
 {
@@ -460,18 +413,13 @@ scaleInt(const algemate::math::Matrix<algemate::math::Fraction>& v)
     return out;
 }
 
-// =========================================================================
-//  高斯消元（人类风格：尽量避免分数）
-// =========================================================================
-
-// 前行消元 → 行阶梯形矩阵（不做回代，不做归一化）
 inline algemate::math::Matrix<algemate::math::Fraction>
 rowEchelon(algemate::math::Matrix<algemate::math::Fraction> M)
 {
     std::size_t r = 0, c = 0;
     const auto rows = M.rows(), cols = M.cols();
     while (r < rows && c < cols) {
-        // Phase 1: 若当前列尚无 ±1，尝试通过行相减创建
+
         bool hasOne = false;
         for (std::size_t i = r; i < rows && !hasOne; ++i)
             if (M(i, c).abs().isOne()) hasOne = true;
@@ -490,7 +438,6 @@ rowEchelon(algemate::math::Matrix<algemate::math::Fraction> M)
             }
         }
 
-        // Phase 2: 选最佳主元（±1 > 绝对值最小）
         std::size_t best = r;
         while (best < rows && M(best, c).isZero()) ++best;
         if (best == rows) { ++c; continue; }
@@ -503,10 +450,8 @@ rowEchelon(algemate::math::Matrix<algemate::math::Fraction> M)
             if (absVal < bestVal && !bestVal.isOne()) { best = i; bestVal = absVal; }
         }
 
-        // Phase 3: 交换到第 r 行
         if (best != r) M.swapRows(r, best);
 
-        // Phase 4: 消去下方
         algemate::math::Fraction pivVal = M(r, c);
         for (std::size_t i = r + 1; i < rows; ++i) {
             if (M(i, c).isZero()) continue;
@@ -518,8 +463,6 @@ rowEchelon(algemate::math::Matrix<algemate::math::Fraction> M)
     return M;
 }
 
-// 完整 RREF（前行消元 + 回代），带 trace 记录
-// 前行消元阶段使用人类风格的智能主元选取。
 inline std::size_t improvedRref(algemate::math::Matrix<algemate::math::Fraction>& M,
                                 algemate::math::StepSequence& trace)
 {
@@ -530,7 +473,7 @@ inline std::size_t improvedRref(algemate::math::Matrix<algemate::math::Fraction>
 
     std::size_t r = 0;
     for (std::size_t c = 0; c < cols && r < rows; ++c) {
-        // ---- smart pivot selection (same logic as rowEchelon) ----
+
         bool hasOne = false;
         for (std::size_t i = r; i < rows && !hasOne; ++i)
             if (M(i, c).abs().isOne()) hasOne = true;
@@ -552,7 +495,7 @@ inline std::size_t improvedRref(algemate::math::Matrix<algemate::math::Fraction>
 
         std::size_t best = r;
         while (best < rows && M(best, c).isZero()) ++best;
-        if (best == rows) continue;  // 该列全零，进入下一列
+        if (best == rows) continue;  
 
         Fraction bestVal = M(best, c).abs();
         for (std::size_t i = best + 1; i < rows; ++i) {
@@ -569,7 +512,6 @@ inline std::size_t improvedRref(algemate::math::Matrix<algemate::math::Fraction>
             trace.pushSwapRows(r, best, M);
         }
 
-        // ---- forward elimination ----
         Fraction pivVal = M(r, c);
         for (std::size_t i = r + 1; i < rows; ++i) {
             if (M(i, c).isZero()) continue;
@@ -581,7 +523,6 @@ inline std::size_t improvedRref(algemate::math::Matrix<algemate::math::Fraction>
         ++r;
     }
 
-    // ---- back-substitution (RREF) ----
     for (std::size_t ri = r; ri > 0; --ri) {
         std::size_t crow = ri - 1;
         std::size_t pc = 0;
@@ -606,32 +547,24 @@ inline std::size_t improvedRref(algemate::math::Matrix<algemate::math::Fraction>
     return r;
 }
 
-// =========================================================================
-//  HTML 片段辅助（纯函数，返回 HTML 字符串，调用方自行拼接）
-// =========================================================================
-
-// 居中公式：LaTeX 渲染为 <img>，包在 <p align="center"> 中
 inline QString formulaHtml(const QString& latex, const Interactive::RenderTheme& th,
                            QTextDocument* doc, int fontPt = 18) {
     return QStringLiteral("<p align=\"center\">%1</p>")
         .arg(embedImg(latex, th, doc, fontPt));
 }
 
-// 标题行
 inline QString titleHtml(const QString& text, const Interactive::RenderTheme& th) {
     return QStringLiteral(
         "<p style=\"color:%1; font-size:16px; font-weight:600;\">%2</p>")
         .arg(th.text, text);
 }
 
-// 小节标题（如 "解"）
 inline QString sectionHtml(const QString& text, const Interactive::RenderTheme& th) {
     return QStringLiteral(
         "<p style=\"color:%1; font-size:16px; font-weight:700; margin-top:10px;\">%2</p>")
         .arg(th.text, text);
 }
 
-// 文字段落（支持 <sub> <i> <b> 等行内标签，传 doc 则自动渲染 $...$ 内联 LaTeX）
 inline QString paraHtml(const QString& richText, const Interactive::RenderTheme& th,
                         QTextDocument* doc = nullptr) {
     QString body = doc ? Interactive::renderNoteWithLatex(richText, th, doc, 15)
@@ -641,12 +574,11 @@ inline QString paraHtml(const QString& richText, const Interactive::RenderTheme&
         .arg(th.text, body);
 }
 
-// 错误消息（红色）
 inline QString errorHtml(const QString& text) {
     return QStringLiteral(
         "<p style=\"color:#E74C3C; font-size:14px;\">%1</p>").arg(text);
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 
 
 #endif

@@ -16,15 +16,12 @@ namespace {
 
 using Poly = Polynomial<Fraction>;
 
-// Fraction tools
-
 Fraction abs_(const Fraction& x) { return x.abs(); }
 
 Fraction half_(const Fraction& a, const Fraction& b) {
     return (a + b) / Fraction(2);
 }
 
-// 将 double 连分数逼近为 Fraction, 分母上限 maxDenom
 Fraction doubleToFraction_(double x, long maxDenom) {
     if (!std::isfinite(x)) throw std::domain_error("fromDouble: x is not finite");
     if (maxDenom <= 0) maxDenom = 1;
@@ -53,13 +50,11 @@ Fraction doubleToFraction_(double x, long maxDenom) {
     return Fraction(BigInt(lastH), BigInt(lastK));
 }
 
-// 构造 x^n - q
 Poly xnMinusQ_(int n, const Fraction& q) {
     Poly p = Poly::monomial(static_cast<std::size_t>(n), Fraction(1));
     return p - Poly(q);
 }
 
-// p(x) -> p(-x)
 Poly composeNegX_(const Poly& p) {
     Poly out;
     const auto& c = p.coeffs();
@@ -71,7 +66,6 @@ Poly composeNegX_(const Poly& p) {
     return out;
 }
 
-// p(x) -> p(x^n): 在每个 x^i 位置插 n-1 个 0
 Poly composeXpowN_(const Poly& p, int n) {
     if (n <= 0) throw std::invalid_argument("composeXpowN_: n must be positive");
     Poly out;
@@ -82,23 +76,18 @@ Poly composeXpowN_(const Poly& p, int n) {
     return out;
 }
 
-// 1/α 的零化多项式: 反转系数
 Poly reciprocalPoly_(const Poly& p) {
     return p.reverse();
 }
 
-// p 在点 x 处的符号
 int polySignAt_(const Poly& p, const Fraction& x) {
     return p(x).sign();
 }
 
-// 用 Sturm 链计数 (a, b] 上的实根个数
 int countRootsInInterval_(const Poly& p, const Fraction& a, const Fraction& b) {
     return countRealRootsInInterval(p, a, b);
 }
 
-// 精化 [a, b] 使得 p 在区间内仅有一个根 α, 且 b - a < tol
-// 假定 p(a) * p(b) <= 0 且 p 在 [a, b] 恰有一根
 void refineInterval_(const Poly& p, Fraction& a, Fraction& b, const Fraction& tol) {
     int sa = polySignAt_(p, a);
     int sb = polySignAt_(p, b);
@@ -116,7 +105,6 @@ void refineInterval_(const Poly& p, Fraction& a, Fraction& b, const Fraction& to
     }
 }
 
-// 检查 q 是否为 n 次完美有理数 s*a^n (s=±1, a>=0), 命中时 out = s*a
 bool perfectNthRoot_(const Fraction& q, int n, Fraction& out) {
     if (q.isZero()) { out = Fraction(0); return true; }
     int sgn = q.sign();
@@ -148,8 +136,6 @@ bool perfectNthRoot_(const Fraction& q, int n, Fraction& out) {
     return true;
 }
 
-// 在宽区间 [A, B] 上定位 p 的所有实根隔离区间, 每个区间宽度 <= tol
-// 基于 Sturm 符号变化数 + 递归二分
 void isolateRoots_(const Poly& p, const Fraction& A, const Fraction& B,
                    const Fraction& tol, std::vector<std::pair<Fraction, Fraction>>& out,
                    int depth = 0) {
@@ -170,18 +156,15 @@ void isolateRoots_(const Poly& p, const Fraction& A, const Fraction& B,
     isolateRoots_(p, m, B, tol, out, depth + 1);
 }
 
-// 在 p 的宽区间 [A, B] 内拾取含 approx 的隔离区间
-// 快速路径: Sturm 中心搜索 (以 approx 为中心做窗口二分, 命中 1 根即返回)
-// 慢路径: 老方案全 isolate 再筛选 (当数值 approx 不可靠时)
 bool pickIntervalContaining_(const Poly& p, const Fraction& A, const Fraction& B,
                              double approx, Fraction& outA, Fraction& outB) {
-    // --- 快速路径: Sturm 中心窗口 ---
+
     std::vector<Poly> seq = sturmSequence(p);
     if (!seq.empty()) {
         auto countIn = [&](const Fraction& a, const Fraction& b) -> int {
             return sturmSignChanges(seq, a) - sturmSignChanges(seq, b);
         };
-        // denom 逐步增大, 窗口逐步缩小
+
         for (long long denom = 1; denom <= 1000000000LL; denom *= 4) {
             double scaled = approx * static_cast<double>(denom);
             if (!std::isfinite(scaled)) break;
@@ -206,7 +189,7 @@ bool pickIntervalContaining_(const Poly& p, const Fraction& A, const Fraction& B
             }
         }
     }
-    // --- 慢路径 fallback ---
+
     Fraction tol(BigInt(1), BigInt(1000));
     for (int round = 0; round < 20; ++round) {
         std::vector<std::pair<Fraction, Fraction>> iv;
@@ -225,10 +208,7 @@ bool pickIntervalContaining_(const Poly& p, const Fraction& A, const Fraction& B
     return false;
 }
 
-} // anonymous namespace
-
-
-// construction
+} 
 
 AlgReal::AlgReal()
     : p_(Poly::x()), a_(Fraction(0)), b_(Fraction(0)) {
@@ -255,9 +235,6 @@ AlgReal AlgReal::fromDouble(double x, long maxDenom) {
     return AlgReal(doubleToFraction_(x, maxDenom));
 }
 
-
-// private: normalize / signAt / refineTo
-
 void AlgReal::normalize_() {
     if (p_.isZero()) throw std::domain_error("AlgReal: zero polynomial");
     p_ = squarefreePart(p_).monic();
@@ -274,7 +251,7 @@ void AlgReal::normalize_() {
     int sa = signAt_(a_);
     int sb = signAt_(b_);
     if (sa == 0) {
-        // a_ 是 p_ 的有理根: 降级到一次因子
+
         p_ = Poly::x() - Poly(a_);
         b_ = a_;
         return;
@@ -291,8 +268,7 @@ void AlgReal::normalize_() {
     if (cnt != 1) {
         throw std::runtime_error("AlgReal::normalize_: interval does not isolate exactly one root");
     }
-    // 主动检查: 若 p_ 存在有理根 q 且 q ∈ [a_, b_], 降级到一次因子
-    // (捕获 sumPoly/productPoly 结果包含有理根但区间二分无法收敛到精确值的场景)
+
     auto rats = rationalRoots(p_);
     for (const Fraction& q : rats) {
         if (!(q < a_) && !(b_ < q)) {
@@ -311,9 +287,6 @@ void AlgReal::refineTo_(const Fraction& tol) const {
     if (p_.degree() == 1) return;
     refineInterval_(p_, a_, b_, tol);
 }
-
-
-// query
 
 bool AlgReal::isRational() const {
     return p_.degree() == 1;
@@ -360,8 +333,6 @@ double AlgReal::toDouble(double eps) const {
     }
     return 0.5 * (a_.toDouble() + b_.toDouble());
 }
-
-
 
 AlgReal AlgReal::operator-() const {
     if (isRational()) return AlgReal(-asRational());
@@ -450,7 +421,7 @@ AlgReal AlgReal::operator/(const AlgReal& r) const {
     if (r.isZero()) throw std::domain_error("AlgReal: division by zero");
     if (r.isRational()) return *this * AlgReal(Fraction(1) / r.asRational());
 
-    (void)r.sign();   // 强制精化到 r 区间不含 0
+    (void)r.sign();   
     Poly np = r.p_.reverse();
     Fraction A = Fraction(1) / r.b_;
     Fraction B = Fraction(1) / r.a_;
@@ -458,7 +429,6 @@ AlgReal AlgReal::operator/(const AlgReal& r) const {
     AlgReal inv(np, A, B);
     return (*this) * inv;
 }
-
 
 bool AlgReal::operator==(const AlgReal& r) const {
     if (isRational() && r.isRational()) return asRational() == r.asRational();
@@ -471,7 +441,6 @@ bool AlgReal::operator<(const AlgReal& r) const {
     AlgReal d = *this - r;
     return d.sign() < 0;
 }
-
 
 AlgReal AlgReal::nthRoot(const Fraction& q, int n) {
     if (n <= 0) throw std::invalid_argument("nthRoot: n must be positive");
@@ -550,13 +519,12 @@ AlgReal AlgReal::sqrt(const AlgReal& a)   { return nthRoot(a, 2); }
 AlgReal AlgReal::cbrt(const Fraction& q)  { return nthRoot(q, 3); }
 AlgReal AlgReal::cbrt(const AlgReal& a)   { return nthRoot(a, 3); }
 
-// realRootsOf: Sturm 隔离 + 每个隔离区间构造 AlgReal
 std::vector<AlgReal> AlgReal::realRootsOf(const Poly& p, const Fraction& tol) {
     std::vector<AlgReal> out;
     if (p.isZero() || p.degree() <= 0) return out;
     Poly sp = squarefreePart(p).monic();
     if (sp.degree() <= 0) return out;
-    // 先入: 有理根快速路径, 并从 sp 中剩下纯无理根因子
+
     auto rats = rationalRoots(sp);
     std::sort(rats.begin(), rats.end());
     rats.erase(std::unique(rats.begin(), rats.end()), rats.end());
@@ -568,7 +536,7 @@ std::vector<AlgReal> AlgReal::realRootsOf(const Poly& p, const Fraction& tol) {
         }
     }
     if (sp.degree() > 0) {
-        // 剩余无理根: Sturm 隔离
+
         std::vector<std::pair<Fraction, Fraction>> ivs = isolateRealRoots(sp, tol);
         for (const auto& iv : ivs) {
             out.push_back(AlgReal(sp, iv.first, iv.second));
@@ -581,12 +549,6 @@ std::vector<AlgReal> AlgReal::realRootsOf(const Poly& p, const Fraction& tol) {
     return out;
 }
 
-// evaluatePoly: 精确求 β = f(α), 策略
-//   1. α 有理 -> 直接带入 f(α)
-//   2. f 常量 -> AlgReal(f[0])
-//   3. β 的零化多项式 q(y) = Res_x(α.minPoly, y - f(x))
-//      度数 <= deg(α.minPoly), squarefree 后根由 realRootsOf 枚举,
-//      按数值最接近 f(α.approx) 的选择
 AlgReal AlgReal::evaluatePoly(const Poly& f, const AlgReal& alpha) {
     if (alpha.isRational()) {
         return AlgReal(f(alpha.asRational()));
@@ -603,16 +565,16 @@ AlgReal AlgReal::evaluatePoly(const Poly& f, const AlgReal& alpha) {
         Fraction qroot = -sp[0] / sp[1];
         return AlgReal(qroot);
     }
-    // 有理根快速路径
+
     auto rats = rationalRoots(sp);
-    // 数值估计 β = f(α)
+
     double alphaD = alpha.toDouble(1e-18);
     double betaD = 0.0;
     const auto& cs = f.coeffs();
     for (int i = static_cast<int>(cs.size()) - 1; i >= 0; --i) {
         betaD = betaD * alphaD + cs[static_cast<std::size_t>(i)].toDouble();
     }
-    // 有理根匹配 (优先)
+
     if (!rats.empty()) {
         double bestDiff = 1e300;
         Fraction bestR(0);
@@ -620,13 +582,13 @@ AlgReal AlgReal::evaluatePoly(const Poly& f, const AlgReal& alpha) {
             double d = std::abs(r.toDouble() - betaD);
             if (d < bestDiff) { bestDiff = d; bestR = r; }
         }
-        // 验证: 若最接近的有理根与 betaD 距离 < 1e-6 且 sp 能整除 (x - r), 则用之
+
         if (bestDiff < 1e-6) {
             Poly lin({Fraction(0) - bestR, Fraction(1)});
             if ((sp % lin).isZero()) return AlgReal(bestR);
         }
     }
-    // 无理根: Sturm 中心搜索 (以 betaD 为中心)
+
     Fraction R = cauchyBound(sp) + Fraction(1);
     Fraction BNeg = Fraction(0) - R;
     Fraction BPos = R;
@@ -634,7 +596,7 @@ AlgReal AlgReal::evaluatePoly(const Poly& f, const AlgReal& alpha) {
     if (pickIntervalContaining_(sp, BNeg, BPos, betaD, outA, outB)) {
         return AlgReal(sp, outA, outB);
     }
-    // fallback: 老路径 realRootsOf + 匹配
+
     std::vector<AlgReal> roots = AlgReal::realRootsOf(sp);
     if (roots.empty()) {
         throw std::runtime_error("evaluatePoly: result poly has no real roots");
@@ -648,10 +610,8 @@ AlgReal AlgReal::evaluatePoly(const Poly& f, const AlgReal& alpha) {
     return roots[static_cast<std::size_t>(bestIdx)];
 }
 
-// toString / toLatex
-
 namespace {
-// 检查 p = x^n - q 形式, 命中返回 (n, q), 否则 n = -1
+
 std::pair<int, Fraction> matchXnMinusQ_(const Poly& p) {
     if (p.degree() < 2) return {-1, Fraction(0)};
     const auto& c = p.coeffs();
@@ -661,7 +621,7 @@ std::pair<int, Fraction> matchXnMinusQ_(const Poly& p) {
     }
     return {static_cast<int>(c.size()) - 1, -c[0]};
 }
-} // anonymous namespace
+} 
 
 std::string AlgReal::toString() const {
     if (isRational()) return asRational().toString();

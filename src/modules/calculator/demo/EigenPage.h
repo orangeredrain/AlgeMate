@@ -37,7 +37,7 @@ private:
     QPushButton*  solveBtn_       = nullptr;
 
     int curN_ = 0;
-    std::vector<QLineEdit*> cells_;  // row-major: cells_[i * curN_ + j]
+    std::vector<QLineEdit*> cells_;  
 };
 
 }

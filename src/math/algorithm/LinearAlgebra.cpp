@@ -11,7 +11,6 @@ namespace algemate::math {
 
 namespace {
 
-// RREF 核心实现: trace 为 nullptr 时为纯计算路径
 std::size_t rrefImpl_(Matrix<Fraction>& M, StepSequence* trace) {
     const std::size_t R = M.rows();
     const std::size_t C = M.cols();
@@ -54,7 +53,6 @@ std::size_t rrefImpl_(Matrix<Fraction>& M, StepSequence* trace) {
     return r;
 }
 
-// det 核心实现: 前向消元到上三角, 累积符号与主元乘积
 Fraction detImpl_(Matrix<Fraction>& M, StepSequence* trace) {
     if (!M.isSquare()) throw std::invalid_argument("det: matrix is not square");
     const std::size_t n = M.rows();
@@ -92,7 +90,6 @@ Fraction detImpl_(Matrix<Fraction>& M, StepSequence* trace) {
     return result;
 }
 
-// inverse 核心实现: [A | I] -> rref -> [I | A^-1]
 Matrix<Fraction> inverseImpl_(const Matrix<Fraction>& M, StepSequence* trace) {
     if (!M.isSquare()) throw std::invalid_argument("inverse: matrix is not square");
     const std::size_t n = M.rows();
@@ -113,7 +110,6 @@ Matrix<Fraction> inverseImpl_(const Matrix<Fraction>& M, StepSequence* trace) {
     return inv;
 }
 
-// 扫描 RREF 后的矩阵, 收集每行主元列 (若无主元则为 cols)
 void collectPivots_(const Matrix<Fraction>& R,
                     std::vector<std::size_t>& pivotCol,
                     std::vector<bool>& isPivotCol) {
@@ -132,7 +128,6 @@ void collectPivots_(const Matrix<Fraction>& R,
     }
 }
 
-// solve 核心实现: [A | b] -> rref, 分类讨论
 SolveResult solveImpl_(const Matrix<Fraction>& A,
                        const Matrix<Fraction>& b,
                        StepSequence* trace) {
@@ -148,7 +143,7 @@ SolveResult solveImpl_(const Matrix<Fraction>& A,
     collectPivots_(M, pivotCol, isPivotCol);
 
     SolveResult result;
-    // b 所在列 = 索引 n, 若成为主元列则方程组无解
+
     if (isPivotCol[n]) {
         result.hasSolution = false;
         if (trace) trace->pushConclude("增广列出现主元, 方程组无解", M);
@@ -157,14 +152,12 @@ SolveResult solveImpl_(const Matrix<Fraction>& A,
 
     result.hasSolution = true;
 
-    // 特解: 自由变量取 0, 主元行直接读出对应分量
     Matrix<Fraction> x(n, 1);
     for (std::size_t r = 0; r < M.rows(); ++r) {
         if (pivotCol[r] < n) x(pivotCol[r], 0) = M(r, n);
     }
     result.particular = x;
 
-    // 零空间基: 每个自由列 (< n 且非主元列) 对应一个基向量
     std::vector<std::size_t> freeCols;
     for (std::size_t c = 0; c < n; ++c) {
         if (!isPivotCol[c]) freeCols.push_back(c);
@@ -188,7 +181,6 @@ SolveResult solveImpl_(const Matrix<Fraction>& A,
     return result;
 }
 
-// nullspace 核心实现
 Matrix<Fraction> nullspaceImpl_(const Matrix<Fraction>& M, StepSequence* trace) {
     const std::size_t n = M.cols();
     Matrix<Fraction> R = M;
@@ -219,7 +211,7 @@ Matrix<Fraction> nullspaceImpl_(const Matrix<Fraction>& M, StepSequence* trace) 
     return N;
 }
 
-} // anonymous namespace
+} 
 
 std::size_t rref(Matrix<Fraction>& M)                        { return rrefImpl_(M, nullptr); }
 std::size_t rref(Matrix<Fraction>& M, StepSequence& trace)   { return rrefImpl_(M, &trace); }
@@ -266,12 +258,6 @@ SolveResult solve(const Matrix<Fraction>& A, const Matrix<Fraction>& b, StepSequ
 Matrix<Fraction> nullspace(const Matrix<Fraction>& M)                      { return nullspaceImpl_(M, nullptr); }
 Matrix<Fraction> nullspace(const Matrix<Fraction>& M, StepSequence& trace) { return nullspaceImpl_(M, &trace); }
 
-// charpoly / eigen
-
-// Faddeev-LeVerrier:
-// M_1 = A,               c_{n-1} = -tr(M_1)
-// M_k = A (M_{k-1} + c_{n-k+1} I),  c_{n-k} = -tr(M_k) / k   (k = 2..n)
-// p(x) = x^n + c_{n-1} x^{n-1} + ... + c_0
 Polynomial<Fraction> charpoly(const Matrix<Fraction>& A) {
     if (!A.isSquare()) throw std::invalid_argument("charpoly: matrix must be square");
     const std::size_t n = A.rows();
@@ -282,13 +268,12 @@ Polynomial<Fraction> charpoly(const Matrix<Fraction>& A) {
     Matrix<Fraction> I = Matrix<Fraction>::identity(n);
     Matrix<Fraction> M = A;
 
-    // k = 1
     Fraction tr(0);
     for (std::size_t i = 0; i < n; ++i) tr = tr + M(i, i);
     coef[n - 1] = -tr;
 
     for (std::size_t k = 2; k <= n; ++k) {
-        // M_k = A * (M + coef[n-k+1] * I)
+
         Matrix<Fraction> S = M;
         const Fraction& shift = coef[n - k + 1];
         for (std::size_t i = 0; i < n; ++i) S(i, i) = S(i, i) + shift;
@@ -299,7 +284,6 @@ Polynomial<Fraction> charpoly(const Matrix<Fraction>& A) {
         coef[n - k] = -tk / Fraction(static_cast<long long>(k));
     }
 
-    // 构造 Polynomial, 低位优先 {c_0, c_1, ..., c_n=1}
     std::vector<Fraction>& low = coef;
     Polynomial<Fraction> p;
     for (std::size_t i = 0; i <= n; ++i) {
@@ -324,7 +308,7 @@ std::vector<EigenPair> rationalEigenPairs(const Matrix<Fraction>& A) {
     const std::size_t n = A.rows();
     Matrix<Fraction> I = Matrix<Fraction>::identity(n);
     for (const Fraction& lam : lambdas) {
-        // A - lam * I
+
         Matrix<Fraction> B = A;
         for (std::size_t i = 0; i < n; ++i) B(i, i) = B(i, i) - lam;
         Matrix<Fraction> basis = nullspaceImpl_(B, nullptr);
@@ -335,8 +319,6 @@ std::vector<EigenPair> rationalEigenPairs(const Matrix<Fraction>& A) {
     }
     return out;
 }
-
-// -------------------- Laplace / 余子式 / 伴随 --------------------
 
 Matrix<Fraction> minorMatrix(const Matrix<Fraction>& M, std::size_t i, std::size_t j) {
     const std::size_t R = M.rows();
@@ -366,7 +348,7 @@ Matrix<Fraction> adjugate(const Matrix<Fraction>& M) {
     if (!M.isSquare()) throw std::invalid_argument("adjugate: matrix must be square");
     const std::size_t n = M.rows();
     Matrix<Fraction> Adj(n, n);
-    // adj(M)_{j,i} = cofactor(M, i, j)  (即转置代数余子式矩阵)
+
     for (std::size_t i = 0; i < n; ++i)
         for (std::size_t j = 0; j < n; ++j)
             Adj(j, i) = cofactor(M, i, j);
@@ -402,20 +384,10 @@ Fraction detByColExpansion(const Matrix<Fraction>& M, std::size_t col) {
     return detLaplace_(M, col, false);
 }
 
-// -------------------- 相抵标准形 --------------------
-
-// 思路:
-//   1) 对增广 [A | I_m] 做行变换 → [R | P], R = P·A 为 RREF
-//   2) R 是 RREF: 主元位置 (i, p_i), R 的第 p_i 列是 e_i, 非主元列是其线性组合
-//   3) 对 R 做列变换 Q:
-//      a) 对每个非主元列 c, 加上 -R(i, c) 倍的第 p_i 列 → 第 c 列全为 0
-//      b) 将主元列 p_0, p_1, ..., p_{r-1} 依次交换到第 0, 1, ..., r-1 列
-//   结果 R·Q = S = [I_r 0; 0 0], 且 P·A·Q = S
 EquivalenceResult equivalentNormalForm(const Matrix<Fraction>& A) {
     const std::size_t m = A.rows();
     const std::size_t n = A.cols();
 
-    // (1) 构造 [A | I_m], 做 RREF 后分出 R 和 P
     Matrix<Fraction> aug(m, n + m);
     for (std::size_t i = 0; i < m; ++i) {
         for (std::size_t j = 0; j < n; ++j) aug(i, j) = A(i, j);
@@ -430,7 +402,6 @@ EquivalenceResult equivalentNormalForm(const Matrix<Fraction>& A) {
         for (std::size_t j = 0; j < m; ++j) P(i, j) = aug(i, n + j);
     }
 
-    // 提取主元列
     std::vector<std::size_t> pivotCol;
     for (std::size_t i = 0; i < m; ++i) {
         for (std::size_t j = 0; j < n; ++j) {
@@ -439,7 +410,6 @@ EquivalenceResult equivalentNormalForm(const Matrix<Fraction>& A) {
     }
     const std::size_t r = pivotCol.size();
 
-    // (3a) 列消元: 对非主元列 c, 减去该列在各主元行上的线性组合
     Matrix<Fraction> Q = Matrix<Fraction>::identity(n);
     std::vector<bool> isPivot(n, false);
     for (std::size_t k = 0; k < r; ++k) isPivot[pivotCol[k]] = true;
@@ -448,20 +418,19 @@ EquivalenceResult equivalentNormalForm(const Matrix<Fraction>& A) {
         for (std::size_t k = 0; k < r; ++k) {
             Fraction f = R(k, c);
             if (f.isZero()) continue;
-            // 列 c += -f * 列 pivotCol[k]
+
             std::size_t pk = pivotCol[k];
             for (std::size_t i = 0; i < m; ++i) R(i, c) = R(i, c) - f * R(i, pk);
             for (std::size_t i = 0; i < n; ++i) Q(i, c) = Q(i, c) - f * Q(i, pk);
         }
     }
 
-    // (3b) 将主元列依次换到前 r 列
     for (std::size_t k = 0; k < r; ++k) {
         std::size_t pk = pivotCol[k];
         if (pk != k) {
             R.swapCols(k, pk);
             Q.swapCols(k, pk);
-            // pivotCol 换新的 k 和 pk 映射
+
             for (std::size_t t = k + 1; t < r; ++t) {
                 if (pivotCol[t] == k) { pivotCol[t] = pk; break; }
             }
@@ -476,7 +445,6 @@ EquivalenceResult equivalentNormalForm(const Matrix<Fraction>& A) {
     return res;
 }
 
-// ---------------- LU 分解 (Doolittle, 无主元交换) ----------------
 LUResult luDecompose(const Matrix<Fraction>& A) {
     if (!A.isSquare())
         throw std::invalid_argument("luDecompose: matrix is not square");
@@ -485,7 +453,7 @@ LUResult luDecompose(const Matrix<Fraction>& A) {
     Matrix<Fraction> U(n, n);
     for (std::size_t i = 0; i < n; ++i) L(i, i) = Fraction(1);
     for (std::size_t j = 0; j < n; ++j) {
-        // U 的第 j 列上三角部分 (i = 0..j)
+
         for (std::size_t i = 0; i <= j; ++i) {
             Fraction s(0);
             for (std::size_t k = 0; k < i; ++k) s = s + L(i, k) * U(k, j);
@@ -494,7 +462,7 @@ LUResult luDecompose(const Matrix<Fraction>& A) {
         if (U(j, j).isZero())
             throw std::domain_error(
                 "luDecompose: 需要行交换或矩阵奇异, 当前实现不支持");
-        // L 的第 j 列下三角部分 (i = j+1..n-1)
+
         for (std::size_t i = j + 1; i < n; ++i) {
             Fraction s(0);
             for (std::size_t k = 0; k < j; ++k) s = s + L(i, k) * U(k, j);

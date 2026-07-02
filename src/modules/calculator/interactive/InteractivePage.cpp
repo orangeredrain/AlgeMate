@@ -47,8 +47,6 @@ protected:
     }
 };
 
-// ======================== InputEditor (保持不动) ========================
-
 InputEditor::InputEditor(QWidget* parent) : QPlainTextEdit(parent) {
     setObjectName(QStringLiteral("CalcInput"));
     setPlaceholderText(QStringLiteral("输入表达式 例如: m = [1, 2, 3; 4, 5, 6]\nEnter 执行, Shift+Enter 换行"));
@@ -430,7 +428,6 @@ bool InputEditor::focusNextPrevChild(bool next) {
     return QPlainTextEdit::focusNextPrevChild(next);
 }
 
-// ======================== InteractivePage ========================
 InteractivePage::InteractivePage(QWidget* parent) : QWidget(parent) {
     theme_ = RenderTheme::forCurrent();
 
@@ -521,7 +518,6 @@ InteractivePage::InteractivePage(QWidget* parent) : QWidget(parent) {
     cardLay->addLayout(toolRow);
     root->addWidget(inputCard);
 
-    // ---- 信号 ----
     connect(runBtn_,      &QPushButton::clicked,             this, &InteractivePage::onRun);
     connect(input_,       &InputEditor::submitRequested,     this, &InteractivePage::onRun);
     connect(helpBtn,      &QPushButton::clicked,             this, &InteractivePage::onShowHelp);
@@ -531,7 +527,6 @@ InteractivePage::InteractivePage(QWidget* parent) : QWidget(parent) {
     connect(decSpin_,     QOverload<int>::of(&QSpinBox::valueChanged), this, &InteractivePage::onDecimalsChanged);
     connect(completeCheck_, &QCheckBox::toggled, this, [this](bool on) { if (input_) input_->setCompletionEnabled(on); });
 
-    // ====== UI 动态主题重绘 ======
     auto applyTheme = [this, inputCard, line, helpBtn, clearVarBtn, clearHisBtn]() {
         bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
 
@@ -563,7 +558,7 @@ InteractivePage::InteractivePage(QWidget* parent) : QWidget(parent) {
 
     connect(&AlgeMate::ThemeManager::instance(), &AlgeMate::ThemeManager::themeChanged, this, [this, applyTheme](AlgeMate::ThemeManager::Theme){
         applyTheme();
-        onThemeChanged(); // 保留原有的渲染刷新
+        onThemeChanged(); 
     });
 
     applyHistoryPalette();
@@ -573,8 +568,6 @@ InteractivePage::InteractivePage(QWidget* parent) : QWidget(parent) {
     refreshVars();
     input_->setFocus();
 }
-
-// ======================== 主题 / 格式 ========================
 
 void InteractivePage::applyHistoryPalette() {
     QPalette p = history_->palette();
@@ -713,4 +706,4 @@ void InteractivePage::appendCell(const QString& source, const EvalResult& r) {
     appendHtml(cell);
 }
 
-} // namespace AlgeMate::Calculator::Interactive
+} 

@@ -1,6 +1,6 @@
 #include "RealEigen.h"
 
-#include "algorithm/LinearAlgebra.h"   // charpoly, nullspace, rank
+#include "algorithm/LinearAlgebra.h"   
 
 #include <stdexcept>
 #include <utility>
@@ -17,7 +17,6 @@ EigenspaceKBasis eigenspaceBasisK(const Matrix<Fraction>& A, const AlgReal& lam)
     if (dInt <= 0) throw std::runtime_error("eigenspaceBasisK: invalid minPoly");
     const std::size_t d = static_cast<std::size_t>(dInt);
 
-    // Companion matrix C_g (d×d): e_1 -> e_2, ..., e_{d-1} -> e_d, 最后一列为 -g 的低次系数 / 首项系数
     Matrix<Fraction> Cg(d, d);
     for (std::size_t i = 0; i + 1 < d; ++i) Cg(i + 1, i) = Fraction(1);
     Fraction lead = g.coeffs()[d];
@@ -25,7 +24,6 @@ EigenspaceKBasis eigenspaceBasisK(const Matrix<Fraction>& A, const AlgReal& lam)
         Cg(i, d - 1) = Fraction(0) - g.coeffs()[i] / lead;
     }
 
-    // B = A ⊗ I_d - I_n ⊗ C_g ∈ ℚ^{nd×nd}, 其 kernel 即 A 的 λ 特征子空间 K-表示
     const std::size_t nd = n * d;
     Matrix<Fraction> B(nd, nd);
     for (std::size_t i = 0; i < n; ++i) {
@@ -45,7 +43,6 @@ EigenspaceKBasis eigenspaceBasisK(const Matrix<Fraction>& A, const AlgReal& lam)
 
     Matrix<Fraction> null = nullspace(B);
 
-    // K-独立代表提取: x·w 在 ℚ 上等价于按 C_g 作用每个 d-块
     auto applyXTimes = [&](const std::vector<Fraction>& w) {
         std::vector<Fraction> out(nd, Fraction(0));
         for (std::size_t i = 0; i < n; ++i) {
@@ -84,7 +81,6 @@ EigenspaceKBasis eigenspaceBasisK(const Matrix<Fraction>& A, const AlgReal& lam)
         }
     }
 
-    // K-表示: basisK[c][i] ∈ K (PolyF, deg < d)
     std::vector<std::vector<PolyF>> basisK;
     basisK.reserve(repWs.size());
     for (const auto& wc : repWs) {

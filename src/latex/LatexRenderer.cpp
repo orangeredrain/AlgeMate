@@ -19,18 +19,14 @@
 
 namespace AlgeMate::Latex {
 
-// 全局: 所有渲染器的 URL→LaTeX 映射共享, LatexTextBrowser 可直接查询
 static QHash<QString, QString> g_urlToLatex;
-// 全局: 记录哪些 URL 对应的是块公式，复制时区分 $...$ / $$...$$
+
 static QSet<QString> g_displayUrls;
-// 全局: latex-vec:// 伪 URL 的额外参数，postProcessDocument 里根据
-//        url 取出这些参数填入 ObjectFormat property。
+
 static QHash<QString, int>    g_urlFontSize;
 static QHash<QString, QColor> g_urlColor;
 static QHash<QString, QString> g_urlToFixed;
 static long long g_imageCounter = 0;
-
-// 构造 / 配置
 
 LatexRenderer::LatexRenderer() = default;
 
@@ -71,13 +67,10 @@ void LatexRenderer::postProcessDocument(QTextDocument* doc)
 {
     if (!doc) return;
 
-    // 注册 handler。重复调用 registerHandler 幂等（后者覆盖前者）。
     if (auto* layout = doc->documentLayout()) {
         layout->registerHandler(kLatexObjectType, LatexInlineHandler::instance());
     }
 
-    // 收集所有 latex-vec:// image fragment 的 (pos, len, url)。
-    // 从尾到头替换，避免位置漂移。
     struct Hit { int pos; int len; QString url; };
     QList<Hit> hits;
     for (QTextBlock block = doc->begin(); block.isValid(); block = block.next()) {
@@ -102,8 +95,7 @@ void LatexRenderer::postProcessDocument(QTextDocument* doc)
 
         QTextCharFormat fmt;
         fmt.setObjectType(kLatexObjectType);
-        // AlignMiddle: 让行内公式盒中线对齐文字 baseline, 避免默认 baseline
-        // 对齐使公式头部突出文字行。Qt 文档: 仅对 inline object 生效。
+
         fmt.setVerticalAlignment(QTextCharFormat::AlignMiddle);
         fmt.setProperty(kLatexSourceProp,     fixed);
         fmt.setProperty(kLatexOrigSourceProp, orig);
@@ -119,8 +111,6 @@ void LatexRenderer::postProcessDocument(QTextDocument* doc)
     cursor.endEditBlock();
 }
 
-// 内部: 去注释
-
 static QString stripComments(const QString& src)
 {
     QString out;
@@ -129,10 +119,7 @@ static QString stripComments(const QString& src)
     int i = 0;
     while (i < n) {
         QChar ch = src[i];
-        // 防御：去除不可见 / 零宽 / BOM 类控制字符，避免 Qt 渲染为方块。
-        // 保留 \t (0x09) / \n (0x0A)。去除范围：
-        //  C0（0x00-0x1F）除 \t \n；DEL (0x7F)；零宽空格 U+200B/U+200C/U+200D/U+FEFF；
-        //  软连字符 U+00AD；狭不间断空格 U+202F；LRM/RLM 等双向控制。
+
         const ushort u = ch.unicode();
         const bool isCtrl =
             (u < 0x20 && u != 0x09 && u != 0x0A) ||
@@ -158,8 +145,6 @@ static QString stripComments(const QString& src)
     }
     return out;
 }
-
-// 内部: 数学宏展开
 
 static QString expandMathMacros(const QString& latex,
                                 const QHash<QString, QString>& macros)
@@ -193,8 +178,6 @@ static QString expandMathMacros(const QString& latex,
     return result;
 }
 
-// 内部: JKQTMathText → QPixmap
-
 static QPixmap renderMathPixmap(const QString& latex, int fontSize,
                                 const QColor& color, bool displayStyle)
 {
@@ -203,11 +186,8 @@ static QPixmap renderMathPixmap(const QString& latex, int fontSize,
         dpr = scr->devicePixelRatio();
     if (dpr < 1.0) dpr = 1.0;
 
-    // 超采样倍率：从 3 降为 2，在保留抗锯齿的同时减少缩回产生的灰路。
     const int ss = 2;
 
-    // CJK 字体 fallback 链：思源宋体 / Noto 衢体 / 宋体 / 雅黑。
-    // 首选衢线体，与 XITS 数学体风格一致（\text{中文} 不再与公式冲突）。
     static const QString kCjkFont = []() -> QString {
         static const QStringList preferred = {
             QStringLiteral("Source Han Serif SC"),
@@ -233,7 +213,7 @@ static QPixmap renderMathPixmap(const QString& latex, int fontSize,
 
     JKQTMathText mt;
     mt.useXITS();
-    mt.setFontRoman(kCjkFont); // \text{中文} 需要中文字体；衢体 fallback 与数学体风格统一
+    mt.setFontRoman(kCjkFont); 
     mt.setFontSans(kCjkFont);
     mt.setFontSize(fontSize * ss);
     mt.setFontColor(color);
@@ -251,7 +231,6 @@ static QPixmap renderMathPixmap(const QString& latex, int fontSize,
     QSizeF sz = mt.getSize(pm);
     pm.end();
 
-    // 边距从 3*ss 缩小到 1*ss，减少行内公式与中文之间的空隙
     const int marginSS = 1 * ss;
     int wSS = qCeil(sz.width()) + marginSS * 2;
     int hSS = qCeil(sz.height()) + marginSS * 2;
@@ -279,24 +258,9 @@ static QPixmap renderMathPixmap(const QString& latex, int fontSize,
     return scaled;
 }
 
-// 内部: 单列矩阵规范化
-// JKQTMathText 渲染单列 array 会错位，pmatrix/bmatrix/vmatrix 单列同样出问题。
-// 在调 mathToImg 之前把它们统一重写为对称 ghost 模板：
-//     \left? \begin{array}{rcl} & a & \\ & b & \\ & c & \end{array} \right?
-// 两侧各一个空列避免数字偏向括号一侧（单侧 ghost 会导致偏移）。
-// 如果原 LaTeX 里本来就是多列（含 &）或多字符列格式，保持原状不动。
-//
-// 同时在此处兼容 JKQTMathText 不支持的几个常见命令：
-//  - \binom{a}{b}     → 列向量模板（DeepSeek 经常用紧凑写法表示列向量）
-//  - \boldsymbol{X}   → \mathbf{X}
-//  - \bm{X}           → \mathbf{X}
-// 不修复时整段公式会解析失败，最终在 QTextBrowser 上只画出一个孤立的 '}'。
 static QString normalizeSingleColumnMatrices(QString latex)
 {
-    // ---------- 兼容性预处理 ----------
-    // 抽取紧跟在 pos 处 '{' 起始的平衡花括号内容，pos 必须指向 '{'。
-    // 成功时返回花括号内的内容（不含括号本身），并把 outEnd 指向闭合 '}' 之后位置；
-    // 失败时返回空串，outEnd = -1。
+
     auto extractBraceArg = [](const QString& s, int pos, int& outEnd) -> QString {
         if (pos < 0 || pos >= s.size() || s[pos] != QLatin1Char('{')) {
             outEnd = -1;
@@ -307,7 +271,7 @@ static QString normalizeSingleColumnMatrices(QString latex)
         while (i < s.size() && depth > 0) {
             const QChar c = s[i];
             if (c == QLatin1Char('\\') && i + 1 < s.size()) {
-                // 跳过转义字符，避免 \{ \} 被误计入深度
+
                 i += 2;
                 continue;
             }
@@ -330,11 +294,10 @@ static QString normalizeSingleColumnMatrices(QString latex)
         return from;
     };
 
-    // 1) \boldsymbol{X} / \bm{X} → \mathbf{X}
     for (const QString& cmd : { QStringLiteral("\\boldsymbol"), QStringLiteral("\\bm") }) {
         int p = 0;
         while ((p = latex.indexOf(cmd, p)) >= 0) {
-            // 命令名后必须不是字母（防止匹配到 \bmatrix）
+
             const int after = p + cmd.size();
             if (after < latex.size() && latex[after].isLetter()) { p = after; continue; }
             const int b = skipSpaces(latex, after);
@@ -348,7 +311,6 @@ static QString normalizeSingleColumnMatrices(QString latex)
         }
     }
 
-    // 2) \binom{a}{b} → 列向量模板（{rcl} 对称 ghost，与单列 pmatrix 处理一致）
     {
         const QString cmd = QStringLiteral("\\binom");
         int p = 0;
@@ -373,7 +335,6 @@ static QString normalizeSingleColumnMatrices(QString latex)
         }
     }
 
-    // ---------- 以下为原有单列矩阵规范化 ----------
     struct EnvSpec {
         const char* env;
         const char* leftDelim;
@@ -387,9 +348,7 @@ static QString normalizeSingleColumnMatrices(QString latex)
     };
 
     auto rewriteSingleCol = [](QString content) -> QString {
-        // 容错：DeepSeek 常用单反斜杠 "\ " 代替双反斜杠 "\\" 作换行，
-        // 导致列向量各项全贴在一起。仅在原 content 完全不含 "\\" 时
-        // 才启用：把后跟空白的单反斜杠 "\<\\s>" 贴补为 "\\<\\s>".
+
         if (!content.contains(QStringLiteral("\\\\"))) {
             QString fixed;
             fixed.reserve(content.size() + 8);
@@ -403,7 +362,7 @@ static QString normalizeSingleColumnMatrices(QString latex)
             }
             content = fixed;
         }
-        // 拆分 \\ 为行，每行末尾补一个 ghost 空列 "& "
+
         QStringList rows;
         int q = 0;
         while (q < content.size()) {
@@ -422,7 +381,6 @@ static QString normalizeSingleColumnMatrices(QString latex)
         return out;
     };
 
-    // 1) pmatrix / bmatrix / vmatrix / Vmatrix
     for (const auto& s : kSpecs) {
         const QString begin = QStringLiteral("\\begin{%1}").arg(QString::fromLatin1(s.env));
         const QString end   = QStringLiteral("\\end{%1}").arg(QString::fromLatin1(s.env));
@@ -445,9 +403,6 @@ static QString normalizeSingleColumnMatrices(QString latex)
         }
     }
 
-    // 2) \begin{array}{<spec>}...\end{array} 伪单列误用
-    //    DeepSeek 常将列向量写成 {cr}/{cc}/{ccc} 但内容不含 &,
-    //    JKQTMathText 会解析异常。只要 content 不含 & 就重写为对称 ghost {rcl}。
     {
         const QString begin = QStringLiteral("\\begin{array}");
         const QString end   = QStringLiteral("\\end{array}");
@@ -481,9 +436,6 @@ static QString normalizeSingleColumnMatrices(QString latex)
     return latex;
 }
 
-// 内部: 数学公式 → <img> HTML。全部 forward 到 LatexRenderer::embedAsImg，
-// 实现计算助手 / 算法演示 / AI 解题三路各业务统一走矢量化路径。
-
 static QString mathToImg(const QString& latex, QTextDocument* doc,
                          int fontSize, const QColor& color,
                          bool displayStyle)
@@ -496,15 +448,11 @@ QString LatexRenderer::embedAsImg(QTextDocument* doc, const QString& latex,
 {
     if (!doc) return QString();
 
-    // 防御：剩余控制字符（表格占位符 / mask 等）不能进 LaTeX
     QString clean = latex;
     clean.replace(QChar(0x01), QString());
     clean.replace(QChar(0x02), QString());
     clean.replace(QChar(0x07), QString());
 
-    // 防御：如果上游漏写 $ 导致奇数个 $ 错位配对，子串可能是中文段落。
-    // JKQTMathText 不认识中文会渲染为方块图。启发式判定：不含任何典型语法字符
-    // 且含 CJK → 不走 JKQT，直接返回文本
     {
         const QString s = clean.trimmed();
         bool hasMathSyntax = false;
@@ -529,16 +477,13 @@ QString LatexRenderer::embedAsImg(QTextDocument* doc, const QString& latex,
 
     const QString fixed = normalizeSingleColumnMatrices(clean);
 
-    // 矢量化路径：不再生成大 pixmap，只预留占位 image。setHtml 完成后调用方会
-    // 调 LatexRenderer::postProcessDocument(doc) 把这些 latex-vec:// 伪图片替换为矢量
-    // inline object（走 LatexInlineHandler）。
     ++g_imageCounter;
     const QString url = QStringLiteral("latex-vec://%1").arg(g_imageCounter);
     QPixmap placeholder(8, 8);
     placeholder.fill(Qt::transparent);
     doc->addResource(QTextDocument::ImageResource, QUrl(url), placeholder);
-    g_urlToLatex[url] = latex;          // 原始 LaTeX（用于复制还原）
-    g_urlToFixed[url] = fixed;          // normalize 后的 LaTeX（用于渲染）
+    g_urlToLatex[url] = latex;          
+    g_urlToFixed[url] = fixed;          
     g_urlFontSize[url] = fontSize;
     g_urlColor[url] = color;
     if (displayStyle) g_displayUrls.insert(url);
@@ -554,8 +499,6 @@ QString LatexRenderer::embedAsImg(QTextDocument* doc, const QString& latex,
     }
 }
 
-// 内部: 纯文本 → HTML 转义
-
 static QString escapeText(const QString& s)
 {
     QString r = s.toHtmlEscaped();
@@ -563,10 +506,9 @@ static QString escapeText(const QString& s)
     return r;
 }
 
-// 内部: 简易 Markdown -> HTML
 static QString renderMarkdownText(QString s)
 {
-    // ---------- 标题 ----------
+
     QRegularExpression h1(R"((^|\n)# ([^\n]+))");
     s.replace(h1, "\\1<h1 style=\"font-size:22px; font-weight:bold; margin:6px 0;\">\\2</h1>");
 
@@ -579,34 +521,20 @@ static QString renderMarkdownText(QString s)
     QRegularExpression h4(R"((^|\n)#### ([^\n]+))");
     s.replace(h4, "\\1<h4 style=\"font-size:14px; font-weight:bold; margin:2px 0;\">\\2</h4>");
 
-    // ---------- 加粗 ----------
     QRegularExpression bold(R"(\*\*(.*?)\*\*)");
     s.replace(bold, "<b>\\1</b>");
 
-    // ---------- 斜体 ----------
     QRegularExpression italic(R"(\*(.*?)\*)");
     s.replace(italic, "<i>\\1</i>");
 
-    // ---------- 分割线 ----------
     QRegularExpression hr(R"((^|\n)---(\n|$))");
     s.replace(hr, "\\1<hr style=\"border:none; border-top:1px solid #cbd5e0; margin:8px 0;\">\\2");
 
-    // ---------- 换行 ----------
     s.replace('\n', "<br/>");
 
     return s;
 }
 
-// 内部: 表格预处理 (GFM)
-// 扫描 src 中的表格区段, 替换为占位符 \x01TBL<idx>\x02,
-// 主循环遇到占位符时 emit HTML 表格。
-//
-// 全局 mask 公式内 |, 避免被误识为表格列分隔符 (如范数 |a|
-// 或 vmatrix)。跨行识别 $...$ 与 $$...$$ ($$ 当作单一边界避免拆为两
-// 个 $), 块内所有 | 被换为 0x07; 切 cell 后再 unmask 还原。
-// 释放策略与 findMathClose 一致: 行级 ($..$) 遇换行释放, 块级
-// ($$..$$) 遇连续空行释放, 避免历史话中未闭合的 $/$$ 让 inMath
-// 错误持续, 污染后续表格识别。
 static QString maskMathPipesGlobal(const QString& src)
 {
     QString out;
@@ -660,7 +588,6 @@ static QString unmaskMathPipes(QString s)
     return s;
 }
 
-// 接受已全局 mask 后的行
 static bool isTableSeparatorMasked(const QString& maskedLine)
 {
     QString t = maskedLine.trimmed();
@@ -686,7 +613,6 @@ static QStringList splitTableRowMasked(const QString& maskedLine)
     return cells;
 }
 
-// 单元格渲染：处理 $...$ 行内公式 + 简易 markdown (加粗/斜体)
 static QString renderCell(const QString& cell, QTextDocument* doc,
                           int fontSize, const QColor& color,
                           const QHash<QString, QString>& macros)
@@ -714,7 +640,7 @@ static QString renderCell(const QString& cell, QTextDocument* doc,
             QString latex = cell.mid(i, end - i);
             if (!latex.isEmpty()) {
                 latex = expandMathMacros(latex, macros);
-                out += mathToImg(latex, doc, fontSize, color, /*displayStyle=*/false);
+                out += mathToImg(latex, doc, fontSize, color, false);
             }
             i = end + 1;
             continue;
@@ -734,14 +660,12 @@ struct TableData {
 
 static QString extractTables(const QString& src, QList<TableData>& tables)
 {
-    // 全局 mask：跨行识别 $...$ 和 $$...$$ 边界，完整屏蔽块内 |。
-    // mask 只供表格识别使用；out 原样输出原始 lines（主循环看到的
-    // src 除表格区被换为占位符外，公式 / 文本一字不变）。
+
     const QString masked = maskMathPipesGlobal(src);
     const QStringList lines = src.split(QLatin1Char('\n'));
     const QStringList maskedLines = masked.split(QLatin1Char('\n'));
     if (lines.size() != maskedLines.size()) {
-        // 理论上不会发生（mask 不会增减换行），守底走原文
+
         return src;
     }
     QString out;
@@ -817,9 +741,6 @@ static QString renderTableHtml(const TableData& td, QTextDocument* doc,
     return html;
 }
 
-// 查找闭合令牌，不允许跨越空行 (\n\n)
-// DeepSeek 丢一个 $$ 会导致后续所有 $$ 配对错位，
-// 限制跨度可避免错错位传染整个回答。
 static int findMathClose(const QString& src, int from,
                          const QString& closeTok, bool blockLevel)
 {
@@ -828,13 +749,13 @@ static int findMathClose(const QString& src, int from,
     int p = from;
     while (p + tokLen <= n) {
         if (blockLevel) {
-            // 块级：跨过空行 → 放弃
+
             if (src[p] == QLatin1Char('\n') &&
                 p + 1 < n && src[p + 1] == QLatin1Char('\n')) {
                 return -1;
             }
         } else {
-            // 行级：任何换行 → 放弃
+
             if (src[p] == QLatin1Char('\n')) return -1;
         }
         if (QStringView(src).mid(p, tokLen) == closeTok) return p;
@@ -842,8 +763,6 @@ static int findMathClose(const QString& src, int from,
     }
     return -1;
 }
-
-// 内部: 匹配括号 / 花括号 (支持嵌套)
 
 static int findClosing(const QString& s, int openPos,
                        QChar openCh, QChar closeCh)
@@ -861,15 +780,12 @@ static int findClosing(const QString& s, int openPos,
     return -1;
 }
 
-// 核心
-
 QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
 {
     if (!doc) return rawSource.toHtmlEscaped();
 
     QString src = stripComments(rawSource);
 
-    // 预处理 GFM 表格：表格被替换为占位符 \x01TBL<idx>\x02
     QList<TableData> tables;
     src = extractTables(src, tables);
 
@@ -890,7 +806,7 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
     };
 
     while (i < n) {
-        // 表格占位符: \x01TBL<idx>\x02
+
         if (src[i].unicode() == 0x01) {
             int end = src.indexOf(QChar(0x02), i + 1);
             if (end > i) {
@@ -907,19 +823,17 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
                     }
                 }
             }
-            // 守底：孤立控制字符丢弃，避免污染 textBuf
+
             ++i;
             continue;
         }
 
-        // 块级公式: $$...$$
         if (src[i] == QLatin1Char('$') && i + 1 < n &&
             src[i + 1] == QLatin1Char('$')) {
             int end = findMathClose(src, i + 2, QStringLiteral("$$"),
-                                    /*blockLevel=*/true);
+                                    true);
             if (end < 0) {
-                // 孤立 $$。Rescue：若 $$ 位于行末且 textBuf 当前行像 LaTeX，
-                // 说明 DeepSeek 漏写了开头的 $$，把当前行包装为 $$line$$ 渲染
+
                 const bool isLineEnd = (i + 2 == n) ||
                                        (i + 2 < n && src[i + 2] == QLatin1Char('\n'));
                 if (isLineEnd) {
@@ -938,12 +852,12 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
                         flushText();
                         QString latex = expandMathMacros(tc, m_mathMacros);
                         html += mathToImg(latex, doc, m_fontSize, m_textColor,
-                                          /*displayStyle=*/true);
+                                          true);
                         i += 2;
                         continue;
                     }
                 }
-                // 未配对或跨段：当作普通文本，避免传染后续内容
+
                 textBuf += QStringLiteral("$$");
                 i += 2;
                 continue;
@@ -953,17 +867,16 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
             if (!latex.isEmpty()) {
                 latex = expandMathMacros(latex, m_mathMacros);
                 html += mathToImg(latex, doc, m_fontSize, m_textColor,
-                                  /*displayStyle=*/true);
+                                  true);
             }
             i = end + 2;
             continue;
         }
 
-        // 块级公式: \[...\]
         if (src[i] == QLatin1Char('\\') && i + 1 < n &&
             src[i + 1] == QLatin1Char('[')) {
             int end = findMathClose(src, i + 2, QStringLiteral("\\]"),
-                                    /*blockLevel=*/true);
+                                    true);
             if (end < 0) {
                 textBuf += QStringLiteral("\\[");
                 i += 2;
@@ -974,17 +887,16 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
             if (!latex.isEmpty()) {
                 latex = expandMathMacros(latex, m_mathMacros);
                 html += mathToImg(latex, doc, m_fontSize, m_textColor,
-                                  /*displayStyle=*/true);
+                                  true);
             }
             i = end + 2;
             continue;
         }
 
-        // 行内公式: \(...\)
         if (src[i] == QLatin1Char('\\') && i + 1 < n &&
             src[i + 1] == QLatin1Char('(')) {
             int end = findMathClose(src, i + 2, QStringLiteral("\\)"),
-                                    /*blockLevel=*/false);
+                                    false);
             if (end < 0) {
                 textBuf += QStringLiteral("\\(");
                 i += 2;
@@ -995,16 +907,15 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
             if (!latex.isEmpty()) {
                 latex = expandMathMacros(latex, m_mathMacros);
                 html += mathToImg(latex, doc, m_fontSize, m_textColor,
-                                  /*displayStyle=*/false);
+                                  false);
             }
             i = end + 2;
             continue;
         }
 
-        // 行内公式: $...$
         if (src[i] == QLatin1Char('$')) {
             int end = findMathClose(src, i + 1, QStringLiteral("$"),
-                                    /*blockLevel=*/false);
+                                    false);
             if (end < 0) {
                 textBuf += QLatin1Char('$');
                 ++i;
@@ -1015,13 +926,12 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
             if (!latex.trimmed().isEmpty()) {
                 latex = expandMathMacros(latex, m_mathMacros);
                 html += mathToImg(latex, doc, m_fontSize, m_textColor,
-                                  /*displayStyle=*/false);
+                                  false);
             }
             i = end + 1;
             continue;
         }
 
-        // 自定义文档命令: \cmd[opt]{arg} 或 \cmd{arg}
         if (src[i] == QLatin1Char('\\') && i + 1 < n &&
             src[i + 1].isLetter()) {
             int nameStart = i + 1;
@@ -1058,18 +968,17 @@ QString LatexRenderer::render(const QString& rawSource, QTextDocument* doc)
             }
         }
 
-        // 普通文本
         textBuf += src[i];
         ++i;
     }
 
     flushText();
     html += QStringLiteral("</div>");
-    // 防御：去掉任何可能泄露的占位符 / mask 控制字符
+
     html.replace(QChar(0x01), QString());
     html.replace(QChar(0x02), QString());
     html.replace(QChar(0x07), QString());
     return html;
 }
 
-} // namespace AlgeMate::Latex
+} 

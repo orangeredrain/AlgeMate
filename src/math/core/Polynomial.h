@@ -1,21 +1,5 @@
 #pragma once
 
-/*
-* @file Polynomial.h
-* @brief 单变量稠密多项式类模板, 低位优先
-*
-* 默认系数类型 T = Fraction, 保证精确运算, 可替换为 BigInt / double 等
-* 提供构造、度数查询、求值、微分/积分、四则运算、带余除法、快速幂、变换 (reverse/shift/scale)
-* 高阶操作 (GCD / 结式 / 判别式 / 无平方分解 / 因式分解 / Sturm 链) 将由 PolynomialAlg 单独提供
-*
-* @example
-* Polynomial<Fraction> p = {Fraction(1), Fraction(-2), Fraction(1)}; // 1 - 2x + x^2
-* auto q = p.derivative();          // -2 + 2x
-* Fraction v = p(Fraction(3));      // p(3) = 4
-* auto r = p * p;                   // (x-1)^4
-* auto [Q, R] = p.divmod(Polynomial<Fraction>{Fraction(-1), Fraction(1)});
-*/
-
 #include "Fraction.h"
 
 #include <algorithm>
@@ -30,41 +14,39 @@
 
 namespace algemate::math {
 
-// 单变量稠密多项式
 template<typename T = Fraction>
 class Polynomial {
 public:
     using value_type = T;
     using size_type  = std::size_t;
 
-    // 带余除法的返回类型
     struct DivMod {
         Polynomial quotient;
         Polynomial remainder;
     };
 
-    Polynomial() = default;                              // 零多项式
-    Polynomial(const T& constant);                       // 常数多项式
-    Polynomial(std::initializer_list<T> coeffsLowFirst); // {a0, a1, ...} 低位优先
+    Polynomial() = default;                              
+    Polynomial(const T& constant);                       
+    Polynomial(std::initializer_list<T> coeffsLowFirst); 
 
-    static Polynomial fromCoeffsHighFirst(std::initializer_list<T> hi); // {an, ..., a0} 高位优先
-    static Polynomial monomial(size_type degree, const T& coef = T(1)); // coef * x^degree 单项式
-    static Polynomial x();                                              // 单项式 x (即 monomial(1,1))
+    static Polynomial fromCoeffsHighFirst(std::initializer_list<T> hi); 
+    static Polynomial monomial(size_type degree, const T& coef = T(1)); 
+    static Polynomial x();                                              
 
-    bool      isZero() const { return coeffs_.empty(); } // 是否为零多项式
-    bool      isOne()  const { return coeffs_.size() == 1 && coeffs_[0] == T(1); } // 是否为常数 1
-    int       degree() const;                           // 零多项式返回 -1
-    size_type size()   const { return coeffs_.size(); } // 系数数组大小
+    bool      isZero() const { return coeffs_.empty(); } 
+    bool      isOne()  const { return coeffs_.size() == 1 && coeffs_[0] == T(1); } 
+    int       degree() const;                           
+    size_type size()   const { return coeffs_.size(); } 
 
-    const T&  leading()  const;                 // 首项系数, 零多项式抛 std::domain_error
-    const T&  constant() const;                 // 常数项, 零多项式返回静态 0
-    const T&  operator[](size_type i) const;    // x^i 系数, 越界返回静态 0
+    const T&  leading()  const;                 
+    const T&  constant() const;                 
+    const T&  operator[](size_type i) const;    
 
-    const std::vector<T>& coeffs() const { return coeffs_; } // 返回系数数组的只读引用 (低位优先)
+    const std::vector<T>& coeffs() const { return coeffs_; } 
 
-    T         operator()(const T& x) const;        // f(x)
-    Polynomial derivative() const;                 // 一阶微分
-    Polynomial integrate(const T& C = T(0)) const; // 不定积分, C 为常数项
+    T         operator()(const T& x) const;        
+    Polynomial derivative() const;                 
+    Polynomial integrate(const T& C = T(0)) const; 
 
     Polynomial operator+() const { return *this; }
     Polynomial operator-() const;
@@ -78,17 +60,17 @@ public:
     Polynomial& operator*=(const Polynomial& r) { *this = *this * r; return *this; }
     Polynomial& operator*=(const T& k)          { *this = *this * k; return *this; }
 
-    DivMod     divmod(const Polynomial& divisor) const;  // 带余除法, 要求 T 可逆元运算
+    DivMod     divmod(const Polynomial& divisor) const;  
     Polynomial operator/(const Polynomial& r) const { return divmod(r).quotient; }
     Polynomial operator%(const Polynomial& r) const { return divmod(r).remainder; }
 
-    Polynomial pow(unsigned int n) const;       // 快速幂
+    Polynomial pow(unsigned int n) const;       
 
-    Polynomial reverse() const;                 // x^n * p(1/x) 系数反转 (互反多项式)
-    Polynomial shift(const T& a) const;         // p(x + a) 平移
-    Polynomial scale(const T& k) const;         // p(k * x)
-    Polynomial monic()  const;                  // 首一化
-    Polynomial negate() const { return -(*this); } // 返回-1倍
+    Polynomial reverse() const;                 
+    Polynomial shift(const T& a) const;         
+    Polynomial scale(const T& k) const;         
+    Polynomial monic()  const;                  
+    Polynomial negate() const { return -(*this); } 
 
     bool operator==(const Polynomial& r) const { return coeffs_ == r.coeffs_; }
     bool operator!=(const Polynomial& r) const { return !(*this == r); }
@@ -96,13 +78,11 @@ public:
     std::string toString(const std::string& var = "x") const;
 
 private:
-    std::vector<T> coeffs_; // 末尾非零, 零多项式时为空
+    std::vector<T> coeffs_; 
 
-    void trim_();           // 去掉高位连续零
+    void trim_();           
     static const T& zero_();
 };
-
-// 以下为具体实现
 
 template<typename T>
 const T& Polynomial<T>::zero_() {
@@ -238,7 +218,6 @@ Polynomial<T> Polynomial<T>::operator-(const Polynomial& r) const {
     return out;
 }
 
-// 普通卷积运算
 template<typename T>
 Polynomial<T> Polynomial<T>::operator*(const Polynomial& r) const {
     if (coeffs_.empty() || r.coeffs_.empty()) return Polynomial();
@@ -264,7 +243,6 @@ Polynomial<T> Polynomial<T>::operator*(const T& k) const {
     return out;
 }
 
-// 带余除法
 template<typename T>
 typename Polynomial<T>::DivMod Polynomial<T>::divmod(const Polynomial& divisor) const {
     if (divisor.isZero()) throw std::domain_error("Polynomial::divmod: division by zero");
@@ -282,7 +260,6 @@ typename Polynomial<T>::DivMod Polynomial<T>::divmod(const Polynomial& divisor) 
     return result;
 }
 
-// 快速幂
 template<typename T>
 Polynomial<T> Polynomial<T>::pow(unsigned int n) const {
     Polynomial result(T(1));
@@ -367,15 +344,12 @@ std::string Polynomial<T>::toString(const std::string& var) const {
     return oss.str();
 }
 
-// 非成员: 标量左乘
 template<typename T>
 Polynomial<T> operator*(const T& k, const Polynomial<T>& p) { return p * k; }
 
-// 非成员: 输出流
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const Polynomial<T>& p) { return os << p.toString(); }
 
-// 非成员: Euclidean GCD, 结果归一化为 monic
 template<typename T>
 Polynomial<T> gcd(Polynomial<T> a, Polynomial<T> b) {
     while (!b.isZero()) {

@@ -1,22 +1,5 @@
 #pragma once
 
-/*
-* @file Matrix.h
-* @brief 支持任意元素类型的行优先存储矩阵模板类
-*
-* 默认元素类型为 Fraction, 保证精确计算, 也可替换为 BigInt / double 等
-* 提供元素访问、初等行/列变换、子矩阵、拼接、四则运算、转置、快速幂、对齐输出
-* 高阶线性代数 (RREF / det / inv / solve / rank) 由 LinearAlgebra 单独提供
-*
-* @example
-* Matrix<Fraction> A = {{1, 2}, {3, 4}};
-* Matrix<Fraction> I = Matrix<Fraction>::identity(3);
-* auto B = A.transpose();
-* auto C = A * A;
-* auto D = A.power(5);
-* std::cout << C << '\n';
-*/
-
 #include "Fraction.h"
 #include "Polynomial.h"
 
@@ -30,61 +13,56 @@
 
 namespace algemate::math {
 
-// 矩阵类模板
 template<typename T = Fraction>
 class Matrix {
 public:
     using value_type = T;
     using size_type  = std::size_t;
 
-    Matrix() = default;                                           // 空矩阵 0 行 0 列
-    Matrix(size_type rows, size_type cols);                       // rows * cols 矩阵, 默认初始化为 0
-    Matrix(size_type rows, size_type cols, const T& fill);        // rows * cols 矩阵, 每个元素初始化为 fill
-    Matrix(std::initializer_list<std::initializer_list<T>> init); // 嵌套初始化列表构造 如 {{1,2},{3,4}}
+    Matrix() = default;                                           
+    Matrix(size_type rows, size_type cols);                       
+    Matrix(size_type rows, size_type cols, const T& fill);        
+    Matrix(std::initializer_list<std::initializer_list<T>> init); 
 
-    static Matrix zeros(size_type rows, size_type cols);          // 全 0 矩阵
-    static Matrix ones(size_type rows, size_type cols);           // 全 1 矩阵
-    static Matrix identity(size_type n);                          // 单位矩阵
-    static Matrix diagonal(std::initializer_list<T> diag);        // 对角矩阵
+    static Matrix zeros(size_type rows, size_type cols);          
+    static Matrix ones(size_type rows, size_type cols);           
+    static Matrix identity(size_type n);                          
+    static Matrix diagonal(std::initializer_list<T> diag);        
 
-    size_type rows() const { return rows_; }                             // 返回行数
-    size_type cols() const { return cols_; }                             // 返回列数
-    bool      isEmpty() const  { return rows_ == 0 || cols_ == 0; }      // 判断是否为空矩阵
-    bool      isSquare() const { return rows_ == cols_ && rows_ > 0; }   // 判断是否为方阵
+    size_type rows() const { return rows_; }                             
+    size_type cols() const { return cols_; }                             
+    bool      isEmpty() const  { return rows_ == 0 || cols_ == 0; }      
+    bool      isSquare() const { return rows_ == cols_ && rows_ > 0; }   
 
-    T&       at(size_type r, size_type c);     // 返回指定位置的元素 (带边界检查)
+    T&       at(size_type r, size_type c);     
     const T& at(size_type r, size_type c) const;                   
-    T&       operator()(size_type r, size_type c)       { return data_[idx_(r, c)]; } // 不带边界检查的元素访问
+    T&       operator()(size_type r, size_type c)       { return data_[idx_(r, c)]; } 
     const T& operator()(size_type r, size_type c) const { return data_[idx_(r, c)]; }
 
-    // 初等行/列变换
-    void swapRows(size_type i, size_type j);                     // 交换 i, j 两行
-    void swapCols(size_type i, size_type j);                     // 交换 i, j 两列
-    void scaleRow(size_type i, const T& k);                      // 第 i 行所有元素 *k
-    void scaleCol(size_type j, const T& k);                      // 第 j 列所有元素 *k
-    void addMulRow(size_type i, size_type j, const T& k);        // 第 i 行 += 第 j 行 * k
-    void addMulCol(size_type i, size_type j, const T& k);        // 第 i 列 += 第 j 列 * k
+    void swapRows(size_type i, size_type j);                     
+    void swapCols(size_type i, size_type j);                     
+    void scaleRow(size_type i, const T& k);                      
+    void scaleCol(size_type j, const T& k);                      
+    void addMulRow(size_type i, size_type j, const T& k);        
+    void addMulCol(size_type i, size_type j, const T& k);        
 
-    Matrix submatrix(size_type r0, size_type c0, size_type nr, size_type nc) const; // 子矩阵
-    Matrix minor(size_type r, size_type c) const;        // 删除第 r 行和第 c 列后的余子式矩阵
-    Matrix row(size_type r) const;                       // 返回第 r 行
-    Matrix col(size_type c) const;                       // 返回第 c 列
+    Matrix submatrix(size_type r0, size_type c0, size_type nr, size_type nc) const; 
+    Matrix minor(size_type r, size_type c) const;        
+    Matrix row(size_type r) const;                       
+    Matrix col(size_type c) const;                       
 
-    Matrix augment(const Matrix& right) const;  // 向右拼接矩阵
-    Matrix stack(const Matrix& below)   const;  // 向下拼接矩阵
+    Matrix augment(const Matrix& right) const;  
+    Matrix stack(const Matrix& below)   const;  
 
-    // 高级构造
-    Matrix kron(const Matrix& other) const;                          // 张量积 (Kronecker product)
-    static Matrix blockDiag(std::initializer_list<Matrix> blocks);   // 分块对角 (直和)
-    static Matrix companion(const Polynomial<T>& monic);             // 首一多项式的伴随矩阵
+    Matrix kron(const Matrix& other) const;                          
+    static Matrix blockDiag(std::initializer_list<Matrix> blocks);   
+    static Matrix companion(const Polynomial<T>& monic);             
 
-    // 结构查询
-    T    trace() const;                                              // 对角元之和, 非方阵抛 std::invalid_argument
-    bool isDiagonal()        const;                                  // 仅对角元可不为 0
-    bool isUpperTriangular() const;                                  // 下三角 (包含对角线以下) 均为 0
-    bool isLowerTriangular() const;                                  // 上三角 (包含对角线以上) 均为 0
+    T    trace() const;                                              
+    bool isDiagonal()        const;                                  
+    bool isUpperTriangular() const;                                  
+    bool isLowerTriangular() const;                                  
 
-    // 加减乘, 标量乘法
     Matrix operator-() const;
     Matrix operator+(const Matrix& r) const;
     Matrix operator-(const Matrix& r) const;
@@ -96,14 +74,13 @@ public:
     Matrix& operator*=(const Matrix& r);
     Matrix& operator*=(const T& k);
 
-    // 比较
     bool operator==(const Matrix& r) const;
     bool operator!=(const Matrix& r) const { return !(*this == r); }
 
-    Matrix transpose() const;              // 转置
-    Matrix power(unsigned int exp) const;  // 快速幂
+    Matrix transpose() const;              
+    Matrix power(unsigned int exp) const;  
 
-    std::string toString() const;          // 转为字符串
+    std::string toString() const;          
 
 private:
     size_type      rows_ = 0;
@@ -301,7 +278,6 @@ Matrix<T> Matrix<T>::stack(const Matrix& below) const {
     return out;
 }
 
-// 张量积: (A ⊗ B)[i*Br + p, j*Bc + q] = A[i,j] * B[p,q]
 template<typename T>
 Matrix<T> Matrix<T>::kron(const Matrix& other) const {
     const size_type br = other.rows_;
@@ -320,8 +296,6 @@ Matrix<T> Matrix<T>::kron(const Matrix& other) const {
     return out;
 }
 
-// 分块对角: 每块必须为方阵或至少不空, 非方阵块亦允许
-// 输出尺寸 = 所有块行和 x 列和, 其余位置填 0
 template<typename T>
 Matrix<T> Matrix<T>::blockDiag(std::initializer_list<Matrix> blocks) {
     size_type totalRows = 0, totalCols = 0;
@@ -338,8 +312,6 @@ Matrix<T> Matrix<T>::blockDiag(std::initializer_list<Matrix> blocks) {
     return out;
 }
 
-// 首一多项式 p(x) = x^n + c_{n-1} x^{n-1} + ... + c_0 的伴随矩阵 (n >= 1)
-// 友矩阵形式: 最后一列放 -c_i, 次对角 1, 其余 0
 template<typename T>
 Matrix<T> Matrix<T>::companion(const Polynomial<T>& monic) {
     if (monic.isZero()) throw std::invalid_argument("Matrix::companion: zero polynomial");

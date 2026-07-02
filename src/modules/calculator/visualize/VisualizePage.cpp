@@ -1,6 +1,6 @@
 #include "VisualizePage.h"
 #include "QuadricWidget.h"
-#include "core/ThemeManager.h" // 引入主题管理器
+#include "core/ThemeManager.h" 
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <math.h>
@@ -32,7 +32,6 @@ using AlgeMate::Calculator::Interactive::RenderTheme;
 
 namespace AlgeMate::Calculator::Visualize {
 
-// ── 17-class quadric classification table ──
 static const QuadricClass kClasses[] = {
     { 0,  "椭球面",       "x²/a² + y²/b² + z²/c² = 1",     3,0,0, "有界封闭卵形曲面",           "非退化"},
     { 2,  "单叶双曲面",   "x²/a² + y²/b² - z²/c² = 1",      2,1,0, "无界直纹曲面，单连通",       "非退化"},
@@ -199,7 +198,6 @@ static void renderDirectQuadric(QuadricWidget* w, const std::vector<double>& coe
     w->resetView();
 }
 
-// ── Constructor ──
 VisualizePage::VisualizePage(QWidget* parent) : QWidget(parent) {
     auto* root = new QHBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -244,7 +242,6 @@ VisualizePage::VisualizePage(QWidget* parent) : QWidget(parent) {
 
     root->addWidget(splitter);
 
-    // ====== UI 动态主题重绘 ======
     auto applyTheme = [this, titleLbl, tabs]() {
         bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
 
@@ -403,7 +400,7 @@ void VisualizePage::setupRenderArea(QWidget* parent) {
 
     infoBrowser_ = new QTextBrowser;
     infoBrowser_->setOpenLinks(false);
-    infoBrowser_->setMaximumHeight(115); // 给公式稍微增加一点高度冗余
+    infoBrowser_->setMaximumHeight(115); 
     lay->addWidget(infoBrowser_);
 
     quadric_ = new QuadricWidget;
@@ -447,13 +444,9 @@ void VisualizePage::renderPreset(int id, double a, double b, double c, double p)
     setPresetSurface(quadric_, id, a, b, c, p);
 }
 
-// ======================================================================
-// 【新增】辅助函数：使用原生 HTML table 精妙模拟 Typora 风格的 LaTeX 公式渲染
-// ======================================================================
 static QString getTyporaStyleEquation(int id) {
     QStringList tops, bots, ops;
 
-    // 变量斜体，数字正体；使用 &minus; 保证负号显示美观
     switch (id) {
     case 0:
         tops = {"<i>x</i><sup>2</sup>", "<i>y</i><sup>2</sup>", "<i>z</i><sup>2</sup>", "1"};
@@ -505,28 +498,23 @@ static QString getTyporaStyleEquation(int id) {
             .arg(QString::fromUtf8(kClasses[classIdToIndex(id)].stdEq));
     }
 
-    // 构建一个两行的 HTML 表格：
-    // 第一行放置分子和跨两行的运算符(rowspan='2')
-    // 第二行放置分母
     QString row1 = "<tr>", row2 = "<tr>";
     for (int i = 0; i < tops.size(); ++i) {
         if (bots[i].isEmpty()) {
-            // 没有分母（例如等式右边的 1 ），跨两行垂直居中
+
             row1 += QString("<td rowspan='2' valign='middle' align='center' style='padding:0 2px;'>%1</td>").arg(tops[i]);
         } else {
-            // 有分母，通过 border-bottom 绘制完美的分数线（继承父级文本颜色 currentColor）
+
             row1 += QString("<td align='center' style='border-bottom:1px solid currentColor; padding:0 4px;'>%1</td>").arg(tops[i]);
             row2 += QString("<td align='center' style='padding:0 4px;'>%1</td>").arg(bots[i]);
         }
 
-        // 渲染操作符 (+, -, =)
         if (i < ops.size()) {
             row1 += QString("<td rowspan='2' valign='middle' align='center' style='padding:0 6px;'>%1</td>").arg(ops[i]);
         }
     }
     row1 += "</tr>"; row2 += "</tr>";
 
-    // 组合成完整表格代码，使用经典的数学罗马字体渲染
     return QString("<table border='0' cellpadding='0' cellspacing='0' "
                    "style='font-family:\"Cambria Math\", \"Times New Roman\", serif; font-size:16px; font-weight:bold; margin:0;'>%1%2</table>")
         .arg(row1, row2);
@@ -537,25 +525,21 @@ void VisualizePage::updateInfo(int cls) {
     auto* doc = infoBrowser_->document();
     doc->clear();
 
-    // 1. 生成 Typora 风格渲染公式 HTML
     QString eqHtml = getTyporaStyleEquation(kClasses[cls].id);
 
-    // 2. 利用嵌套 table 来保证“标准方程：”与后面“二维垂直分数表格”能够严格同一行并水平对齐
     QString html = QStringLiteral(
                        "<div style='padding:2px;'>"
-                       // 第一行：标题与分类
+
                        "<div style='margin-bottom:8px;'>"
                        "<b style='font-size:16px; color:%1;'>%2</b>&nbsp;&nbsp;&nbsp;&nbsp;"
                        "<span style='color:#8A8FA3; font-size:12px;'>%3</span>"
                        "</div>"
 
-                       // 第二行：带垂直对齐的公式区
                        "<table border='0' cellpadding='0' cellspacing='0' style='margin-bottom:8px;'><tr>"
                        "<td valign='middle'><span style='font-size:13px; color:#64748B;'>标准方程：</span></td>"
                        "<td valign='middle' style='color:%1;'>%4</td>"
                        "</tr></table>"
 
-                       // 第三行：特征属性
                        "<div>"
                        "<span style='font-size:13px; color:#64748B;'>惯性指数 (p,q,r) = (%5, %6, %7)</span>&nbsp;&nbsp;&nbsp;&nbsp;"
                        "<span style='font-size:13px; color:#8A8FA3;'>%8</span>"
@@ -575,4 +559,4 @@ void VisualizePage::updateInfo(int cls) {
 
 void VisualizePage::onResetView() { if (quadric_) quadric_->resetView(); }
 
-} // namespace AlgeMate::Calculator::Visualize
+} 

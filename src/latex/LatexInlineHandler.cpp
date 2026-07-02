@@ -12,7 +12,6 @@
 
 namespace AlgeMate::Latex {
 
-// CJK fallback：与 LatexRenderer.cpp 内一致，集中放在 handler 这边以便 mt 池命中
 static const QString& cjkFontName()
 {
     static const QString name = []() -> QString {
@@ -40,7 +39,6 @@ static const QString& cjkFontName()
     return name;
 }
 
-// mt 实例池 key：所有影响渲染外观的参数都参与
 struct PoolKey {
     QString latex;
     bool    display;
@@ -106,7 +104,6 @@ QSizeF LatexInlineHandler::intrinsicSize(QTextDocument*, int,
     QSizeF sz = mt->getSize(p);
     p.end();
 
-    // 边距：左右各 2px 留呼吸空间，垂直留 1px 防被裁
     return QSizeF(sz.width() + 4.0, sz.height() + 2.0);
 }
 
@@ -130,8 +127,6 @@ void LatexInlineHandler::drawObject(QPainter* painter, const QRectF& rect,
     painter->setRenderHint(QPainter::TextAntialiasing,     true);
     painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    // intrinsicSize 留了 4×2 边距，drawObject 接到的 rect 就是这个尺寸；
-    // 公式画到 inner 矩形，左右各扣 2，上下各扣 1。
     const QRectF inner = rect.adjusted(2.0, 1.0, -2.0, -1.0);
     mt->draw(*painter, Qt::AlignCenter, inner, false);
 
@@ -143,4 +138,4 @@ void LatexInlineHandler::clearPool()
     g_pool.clear();
 }
 
-} // namespace AlgeMate::Latex
+} 

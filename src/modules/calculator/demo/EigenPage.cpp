@@ -38,9 +38,6 @@ using AlgeMate::Calculator::Interactive::RenderTheme;
 
 namespace AlgeMate::Calculator::Demo {
 
-// ---- helpers ----
-
-// λI - A 矩阵（通用格式：对角 λ - a_ii，其余 -a_ij）
 static QString lambdaMinusALtx(const Matrix<Fraction>& A) {
     const auto n = A.rows();
     QString body;
@@ -69,7 +66,6 @@ static QString lambdaMinusALtx(const Matrix<Fraction>& A) {
     return QStringLiteral("\\begin{pmatrix}%1\\end{pmatrix}").arg(body);
 }
 
-// 特征多项式行列式（竖线）
 static QString charDetLtx(const Matrix<Fraction>& A) {
     const auto n = A.rows();
     QString body;
@@ -94,26 +90,23 @@ static QString charDetLtx(const Matrix<Fraction>& A) {
     return QStringLiteral("\\begin{vmatrix}%1\\end{vmatrix}").arg(body);
 }
 
-// Companion matrix for polynomial λ^n + a_{n-1}λ^{n-1} + ... + a_0
-// Returns an n×n matrix whose eigenvalues are the polynomial's roots
 static Matrix<Fraction> companionMatrix(const Polynomial<Fraction>& p) {
     int n = p.degree();
     Matrix<Fraction> C(n, n);
-    // Subdiagonal: 1's
+
     for (int i = 1; i < n; ++i)
         C(i, i - 1) = Fraction(1);
-    // Last column: -a_i
+
     const auto& c = p.coeffs();
     for (int i = 0; i < n; ++i)
         C(i, n - 1) = -c[i];
     return C;
 }
 
-// Numerical root: format a double as a clean string (strip trailing zeros)
 static QString fmtDouble(double v, int decimals = 2) {
     if (std::abs(v) < 1e-12) v = 0.0;
     QString s = QString::number(v, 'f', decimals);
-    // Strip trailing zeros and trailing dot
+
     if (s.contains(QLatin1Char('.'))) {
         while (s.endsWith(QLatin1Char('0'))) s.chop(1);
         if (s.endsWith(QLatin1Char('.'))) s.chop(1);
@@ -121,7 +114,6 @@ static QString fmtDouble(double v, int decimals = 2) {
     return s;
 }
 
-// Format a complex number for LaTeX
 static QString complexLtx(double re, double im) {
     if (std::abs(im) < 1e-12)
         return fmtDouble(re);
@@ -134,7 +126,6 @@ static QString complexLtx(double re, double im) {
     return fmtDouble(re) + sign + fmtDouble(im) + QStringLiteral("i");
 }
 
-// Quadratic formula roots as LaTeX strings
 static QStringList quadraticRootsLtx(const Fraction& a, const Fraction& b, const Fraction& c) {
     Fraction delta = b * b - Fraction(4) * a * c;
     QStringList roots;
@@ -143,7 +134,7 @@ static QStringList quadraticRootsLtx(const Fraction& a, const Fraction& b, const
     } else if (delta.sign() > 0) {
         Fraction negB = Fraction(-1) * b;
         Fraction twoA = Fraction(2) * a;
-        // Check if delta is perfect square rational
+
         long long dNum = delta.numerator().toLongLong();
         long long dDen = delta.denominator().toLongLong();
         if (dNum > 0 && dDen > 0 && dNum < 100000000000000LL) {
@@ -170,12 +161,8 @@ static QStringList quadraticRootsLtx(const Fraction& a, const Fraction& b, const
     return roots;
 }
 
-// ---- Numerical root-finding: Durand-Kerner (Weierstrass) method ----
 using Complex = std::complex<double>;
 
-// ---- Durand-Kerner + complex nullspace ----
-
-// Evaluate polynomial c[0] + c[1]x + ... + c[n]x^n at x
 static Complex evalPoly(const std::vector<Complex>& c, Complex x) {
     Complex r(0.0, 0.0);
     for (int i = static_cast<int>(c.size()) - 1; i >= 0; --i)
@@ -183,7 +170,6 @@ static Complex evalPoly(const std::vector<Complex>& c, Complex x) {
     return r;
 }
 
-// Durand-Kerner: simultaneously find all complex roots. Always converges.
 static std::vector<Complex> durandKerner(const std::vector<Complex>& c) {
     int n = static_cast<int>(c.size()) - 1;
     if (n <= 0) return {};
@@ -235,7 +221,6 @@ static std::vector<std::pair<double, double>> numericalEigenvalues(const Matrix<
     } catch (...) { return {}; }
 }
 
-// Complex Gaussian elimination → nullspace of (A - λI)
 static std::vector<std::vector<std::pair<double,double>>>
 complexNullspace(const Matrix<Fraction>& A, double re, double im) {
     const auto n = A.rows();
@@ -293,10 +278,6 @@ static std::vector<std::pair<double,double>> inverseIter(const Matrix<Fraction>&
     if (!ns.empty()) return ns[0];
     return {};
 }
-
-// =====================================================================
-//  Constructor  (same pattern as other pages)
-// =====================================================================
 
 EigenPage::EigenPage(QWidget* parent) : QWidget(parent) {
     auto* root = new QVBoxLayout(this);
@@ -414,10 +395,6 @@ bool EigenPage::eventFilter(QObject* obj, QEvent* ev) {
     return QWidget::eventFilter(obj, ev);
 }
 
-// =====================================================================
-//  Solve
-// =====================================================================
-
 void EigenPage::onSolve() {
     if (curN_ == 0) return;
 
@@ -440,21 +417,18 @@ void EigenPage::onSolve() {
     parts << formulaHtml(QStringLiteral("A = ") + matLtx(A), th, doc);
     parts << sectionHtml(QStringLiteral("解"), th);
 
-    // ---- 2. Characteristic polynomial ----
     try {
     Polynomial<Fraction> cp = charpoly(A);
     RationalFactorization rf = factorOverQ(cp);
 
-    // Characteristic polynomial: |λI - A| = det = polynomial
     parts << paraHtml(QStringLiteral("计算特征多项式："), th);
     parts << formulaHtml(
         QStringLiteral("|\\lambda I - A| = %1 = %2.")
             .arg(charDetLtx(A), polyLtx(cp)),
         th, doc, 15);
 
-    // ---- 3. Extract eigenvalues ----
     std::vector<std::pair<Fraction, int>> exactEigenvals;
-    std::vector<std::pair<std::pair<double, double>, int>> complexEigenvals; // ((re,im), mult)
+    std::vector<std::pair<std::pair<double, double>, int>> complexEigenvals; 
     bool allLinear = true;
 
     for (const auto& f : rf.factors) {
@@ -464,15 +438,14 @@ void EigenPage::onSolve() {
             exactEigenvals.push_back({root, mult});
         } else {
             allLinear = false;
-            // For quadratic factors, use quadratic formula for exact symbolic roots
+
             if (deg == 2) {
                 auto roots = quadraticRootsLtx(f.first.coeffs()[2], f.first.coeffs()[1], f.first.coeffs()[0]);
-                // For complex eigenvector computation later, get numerical approximations
+
                 Fraction a = f.first.coeffs()[2], b = f.first.coeffs()[1], c = f.first.coeffs()[0];
                 Fraction delta = b * b - Fraction(4) * a * c;
                 if (delta.sign() >= 0) {
-                    // Real roots: display symbolically
-                    // Approximate numerically for eigenvector computation
+
                     double sqrtDelta = std::sqrt(delta.toDouble());
                     double re1 = ((-b).toDouble() + sqrtDelta) / (2.0 * a.toDouble());
                     double re2 = ((-b).toDouble() - sqrtDelta) / (2.0 * a.toDouble());
@@ -481,7 +454,7 @@ void EigenPage::onSolve() {
                         complexEigenvals.push_back({{re2, 0.0}, 1});
                     }
                 } else {
-                    // Complex conjugate pair
+
                     double sqrtNegDelta = std::sqrt((-delta).toDouble());
                     double re = (-b).toDouble() / (2.0 * a.toDouble());
                     double im = sqrtNegDelta / (2.0 * a.toDouble());
@@ -491,7 +464,7 @@ void EigenPage::onSolve() {
                     }
                 }
             } else {
-                // Higher degree: use companion matrix
+
                 Matrix<Fraction> C = companionMatrix(f.first);
                 auto cr = complexEigenvalues(C);
                 for (const auto& ev : cr.eigenvalues) {
@@ -503,9 +476,8 @@ void EigenPage::onSolve() {
         }
     }
 
-    // ---- 4. Eigenvalues summary ----
     if (allLinear) {
-        // Pure rational eigenvalues
+
         QString eigStr;
         for (std::size_t i = 0; i < exactEigenvals.size(); ++i) {
             if (i > 0) eigStr += QStringLiteral(", ");
@@ -513,7 +485,7 @@ void EigenPage::onSolve() {
             if (exactEigenvals[i].second > 1)
                 eigStr += QStringLiteral("（$%1$ 重）").arg(exactEigenvals[i].second);
         }
-        // Show fully factored form
+
         {
             QString factLtx;
             for (const auto& ev : exactEigenvals)
@@ -532,7 +504,6 @@ void EigenPage::onSolve() {
         parts << paraHtml(QStringLiteral(
             "因此 $A$ 的全部特征值是 %1.").arg(eigStr), th, doc);
 
-        // ---- 5a. Eigenvectors for exact rational eigenvalues ----
         int alphaIdx = 1;
         for (const auto& ev : exactEigenvals) {
             Fraction lambda = ev.first;
@@ -659,9 +630,9 @@ void EigenPage::onSolve() {
             }
         }
     } else {
-        // Has non-linear factors over Q
+
         int alphaIdx = 1;
-        // Show Q-factored form (with irreducible quadratics)
+
         {
             QString qFact;
             for (const auto& f : rf.factors) {
@@ -691,7 +662,7 @@ void EigenPage::onSolve() {
         }
 
         if (useNumerical) {
-            // Numerical fallback with eigenvectors
+
             if (!complexDomain) {
                 std::vector<std::pair<double, double>> realEvals;
                 for (const auto& ev : numEvals)
@@ -701,11 +672,11 @@ void EigenPage::onSolve() {
                         "特征多项式在 $\\mathbb{R}$ 上没有实根，"
                         "因此 $A$ 没有实特征值."), th, doc);
                 } else {
-                    // Show complete factored form over ℝ (linear + irreducible quadratic)
+
                     {
-                        // Separate reals from complex conjugate pairs
+
                         std::vector<double> reals;
-                        std::vector<std::pair<double,double>> cplx; // (re, |im|)
+                        std::vector<std::pair<double,double>> cplx; 
                         std::vector<bool> used(numEvals.size(), false);
                         for (std::size_t i = 0; i < numEvals.size(); ++i) {
                             if (used[i]) continue;
@@ -713,7 +684,7 @@ void EigenPage::onSolve() {
                             if (std::abs(im) < 1e-10) {
                                 reals.push_back(numEvals[i].first);
                             } else {
-                                // Find conjugate
+
                                 for (std::size_t j = i + 1; j < numEvals.size(); ++j) {
                                     if (!used[j] && std::abs(numEvals[j].first - numEvals[i].first) < 1e-8
                                         && std::abs(numEvals[j].second + im) < 1e-8) {
@@ -732,8 +703,8 @@ void EigenPage::onSolve() {
                         }
                         for (const auto& cp : cplx) {
                             double r = cp.first, s = cp.second;
-                            double b = -2.0 * r;        // coefficient of λ
-                            double c = r*r + s*s;       // constant term
+                            double b = -2.0 * r;        
+                            double c = r*r + s*s;       
                             QString quad;
                             if (std::abs(b) < 1e-10) {
                                 quad = QStringLiteral("\\lambda^{2} + %1").arg(fmtDouble(c));
@@ -755,7 +726,6 @@ void EigenPage::onSolve() {
                     parts << paraHtml(QStringLiteral(
                         "因此 $A$ 的全部特征值是 %1.").arg(eigStr), th, doc);
 
-                    // Eigenvectors for each real eigenvalue
                     for (const auto& ev : realEvals) {
                         double lam = ev.first;
                         QString lamStr = fmtDouble(lam);
@@ -783,7 +753,7 @@ void EigenPage::onSolve() {
                     }
                 }
             } else {
-                // Complex domain: show all eigenvalues
+
                 {
                     QString factLtx;
                     for (const auto& ev : numEvals) {
@@ -811,7 +781,6 @@ void EigenPage::onSolve() {
                 parts << paraHtml(QStringLiteral(
                     "因此 $A$ 的全部特征值是 %1.").arg(eigStr), th, doc);
 
-                // For complex domain with numerical fallback, show real eigenvectors only
                 for (const auto& ev : numEvals) {
                     if (std::abs(ev.second) > 1e-10) {
                         double lamRe = ev.first, lamIm = ev.second;
@@ -869,7 +838,7 @@ void EigenPage::onSolve() {
                 }
             }
         } else if (!complexDomain) {
-            // Real domain: filter for real eigenvalues only
+
             std::vector<ComplexEigenPair> realPairs;
             for (const auto& ev : pairs) {
                 auto [re, im] = ev.value.toDouble();
@@ -892,7 +861,6 @@ void EigenPage::onSolve() {
                 parts << paraHtml(QStringLiteral(
                     "其实特征值为 %1.").arg(eigStr), th, doc);
 
-                // Show eigenvectors for real eigenvalues
                 for (const auto& ev : realPairs) {
                     double lam = ev.value.toDouble().first;
                     QString lamStr = fmtDouble(lam);
@@ -952,7 +920,7 @@ void EigenPage::onSolve() {
                 }
             }
         } else {
-            // Complex domain: show all eigenvalues
+
             QString eigStr;
             for (std::size_t i = 0; i < pairs.size(); ++i) {
                 if (i > 0) eigStr += QStringLiteral(", ");
@@ -962,7 +930,6 @@ void EigenPage::onSolve() {
                     eigStr += QStringLiteral("（$%1$ 重）").arg(pairs[i].multiplicity);
             }
 
-            // Fully factored form over C
             {
                 QString factLtx;
                 for (const auto& ev : pairs) {
@@ -973,7 +940,7 @@ void EigenPage::onSolve() {
                             else if (re < 0) factLtx += QStringLiteral("(\\lambda + %1)").arg(fmtDouble(-re));
                             else factLtx += QStringLiteral("(\\lambda - %1)").arg(fmtDouble(re));
                         } else if (std::abs(re) < 1e-10) {
-                            // Pure imaginary: λ ± i or λ ± a·i
+
                             if (std::abs(im - 1.0) < 1e-10)
                                 factLtx += QStringLiteral("(\\lambda - i)");
                             else if (std::abs(im + 1.0) < 1e-10)
@@ -993,7 +960,6 @@ void EigenPage::onSolve() {
             parts << paraHtml(QStringLiteral(
                 "因此 $A$ 的全部特征值是 %1.").arg(eigStr), th, doc);
 
-            // Eigenvectors for each eigenvalue
             for (const auto& ev : pairs) {
                 auto [re, im] = ev.value.toDouble();
                 QString lamStr = complexLtx(re, im);
@@ -1076,15 +1042,11 @@ void EigenPage::onSolve() {
         .arg(parts.join(QString())));
 }
 
-// =====================================================================
-//  Demo
-// =====================================================================
-
 void EigenPage::onDemo() {
     spinN_->setValue(2);
     domainCombo_->setCurrentIndex(0);
     onGenerate();
-    // A = [1, 2; -1, 4]
+
     cells_[0]->setText(QStringLiteral("1"));
     cells_[1]->setText(QStringLiteral("2"));
     cells_[2]->setText(QStringLiteral("-1"));
@@ -1092,4 +1054,4 @@ void EigenPage::onDemo() {
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

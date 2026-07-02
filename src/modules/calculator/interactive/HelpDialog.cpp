@@ -18,9 +18,9 @@ namespace AlgeMate::Calculator::Interactive {
 namespace {
 
 struct FuncDoc {
-    QString sig;      // 签名
-    QString desc;     // 说明
-    QString example;  // 示例
+    QString sig;      
+    QString desc;     
+    QString example;  
 };
 
 struct Section {
@@ -315,7 +315,7 @@ QString buildHtml(const RenderTheme& th, QTextDocument* doc) {
             "<table cellspacing=\"0\" cellpadding=\"0\" "
             "style=\"border-collapse:collapse; width:100%; margin-bottom:6px;\">");
         for (const auto& it : sec.items) {
-            // 说明列支持 $...$ 内联 LaTeX; 签名/示例列保持 code 原样.
+
             const QString descHtml = renderNoteWithLatex(it.desc, th, doc, 13);
             html += QStringLiteral(
                 "<tr>"
@@ -385,7 +385,7 @@ void HelpDialog::rebuildContent() {
     p.setColor(QPalette::Base, QColor(th.bgHistory));
     p.setColor(QPalette::Text, QColor(th.text));
     view_->setPalette(p);
-    // 传入 document 以供 LaTeX 片段注册 QPixmap 资源.
+
     view_->setHtml(buildHtml(th, view_->document()));
 }
 

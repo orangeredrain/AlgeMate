@@ -28,16 +28,16 @@ private slots:
     bool eventFilter(QObject* obj, QEvent* ev) override;
 
 private:
-    QSpinBox*     spinN_          = nullptr;  // 维数
-    QSpinBox*     spinM_          = nullptr;  // 向量个数
+    QSpinBox*     spinN_          = nullptr;  
+    QSpinBox*     spinM_          = nullptr;  
     QWidget*      gridContainer_  = nullptr;
     QVBoxLayout*  gridContainerLay_ = nullptr;
     QTextBrowser* resultBrowser_  = nullptr;
     QPushButton*  solveBtn_       = nullptr;
 
-    int curN_ = 0;  // 维数
-    int curM_ = 0;  // 向量个数
-    std::vector<QLineEdit*> cells_;  // column-major: vector j row i → cells_[j * curN_ + i]
+    int curN_ = 0;  
+    int curM_ = 0;  
+    std::vector<QLineEdit*> cells_;  
 };
 
 }

@@ -16,7 +16,6 @@ namespace {
 
 using Cmplx = std::complex<double>;
 
-// Horner 求值
 Cmplx evalPoly(const std::vector<Cmplx>& c, Cmplx x) {
     Cmplx r(0.0, 0.0);
     for (int i = static_cast<int>(c.size()) - 1; i >= 0; --i)
@@ -24,7 +23,6 @@ Cmplx evalPoly(const std::vector<Cmplx>& c, Cmplx x) {
     return r;
 }
 
-// Durand-Kerner 同时求全部复根
 std::vector<Cmplx> durandKerner(const std::vector<Cmplx>& coeffs) {
     int n = static_cast<int>(coeffs.size()) - 1;
     if (n <= 0) return {};
@@ -52,7 +50,6 @@ std::vector<Cmplx> durandKerner(const std::vector<Cmplx>& coeffs) {
     return roots;
 }
 
-// Polynomial<Fraction> → std::complex<double> 系数 (低位优先)
 std::vector<Cmplx> polyToCoeffs(const Poly& p) {
     std::vector<Cmplx> c;
     for (const auto& coeff : p.coeffs())
@@ -60,7 +57,6 @@ std::vector<Cmplx> polyToCoeffs(const Poly& p) {
     return c;
 }
 
-// 对多项式做数值求根, 返回 Complex 列表
 std::vector<Complex> numericalRootsOf(const Poly& f, int mult) {
     if (f.degree() <= 0) return {};
     auto coeffs = polyToCoeffs(f);
@@ -73,7 +69,7 @@ std::vector<Complex> numericalRootsOf(const Poly& f, int mult) {
     return out;
 }
 
-} // anonymous namespace
+} 
 
 Matrix<Complex> toComplex(const Matrix<Fraction>& A) {
     Matrix<Complex> B(A.rows(), A.cols());
@@ -83,24 +79,23 @@ Matrix<Complex> toComplex(const Matrix<Fraction>& A) {
     return B;
 }
 
-// Matrix<Complex> 的精确 RREF: 高斯-约当消元, 主元按列扫描
 std::size_t rrefComplex(Matrix<Complex>& M) {
     const std::size_t m = M.rows();
     const std::size_t n = M.cols();
     std::size_t r = 0;
     for (std::size_t c = 0; c < n && r < m; ++c) {
-        // 在 r..m-1 行中寻找 M(row, c) 非零的行
+
         std::size_t pivotRow = m;
         for (std::size_t i = r; i < m; ++i) {
             if (!M(i, c).isZero()) { pivotRow = i; break; }
         }
         if (pivotRow == m) continue;
         if (pivotRow != r) M.swapRows(r, pivotRow);
-        // 主元归一
+
         Complex pivot = M(r, c);
         Complex invPivot = Complex(Fraction(1)) / pivot;
         M.scaleRow(r, invPivot);
-        // 消去其他行
+
         for (std::size_t i = 0; i < m; ++i) {
             if (i == r) continue;
             if (M(i, c).isZero()) continue;
@@ -123,7 +118,7 @@ Matrix<Complex> nullspaceComplex(const Matrix<Complex>& Min) {
     const std::size_t n = Min.cols();
     Matrix<Complex> R = Min;
     rrefComplex(R);
-    // 找主元列 (每行第一个非零列)
+
     std::vector<int> pivotCol(m, -1);
     std::vector<bool> isPivot(n, false);
     for (std::size_t i = 0; i < m; ++i) {
@@ -135,7 +130,7 @@ Matrix<Complex> nullspaceComplex(const Matrix<Complex>& Min) {
             }
         }
     }
-    // 自由列
+
     std::vector<std::size_t> freeCols;
     for (std::size_t j = 0; j < n; ++j) if (!isPivot[j]) freeCols.push_back(j);
     Matrix<Complex> basis(n, freeCols.size());
@@ -153,7 +148,6 @@ Matrix<Complex> nullspaceComplex(const Matrix<Complex>& Min) {
 
 namespace {
 
-// 剥线性因子 (x - r), 并在 f 中除掉
 void peelLinear(Poly& f, const Fraction& r) {
     Poly lin = { -r, Fraction(1) };
     if (!f.isZero() && (f % lin).isZero()) {
@@ -161,9 +155,8 @@ void peelLinear(Poly& f, const Fraction& r) {
     }
 }
 
-// 二次不可约因子 f = x^2 + bx + c 的两个复根
 std::pair<Complex, Complex> quadraticRoots(const Poly& f) {
-    // f monic, degree 2
+
     Fraction b = f[1];
     Fraction c = f[0];
     Fraction delta = b * b - Fraction(4) * c;
@@ -175,28 +168,28 @@ std::pair<Complex, Complex> quadraticRoots(const Poly& f) {
     return {r1, r2};
 }
 
-} // anonymous
+} 
 
 ComplexEigenResult complexEigenvalues(const Matrix<Fraction>& A) {
     if (!A.isSquare()) throw std::invalid_argument("complexEigenvalues: not square");
     ComplexEigenResult out;
     Poly cp = charpoly(A);
     auto sqf = squarefreeFactorization(cp);
-    // sqf.factors[k] 对应重数 k+1
+
     for (std::size_t k = 0; k < sqf.factors.size(); ++k) {
         Poly f = sqf.factors[k];
         int mult = static_cast<int>(k + 1);
         if (f.degree() <= 0) continue;
-        // 剥全部有理根
+
         auto roots = rationalRoots(f);
         for (const auto& r : roots) {
             peelLinear(f, r);
             out.eigenvalues.push_back({ Complex(r), mult });
         }
-        // 剩余商
+
         if (f.degree() <= 0) continue;
         if (f.degree() == 1) {
-            // 理论上 rationalRoots 应该处理了, 保底
+
             Fraction r = -f[0] / f[1];
             out.eigenvalues.push_back({ Complex(r), mult });
             continue;
@@ -207,7 +200,7 @@ ComplexEigenResult complexEigenvalues(const Matrix<Fraction>& A) {
             out.eigenvalues.push_back({ pr.second, mult });
             continue;
         }
-        // 三次及以上: 数值求解全部复根 (Durand-Kerner)
+
         auto numRoots = numericalRootsOf(f.monic(), mult);
         for (const auto& r : numRoots)
             out.eigenvalues.push_back({ r, mult });
@@ -222,7 +215,6 @@ std::vector<ComplexEigenPair> complexEigenPairs(const Matrix<Fraction>& A) {
     Matrix<Complex> Ac = toComplex(A);
     Matrix<Complex> I  = Matrix<Complex>::identity(n);
 
-    // 合并相同特征值 (相等则累加重数)
     std::vector<ComplexEigenvalue> merged;
     for (const auto& ev : res.eigenvalues) {
         bool found = false;
@@ -244,4 +236,4 @@ std::vector<ComplexEigenPair> complexEigenPairs(const Matrix<Fraction>& A) {
     return out;
 }
 
-} // namespace algemate::math
+} 

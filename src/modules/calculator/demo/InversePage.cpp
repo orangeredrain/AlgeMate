@@ -28,12 +28,10 @@ using AlgeMate::Calculator::Interactive::RenderTheme;
 
 namespace AlgeMate::Calculator::Demo {
 
-// Gauss-Jordan 消元 on augmented [M | I]: 转换为 [I | M⁻¹]
-// 返回逆矩阵（右半部分），并沿路向 trace 推送关键状态。
 static Matrix<Fraction> gaussJordanInverse(const Matrix<Fraction>& A, StepSequence& trace)
 {
     const auto n = A.rows();
-    // Augmented matrix [A | I]
+
     Matrix<Fraction> M(n, 2 * n);
     for (std::size_t i = 0; i < n; ++i) {
         for (std::size_t j = 0; j < n; ++j)
@@ -44,7 +42,7 @@ static Matrix<Fraction> gaussJordanInverse(const Matrix<Fraction>& A, StepSequen
     trace.pushInitial(M);
 
     for (std::size_t c = 0; c < n; ++c) {
-        // ---- smart pivot selection ----
+
         bool hasOne = false;
         for (std::size_t i = c; i < n && !hasOne; ++i)
             if (M(i, c).abs().isOne()) hasOne = true;
@@ -77,7 +75,6 @@ static Matrix<Fraction> gaussJordanInverse(const Matrix<Fraction>& A, StepSequen
 
         if (best != c) M.swapRows(c, best);
 
-        // Scale pivot to 1
         Fraction piv = M(c, c);
         if (!piv.isOne()) {
             Fraction inv = Fraction(1) / piv;
@@ -87,7 +84,6 @@ static Matrix<Fraction> gaussJordanInverse(const Matrix<Fraction>& A, StepSequen
 
         trace.pushSelectPivot(c, c, M);
 
-        // Eliminate all other rows
         for (std::size_t r = 0; r < n; ++r) {
             if (r == c || M(r, c).isZero()) continue;
             Fraction factor = -M(r, c);
@@ -98,7 +94,6 @@ static Matrix<Fraction> gaussJordanInverse(const Matrix<Fraction>& A, StepSequen
 
     trace.pushConclude("Gauss-Jordan complete", M);
 
-    // Extract right half (inverse)
     Matrix<Fraction> inv(n, n);
     for (std::size_t i = 0; i < n; ++i)
         for (std::size_t j = 0; j < n; ++j)
@@ -106,12 +101,11 @@ static Matrix<Fraction> gaussJordanInverse(const Matrix<Fraction>& A, StepSequen
     return inv;
 }
 
-// 只显示增广矩阵的左半和右半，用竖线分隔
 static QString augMatLtx(const Matrix<Fraction>& M, std::size_t n)
 {
     if (M.rows() == 0) return QStringLiteral("()");
     const auto R = M.rows();
-    // 左半: cols 0..n-1, 右半: cols n..2n-1
+
     QString body;
     for (std::size_t i = 0; i < R; ++i) {
         for (std::size_t j = 0; j < n; ++j) {
@@ -125,8 +119,7 @@ static QString augMatLtx(const Matrix<Fraction>& M, std::size_t n)
         }
         if (i + 1 < R) body += QStringLiteral(" \\\\\\\\ ");
     }
-    // Use {*{N}{c}|*{N}{c}} column spec — simplified: just use standard columns
-    // JKQTMathText bug workaround: no single-column issues here since n ≥ 2
+
     QString colSpec;
     for (std::size_t j = 0; j < n; ++j) colSpec += QLatin1Char('c');
     colSpec += QStringLiteral("|");
@@ -142,7 +135,6 @@ InversePage::InversePage(QWidget* parent)
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // ---------- top bar ----------
     auto* topBar = new QWidget;
     topBar->setFixedHeight(48);
     auto* topLay = new QHBoxLayout(topBar);
@@ -164,7 +156,6 @@ InversePage::InversePage(QWidget* parent)
 
     root->addWidget(topBar);
 
-    // ---------- scrollable content ----------
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -174,7 +165,6 @@ InversePage::InversePage(QWidget* parent)
     cLay->setContentsMargins(24, 16, 24, 24);
     cLay->setSpacing(16);
 
-    // -- parameter row --
     auto* paramW = new QWidget;
     auto* pLay = new QHBoxLayout(paramW);
     pLay->setContentsMargins(0, 0, 0, 0);
@@ -199,13 +189,11 @@ InversePage::InversePage(QWidget* parent)
 
     cLay->addWidget(paramW);
 
-    // -- grid container --
     gridContainer_ = new QWidget;
     gridContainerLay_ = new QVBoxLayout(gridContainer_);
     gridContainerLay_->setContentsMargins(0, 0, 0, 0);
     cLay->addWidget(gridContainer_);
 
-    // -- solve button --
     solveBtn_ = new QPushButton(QStringLiteral("开始求解"));
     solveBtn_->setEnabled(false);
     solveBtn_->setCursor(Qt::PointingHandCursor);
@@ -218,7 +206,6 @@ InversePage::InversePage(QWidget* parent)
     connect(solveBtn_, &QPushButton::clicked, this, &InversePage::onSolve);
     cLay->addWidget(solveBtn_);
 
-    // -- demo button --
     auto* demoBtn = new QPushButton(QStringLiteral("演示例题"));
     demoBtn->setCursor(Qt::PointingHandCursor);
     demoBtn->setStyleSheet(QStringLiteral(
@@ -228,7 +215,6 @@ InversePage::InversePage(QWidget* parent)
     connect(demoBtn, &QPushButton::clicked, this, &InversePage::onDemo);
     cLay->addWidget(demoBtn);
 
-    // -- result browser --
     resultBrowser_ = new QTextBrowser;
         attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setOpenLinks(false);
@@ -336,7 +322,6 @@ void InversePage::onSolve()
 {
     if (curN_ == 0) return;
 
-    // ---- 1. Parse input → Matrix<Fraction> A (n × n) ----
     Matrix<Fraction> A(static_cast<std::size_t>(curN_),
                        static_cast<std::size_t>(curN_));
     for (int i = 0; i < curN_; ++i) {
@@ -357,14 +342,12 @@ void InversePage::onSolve()
         }
     }
 
-    // ---- 2. Compute determinant ----
     Fraction detA = det(A);
 
     auto th = RenderTheme::forCurrent();
     auto* doc = resultBrowser_->document();
     doc->clear();
 
-    // ---- 3. Handle singular matrix ----
     if (detA.isZero()) {
         QStringList parts;
         parts << titleHtml(QStringLiteral("求下述矩阵的逆矩阵："), th);
@@ -377,11 +360,9 @@ void InversePage::onSolve()
         return;
     }
 
-    // ---- 4. Gauss-Jordan inversion ----
     StepSequence trace;
     Matrix<Fraction> inv = gaussJordanInverse(A, trace);
 
-    // ---- 5. Build result HTML ----
     QStringList parts;
 
     parts << titleHtml(QStringLiteral("求下述矩阵的逆矩阵："), th);
@@ -394,11 +375,10 @@ void InversePage::onSolve()
         " 作初等行变换，把增广矩阵 $(A,\\,I)$"
         " 化成 $(I,\\,A^{-1})$：").arg(fracLtx(detA)), th, doc);
 
-    // Show augmented matrix chain — one per line like textbook
     const auto& steps = trace.steps();
     {
         std::vector<Matrix<Fraction>> snapshots;
-        snapshots.push_back(steps[0].snapshot);  // Initial [A|I]
+        snapshots.push_back(steps[0].snapshot);  
         for (std::size_t i = 1; i < steps.size(); ++i) {
             if (steps[i].kind == StepKind::SelectPivot)
                 snapshots.push_back(steps[i].snapshot);
@@ -416,7 +396,6 @@ void InversePage::onSolve()
         }
     }
 
-    // Final inverse
     parts << paraHtml(QStringLiteral("因此"), th);
     parts << formulaHtml(QStringLiteral("A^{-1} = ") + matLtx(inv), th, doc);
 
@@ -430,7 +409,6 @@ void InversePage::onDemo()
     spinN_->setValue(3);
     onGenerate();
 
-    // A = [4, 1, 2; 3, 2, 1; 5, -3, 2]
     const std::vector<std::vector<int>> demo = {
         {4, 1, 2},
         {3, 2, 1},
@@ -443,4 +421,4 @@ void InversePage::onDemo()
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

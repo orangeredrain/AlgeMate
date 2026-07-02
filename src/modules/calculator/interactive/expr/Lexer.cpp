@@ -6,7 +6,7 @@ namespace AlgeMate::Calculator::Interactive {
 
 static bool isIdentStart(char c) {
     unsigned char u = static_cast<unsigned char>(c);
-    // UTF-8 多字节字符 (≥ 0x80) 允许作为标识符 (如希腊字母 α/β/λ/σ)
+
     return std::isalpha(u) || c == '_' || u >= 0x80;
 }
 static bool isIdentCont (char c) {
@@ -29,7 +29,6 @@ std::vector<Token> lex(const std::string& src) {
         t.spaceBefore = pendingSpace;
         pendingSpace = false;
 
-        // 数字: 整数或小数 (.5 / 5. / 5.5)
         if (std::isdigit((unsigned char)c) || (c == '.' && i + 1 < N && std::isdigit((unsigned char)src[i + 1]))) {
             int start = i;
             bool sawDot = false;
@@ -44,7 +43,6 @@ std::vector<Token> lex(const std::string& src) {
             continue;
         }
 
-        // 标识符
         if (isIdentStart(c)) {
             int start = i;
             while (i < N && isIdentCont(src[i])) ++i;
@@ -54,7 +52,6 @@ std::vector<Token> lex(const std::string& src) {
             continue;
         }
 
-        // 单字符符号
         switch (c) {
             case '+':  t.kind = Tok::Plus;     break;
             case '-':  t.kind = Tok::Minus;    break;

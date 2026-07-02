@@ -11,7 +11,6 @@
 
 namespace algemate::math {
 
-
 Complex::Complex()
     : re_(Fraction(0)), im_(Fraction(0)) {}
 
@@ -35,7 +34,6 @@ Complex Complex::fromDouble(double re, double im) {
     return Complex(AlgReal::fromDouble(re), AlgReal::fromDouble(im));
 }
 
-
 Complex Complex::operator-() const {
     return Complex(-re_, -im_);
 }
@@ -56,7 +54,7 @@ Complex Complex::operator*(const Complex& r) const {
 
 Complex Complex::operator/(const Complex& r) const {
     if (r.isZero()) throw std::domain_error("Complex: division by zero");
-    AlgReal denom = r.modulusSquared();          // c^2 + d^2
+    AlgReal denom = r.modulusSquared();          
     AlgReal nre   = (re_ * r.re_ + im_ * r.im_) / denom;
     AlgReal nim   = (im_ * r.re_ - re_ * r.im_) / denom;
     return Complex(nre, nim);
@@ -65,7 +63,6 @@ Complex Complex::operator/(const Complex& r) const {
 bool Complex::operator==(const Complex& r) const {
     return re_ == r.re_ && im_ == r.im_;
 }
-
 
 Complex Complex::conjugate() const {
     return Complex(re_, -im_);
@@ -82,7 +79,6 @@ AlgReal Complex::modulus() const {
 std::pair<double, double> Complex::toDouble() const {
     return {re_.toDouble(), im_.toDouble()};
 }
-
 
 Complex Complex::sqrt(const Complex& z) {
     if (!z.isReal()) throw std::domain_error("Complex::sqrt: non-real z unsupported");
@@ -108,13 +104,11 @@ Complex Complex::nthRoot(const Complex& z, int n) {
     return Complex(AlgReal(Fraction(0)), AlgReal::nthRoot(-r, n));
 }
 
-// 解析器: tokenizer + 递归下降
-
 namespace {
 
 enum class TokKind {
-    Number,      // 字面量: 整数/分数/小数, 内容存在 str 中
-    Ident,       // sqrt / cbrt / root / i
+    Number,      
+    Ident,       
     Plus, Minus, Star, Slash,
     LParen, RParen, Comma,
     End
@@ -123,7 +117,7 @@ enum class TokKind {
 struct Token {
     TokKind     kind;
     std::string str;
-    int         col;    // 1-based
+    int         col;    
 };
 
 class Lexer {
@@ -172,7 +166,7 @@ private:
             hasDot = true; ++pos_;
             while (pos_ < s_.size() && std::isdigit(static_cast<unsigned char>(s_[pos_]))) ++pos_;
         } else if (pos_ < s_.size() && s_[pos_] == '/') {
-            // 仅当 '/' 后跟数字才当作分数 (否则回吐)
+
             std::size_t save = pos_;
             ++pos_;
             if (pos_ < s_.size() && std::isdigit(static_cast<unsigned char>(s_[pos_]))) {
@@ -309,7 +303,7 @@ private:
     std::size_t        pos_ = 0;
 };
 
-} // anonymous namespace
+} 
 
 Complex Complex::fromString(const std::string& s) {
     Lexer lex(s);
@@ -318,13 +312,8 @@ Complex Complex::fromString(const std::string& s) {
     return p.parseFull();
 }
 
-// ============================================================
-// toString / toLatex
-// ============================================================
-
 namespace {
 
-// 虚部系数字符串, 有理数不带乘号, 代数实数带 '*'
 std::string coefStr_(const AlgReal& x) {
     if (x.isRational()) return x.asRational().toString();
     return x.toString() + "*";
@@ -335,7 +324,7 @@ std::string coefLatex_(const AlgReal& x) {
     return x.toLatex() + "\\cdot ";
 }
 
-} // anonymous namespace
+} 
 
 std::string Complex::toString() const {
     if (isZero()) return "0";

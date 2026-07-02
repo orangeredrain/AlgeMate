@@ -1,4 +1,4 @@
-// Monomial.h — 多元单项式 (字典序)
+
 #pragma once
 
 #include <cstddef>
@@ -18,13 +18,12 @@ public:
     std::size_t vars() const { return exps_.size(); }
     int operator[](std::size_t i) const { return i < exps_.size() ? exps_[i] : 0; }
 
-    // 字典序
     bool operator<(const Monomial& rhs) const;
-    // 乘法
+
     Monomial operator*(const Monomial& rhs) const;
-    // 比较
+
     bool operator==(const Monomial& rhs) const;
-    bool isOne() const;  // 全零指数
+    bool isOne() const;  
     int totalDegree() const;
 
     std::vector<int> exps_;
@@ -34,7 +33,7 @@ inline bool Monomial::operator<(const Monomial& rhs) const {
     std::size_t n = std::max(exps_.size(), rhs.exps_.size());
     for (std::size_t i = 0; i < n; ++i) {
         int a = (*this)[i], b = rhs[i];
-        if (a != b) return a > b;  // 字典序
+        if (a != b) return a > b;  
     }
     return false;
 }
@@ -65,4 +64,4 @@ inline int Monomial::totalDegree() const {
     return d;
 }
 
-} // namespace algemate::math::mpoly
+} 

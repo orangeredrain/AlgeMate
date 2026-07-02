@@ -25,7 +25,6 @@ class QStandardItemModel;
 
 namespace AlgeMate::Calculator::Interactive {
 
-// 输入框: Enter = 提交, Shift+Enter = 换行
 class InputEditor : public QPlainTextEdit {
     Q_OBJECT
 public:
@@ -74,9 +73,8 @@ public:
 
     void insertAtCursor(const QString& text);
 
-    // 插入 sqrt() 光标自动置于括号中间
     void insertSqrtTemplate();
-    // 插入 root(n, x) 默认选中 n, Tab 跳到 x
+
     void insertRootTemplate();
 
 private slots:
@@ -92,7 +90,6 @@ private:
     Evaluator      eval_;
     int            counter_ = 0;
 
-    // 渲染设置
     RenderTheme    theme_;
     DisplayFormat  format_;
 
@@ -113,7 +110,6 @@ private:
     void applyHistoryPalette();
     void redrawHistory();
 
-    // 保存每个 cell 的源数据, 切主题时整体重绘
     std::vector<std::pair<QString, EvalResult>> cells_;
 };
 

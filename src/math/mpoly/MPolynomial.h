@@ -1,4 +1,4 @@
-// MPolynomial.h — 多元多项式 (字典序, Fraction 系数)
+
 #pragma once
 
 #include "Monomial.h"
@@ -15,19 +15,17 @@ using Fraction = algemate::math::Fraction;
 class MPolynomial {
 public:
     MPolynomial() = default;
-    explicit MPolynomial(const Fraction& c);  // 常数
-    MPolynomial(const Fraction& c, Monomial m);  // 单项式
+    explicit MPolynomial(const Fraction& c);  
+    MPolynomial(const Fraction& c, Monomial m);  
 
     bool isZero() const { return terms_.empty(); }
     std::string toString(const std::vector<std::string>& varNames) const;
 
-    // 运算
     MPolynomial operator+(const MPolynomial& rhs) const;
     MPolynomial operator-(const MPolynomial& rhs) const;
     MPolynomial operator*(const MPolynomial& rhs) const;
     MPolynomial operator*(const Fraction& c) const;
 
-    // 首项
     const Monomial& leadingMonomial() const { return terms_.begin()->first; }
     const Fraction& leadingCoefficient() const { return terms_.begin()->second; }
 
@@ -120,4 +118,4 @@ inline std::string MPolynomial::toString(const std::vector<std::string>& varName
     return out;
 }
 
-} // namespace algemate::math::mpoly
+} 

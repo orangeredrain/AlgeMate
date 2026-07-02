@@ -29,8 +29,6 @@ std::vector<Fraction> leadingPrincipalMinors(const Matrix<Fraction>& A) {
     return out;
 }
 
-// 合同对角化: 成对的行列操作
-// 若 D[k,k] == 0, 先通过交换 / 行列相加使其非零
 CongruenceResult congruenceDiagonalize(const Matrix<Fraction>& A) {
     if (!isSymmetric(A)) {
         throw std::invalid_argument("congruenceDiagonalize: expect symmetric matrix");
@@ -40,9 +38,9 @@ CongruenceResult congruenceDiagonalize(const Matrix<Fraction>& A) {
     Matrix<Fraction> P = Matrix<Fraction>::identity(n);
 
     for (std::size_t k = 0; k < n; ++k) {
-        // 步骤 1: 若 D(k,k) == 0, 寻找主元
+
         if (D(k, k) == Fraction(0)) {
-            // 1a. 寻找 i > k 使 D(i,i) != 0
+
             std::size_t swapIdx = n;
             for (std::size_t i = k + 1; i < n; ++i) {
                 if (!(D(i, i) == Fraction(0))) {
@@ -55,7 +53,7 @@ CongruenceResult congruenceDiagonalize(const Matrix<Fraction>& A) {
                 D.swapCols(k, swapIdx);
                 P.swapCols(k, swapIdx);
             } else {
-                // 1b. 所有对角均为 0, 寻找非零 D(i,j), i >= k, j >= k, i != j
+
                 std::size_t pi = n, pj = n;
                 for (std::size_t i = k; i < n && pi == n; ++i) {
                     for (std::size_t j = k; j < n; ++j) {
@@ -66,11 +64,10 @@ CongruenceResult congruenceDiagonalize(const Matrix<Fraction>& A) {
                     }
                 }
                 if (pi == n) {
-                    // 剩余子块全 0, 对角化已完成 k..n-1 位置
+
                     continue;
                 }
-                // 将列 pj 加到列 pi, 行 pj 加到行 pi: 使 D(pi, pi) != 0
-                // 对称性保证 D(pi,pi) 新值 = 2 * D_old(pi, pj) != 0
+
                 D.addMulCol(pi, pj, Fraction(1));
                 D.addMulRow(pi, pj, Fraction(1));
                 P.addMulCol(pi, pj, Fraction(1));
@@ -82,16 +79,15 @@ CongruenceResult congruenceDiagonalize(const Matrix<Fraction>& A) {
             }
         }
 
-        // 步骤 2: D(k,k) != 0, 消去第 k 行/列的其余非零元
         Fraction pivot = D(k, k);
         for (std::size_t i = k + 1; i < n; ++i) {
             if (D(i, k) == Fraction(0)) continue;
             Fraction c = Fraction(0) - D(i, k) / pivot;
-            // 行 i += c * 行 k
+
             D.addMulRow(i, k, c);
-            // 列 i += c * 列 k (保持对称)
+
             D.addMulCol(i, k, c);
-            // P 列 i += c * P 列 k
+
             P.addMulCol(i, k, c);
         }
     }
@@ -127,14 +123,14 @@ DefiniteClass classifyQuadraticForm(const Matrix<Fraction>& A) {
         return sig.positive == n ? DefiniteClass::PositiveDefinite
                                   : DefiniteClass::PositiveSemidefinite;
     }
-    // sig.positive == 0
+
     return sig.negative == n ? DefiniteClass::NegativeDefinite
                               : DefiniteClass::NegativeSemidefinite;
 }
 
 bool isPositiveDefinite(const Matrix<Fraction>& A) {
     if (!isSymmetric(A)) return false;
-    // Sylvester: 所有顺序主子式 > 0
+
     std::vector<Fraction> ms = leadingPrincipalMinors(A);
     for (const Fraction& m : ms) {
         if (!(m > Fraction(0))) return false;
@@ -150,7 +146,7 @@ bool isPositiveSemidefinite(const Matrix<Fraction>& A) {
 
 bool isNegativeDefinite(const Matrix<Fraction>& A) {
     if (!isSymmetric(A)) return false;
-    // -A 正定 <=> A 负定
+
     Matrix<Fraction> neg = A * Fraction(-1);
     return isPositiveDefinite(neg);
 }

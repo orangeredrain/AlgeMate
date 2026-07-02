@@ -1,7 +1,7 @@
 #include "OrthogonalDiag.h"
-#include "BilinearForm.h"     // isSymmetric
-#include "LinearAlgebra.h"    // charpoly, nullspace
-#include "PolynomialAlg.h"    // rationalRoots, minPolyOfEval
+#include "BilinearForm.h"     
+#include "LinearAlgebra.h"    
+#include "PolynomialAlg.h"    
 
 #include <algorithm>
 #include <chrono>
@@ -21,8 +21,6 @@ namespace algemate::math {
 
 using PolyF = Polynomial<Fraction>;
 
-// ---------- Matrix<AlgReal> 精确线代 ----------
-
 Matrix<AlgReal> toAlgReal(const Matrix<Fraction>& A) {
     Matrix<AlgReal> R(A.rows(), A.cols());
     for (std::size_t i = 0; i < A.rows(); ++i)
@@ -36,7 +34,7 @@ std::size_t rrefAlg(Matrix<AlgReal>& M) {
     const std::size_t m = M.cols();
     std::size_t pivotRow = 0;
     for (std::size_t c = 0; c < m && pivotRow < n; ++c) {
-        // 寻找非零主元
+
         std::size_t pr = pivotRow;
         while (pr < n && M(pr, c).isZero()) ++pr;
         if (pr == n) continue;
@@ -64,8 +62,8 @@ Matrix<AlgReal> nullspaceAlg(const Matrix<AlgReal>& Min) {
     if (m == 0) return Matrix<AlgReal>(n, 0);
     Matrix<AlgReal> R = Min;
     rrefAlg(R);
-    // 主元列定位
-    std::vector<int> pivotColOfRow;  // pivotColOfRow[i] = 行 i 的主元列 (或 -1)
+
+    std::vector<int> pivotColOfRow;  
     pivotColOfRow.reserve(R.rows());
     std::vector<bool> isPivot(m, false);
     for (std::size_t i = 0; i < R.rows(); ++i) {
@@ -76,7 +74,7 @@ Matrix<AlgReal> nullspaceAlg(const Matrix<AlgReal>& Min) {
         pivotColOfRow.push_back(pc);
         if (pc >= 0) isPivot[pc] = true;
     }
-    // 自由列 => 基向量
+
     std::vector<std::size_t> freeCols;
     for (std::size_t j = 0; j < m; ++j) if (!isPivot[j]) freeCols.push_back(j);
     if (freeCols.empty()) return Matrix<AlgReal>(m, 0);
@@ -104,11 +102,9 @@ AlgReal dotProductAlg(const Matrix<AlgReal>& u, const Matrix<AlgReal>& v) {
     return s;
 }
 
-// ---------- 数值降级路径 + 精确路径内部实现 ----------
 namespace {
 constexpr auto kTimeout = std::chrono::seconds(3);
 
-// 精确 Gram-Schmidt (AlgReal), 仅由线程超时包装器调用
 Matrix<AlgReal> gsExactAlg_(const Matrix<AlgReal>& V) {
     if (V.isEmpty()) return V;
     const std::size_t n = V.rows();
@@ -139,7 +135,6 @@ Matrix<AlgReal> gsExactAlg_(const Matrix<AlgReal>& V) {
     return Q;
 }
 
-// double GS (从 AlgReal 矩阵读取 toDouble)
 Matrix<AlgReal> gsNumericAlg_(const Matrix<AlgReal>& V) {
     const std::size_t m = V.rows();
     const std::size_t n = V.cols();
@@ -169,7 +164,6 @@ Matrix<AlgReal> gsNumericAlg_(const Matrix<AlgReal>& V) {
     return Q;
 }
 
-// double GS (从 Fraction 矩阵读取 toDouble)
 Matrix<AlgReal> gsNumeric_(const Matrix<Fraction>& V) {
     const std::size_t m = V.rows();
     const std::size_t n = V.cols();
@@ -243,7 +237,6 @@ QRResult qrNumeric_(const Matrix<Fraction>& A) {
     return {std::move(Q), std::move(R)};
 }
 
-// double QR (从 AlgReal 矩阵读取 toDouble)
 QRResult qrNumericAlg_(const Matrix<AlgReal>& A) {
     const std::size_t m = A.rows();
     const std::size_t n = A.cols();
@@ -284,7 +277,7 @@ QRResult qrNumericAlg_(const Matrix<AlgReal>& A) {
     return {std::move(Q), std::move(R)};
 }
 
-}  // anonymous namespace
+}  
 
 Matrix<AlgReal> gramSchmidtOrthonormal(const Matrix<AlgReal>& V) {
     if (V.isEmpty()) return V;
@@ -322,8 +315,6 @@ Matrix<AlgReal> gramSchmidtOrthonormal(const Matrix<Fraction>& V) {
     }
     return gsNumeric_(V);
 }
-
-// ---------- QR 分解 ----------
 
 QRResult qrDecompose(const Matrix<AlgReal>& A) {
     std::promise<QRResult> prom;
@@ -366,8 +357,6 @@ QRResult qrDecompose(const Matrix<Fraction>& A) {
     return qrNumeric_(A);
 }
 
-// ---------- 特征值求解 (通过 AlgReal::realRootsOf 覆盖任意次数) ----------
-
 std::vector<AlgReal> realSymmetricEigenvalues(const Matrix<Fraction>& A) {
     if (!isSymmetric(A)) {
         throw std::invalid_argument("realSymmetricEigenvalues: expect symmetric matrix");
@@ -376,11 +365,8 @@ std::vector<AlgReal> realSymmetricEigenvalues(const Matrix<Fraction>& A) {
     return AlgReal::realRootsOf(p);
 }
 
-// ---------- 正交对角化主函数 ----------
-
 namespace {
 
-// 扩展欧几里得 on Q[x]: 返回 u*a + v*b = gcd
 void extGcdPoly_(const PolyF& a, const PolyF& b, PolyF& gOut, PolyF& uOut, PolyF& vOut) {
     if (b.isZero()) {
         gOut = a;
@@ -396,7 +382,6 @@ void extGcdPoly_(const PolyF& a, const PolyF& b, PolyF& gOut, PolyF& uOut, PolyF
     vOut = u1 - q * v1;
 }
 
-// a 在 Q[x]/g 中的逆 (gcd(a, g) 必须为常数)
 PolyF invModPoly_(const PolyF& a, const PolyF& g) {
     PolyF a_r = a % g;
     if (a_r.isZero()) throw std::domain_error("invModPoly_: zero element");
@@ -408,8 +393,6 @@ PolyF invModPoly_(const PolyF& a, const PolyF& g) {
     return inv % g;
 }
 
-// 求 λ-特征子空间并在 K = Q[x]/(g) 上正交化, 然后 evaluate + AlgReal 归一
-// 返回 Matrix<AlgReal> (n × k) 已正交归一
 Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& lam) {
     const std::size_t n = A.rows();
     const PolyF& g = lam.minPoly();
@@ -417,7 +400,6 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
     if (dInt <= 0) throw std::runtime_error("eigenspaceBasisAlg_: invalid minPoly");
     const std::size_t d = static_cast<std::size_t>(dInt);
 
-    // Companion matrix C_g (d×d)
     Matrix<Fraction> Cg(d, d);
     for (std::size_t i = 0; i + 1 < d; ++i) Cg(i + 1, i) = Fraction(1);
     Fraction lead = g.coeffs()[d];
@@ -425,7 +407,6 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
         Cg(i, d - 1) = Fraction(0) - g.coeffs()[i] / lead;
     }
 
-    // B = A ⊗ I_d - I_n ⊗ C_g
     const std::size_t nd = n * d;
     Matrix<Fraction> B(nd, nd);
     for (std::size_t i = 0; i < n; ++i) {
@@ -445,7 +426,6 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
 
     Matrix<Fraction> null = nullspace(B);
 
-    // K-独立代表提取 (x · w 在 Q 上等价 Cg-block 作用)
     auto applyXTimes = [&](const std::vector<Fraction>& w) {
         std::vector<Fraction> out(nd, Fraction(0));
         for (std::size_t i = 0; i < n; ++i) {
@@ -484,7 +464,6 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
         }
     }
 
-    // K-表示基向量: basisK[i][j] ∈ K (PolyF, deg < d)
     std::vector<std::vector<PolyF>> basisK;
     basisK.reserve(repWs.size());
     for (const auto& wc : repWs) {
@@ -500,7 +479,6 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
         basisK.push_back(std::move(v));
     }
 
-    // K-GS 正交化 (不归一): v_new = v - Σ (<v,q>_K / <q,q>_K) q
     std::vector<std::vector<PolyF>> qsK;
     for (auto& v : basisK) {
         for (const auto& q : qsK) {
@@ -508,7 +486,7 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
             for (std::size_t j = 0; j < n; ++j) inner = (inner + v[j] * q[j]) % g;
             PolyF den;
             for (std::size_t j = 0; j < n; ++j) den = (den + q[j] * q[j]) % g;
-            if (den.isZero()) continue;  // K 可约时可能遇到, 跳过
+            if (den.isZero()) continue;  
             PolyF dInv = invModPoly_(den, g);
             PolyF factor = (inner * dInv) % g;
             for (std::size_t j = 0; j < n; ++j) v[j] = (v[j] - (factor * q[j]) % g) % g;
@@ -518,29 +496,25 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
         if (nonzero) qsK.push_back(std::move(v));
     }
 
-    // evaluate + AlgReal 归一 (K 内预算 u_r = q[r]^2 * qqK^{-1} mod g,
-    // 每分量只做一次 sqrt, 彻底绕过 AlgReal::operator/ 的 deg-9 squarefreePart 热点)
     Matrix<AlgReal> outM(n, qsK.size());
     for (std::size_t c = 0; c < qsK.size(); ++c) {
         const auto& q = qsK[c];
-        // qqK = Σ q[j]^2 mod g  ∈ K
+
         PolyF qqK;
         for (std::size_t j = 0; j < n; ++j) qqK = (qqK + q[j] * q[j]) % g;
         if (qqK.isZero()) throw std::runtime_error("eigenspaceBasisAlg_: zero norm squared");
-        // K 上的 1/qqK (一次扩展欧几里得, 纯 Q[x] 运算, 微秒级)
+
         PolyF qqK_inv = invModPoly_(qqK, g);
 
         for (std::size_t r = 0; r < n; ++r) {
-            // K 内: u_r = q[r]^2 * qqK_inv mod g  (deg < d),
-            //   u_r(lam) = q[r](lam)^2 / qqK(lam) = (q[r](lam) / norm)^2 ≥ 0
+
             PolyF qr2 = (q[r] * q[r]) % g;
             PolyF u_r = (qr2 * qqK_inv) % g;
 
-            AlgReal mag = AlgReal::evaluatePoly(u_r, lam);   // deg ≤ d
+            AlgReal mag = AlgReal::evaluatePoly(u_r, lam);   
             if (mag.isZero()) { outM(r, c) = AlgReal(Fraction(0)); continue; }
-            AlgReal absVal = AlgReal::sqrt(mag);             // sqrt 输入 deg ≤ d, 快
+            AlgReal absVal = AlgReal::sqrt(mag);             
 
-            // 符号: q[r](lam) 决定 (qqA > 0)
             AlgReal vA = AlgReal::evaluatePoly(q[r], lam);
             int sgn = vA.sign();
             outM(r, c) = (sgn < 0) ? (AlgReal(Fraction(0)) - absVal) : absVal;
@@ -553,7 +527,6 @@ Matrix<AlgReal> eigenspaceBasisAlg_(const Matrix<Fraction>& A, const AlgReal& la
 
 namespace {
 
-// double Jacobi 对称矩阵特征分解
 OrthoDiagResult orthoDiagNumeric_(const Matrix<Fraction>& A) {
     const std::size_t n = A.rows();
     Matrix<double> S(n, n);
@@ -599,7 +572,7 @@ OrthoDiagResult orthoDiagNumeric_(const Matrix<Fraction>& A) {
             }
         }
     }
-    // 特征值按升序排列 (与精确路径一致)
+
     std::vector<std::size_t> order(n);
     for (std::size_t i = 0; i < n; ++i) order[i] = i;
     std::sort(order.begin(), order.end(),
@@ -624,7 +597,7 @@ OrthoDiagResult orthoDiagNumeric_(const Matrix<Fraction>& A) {
     return res;
 }
 
-}  // anonymous namespace
+}  
 
 OrthoDiagResult orthogonalDiagonalize(const Matrix<Fraction>& A) {
     if (!isSymmetric(A)) {
