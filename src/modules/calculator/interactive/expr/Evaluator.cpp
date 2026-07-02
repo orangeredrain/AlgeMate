@@ -39,12 +39,6 @@ using algemate::math::PolynomialZp;
 
 namespace {
 
-// ================ Jordan / 复根数值化辅助 (参考 demo/JordanFormPage) ================
-//
-// 原 “jordan(A)” 走 algemate::math::jordanForm 的精确复数路径，在含重根或复特征
-// 值时会崩溃。现改为：先走 λ-矩阵 → 行列式因子 → 不变因子（均精确），再在 ℂ 上
-// 用 Durand–Kerner 数值求根得到初等因子 / Jordan 块。与 demo 页一致。
-
 using JCmplx = std::complex<double>;
 
 inline std::vector<JCmplx> jPolyToCoeffs(const Polynomial<Fraction>& p) {

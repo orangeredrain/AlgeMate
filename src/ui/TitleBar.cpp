@@ -76,10 +76,13 @@ void TitleBar::buildUi() {
 
     auto* themeLabel = new QLabel(QStringLiteral("主题"));
     themeLabel->setStyleSheet("color:#8A8FA3; font-size:12px;");
+    themeLabel->setVisible(false);
     btnLight_ = makeIconBtn(QStringLiteral("☀"), QStringLiteral("亮色主题"));
     btnDark_  = makeIconBtn(QStringLiteral("☾"), QStringLiteral("暗色主题"));
     btnLight_->setAutoExclusive(true);
     btnDark_->setAutoExclusive(true);
+    btnLight_->setVisible(false);
+    btnDark_->setVisible(false);
 
     root->addWidget(themeLabel);
     root->addWidget(btnLight_);
@@ -88,6 +91,7 @@ void TitleBar::buildUi() {
     auto* sep1 = new QFrame;
     sep1->setFrameShape(QFrame::VLine);
     sep1->setFixedHeight(24);
+    sep1->setVisible(false);
     root->addSpacing(4); root->addWidget(sep1); root->addSpacing(4);
 
     auto* fontLabel = new QLabel(QStringLiteral("字号"));
