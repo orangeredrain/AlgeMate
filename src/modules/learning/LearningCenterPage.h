@@ -5,6 +5,8 @@
 
 class QListWidget;
 class QShowEvent;
+class QLabel;
+class QToolButton;
 
 namespace AlgeMate::Learning {
 
@@ -23,11 +25,15 @@ signals:
 
 private:
     void refreshRecords();
+    QLabel* labelTomatoRecord_ = nullptr;
+    QLabel* m_lblTomatoCount = nullptr;
+    QToolButton* m_btnTomato = nullptr;
+    void updateTomatoRecord();
 
     QListWidget* m_records = nullptr;
     QWidget* m_moduleChart = nullptr;
 };
 
-} // namespace AlgeMate::Learning
+} // namespace AlgeMate::Learning，防止与项目中其他地方也有LearningCenterPage这个类
 
 #endif // ALGEMATE_LEARNING_CENTER_PAGE_H

@@ -249,11 +249,23 @@ VisualizePage::VisualizePage(QWidget* parent) : QWidget(parent) {
         bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
 
         titleLbl->setStyleSheet(isDark ? "color: #E6E7F0; font-size: 18px; font-weight: bold;" : "color: #111827; font-size: 18px; font-weight: bold;");
-
         QString tabQss = isDark ?
-                             "QTabWidget::pane { border-top: 1px solid #3B395A; } QTabBar::tab { background: transparent; color: #7B7B96; padding: 10px 20px; font-weight: bold; font-size: 14px; border-bottom: 2px solid transparent; } QTabBar::tab:selected { color: #8FA1FF; border-bottom: 2px solid #8FA1FF; } QTabBar::tab:hover:!selected { color: #E6E7F0; }"
+                             // 暗色模式：
+                             "QTabWidget { background: transparent; }" // 整个容器背景透明
+                             "QTabWidget::pane { border-top: 1px solid #3B395A; background: transparent; }" // 面板背景透明
+                             "QTabBar { background: transparent; }" // 标签栏背景透明
+                             "QTabBar::tab { background: transparent; color: #7B7B96; padding: 10px 20px; font-weight: bold; font-size: 14px; border-bottom: 2px solid transparent; }"
+                             "QTabBar::tab:selected { color: #8FA1FF; border-bottom: 2px solid #8FA1FF; }"
+                             "QTabBar::tab:hover:!selected { color: #E6E7F0; }"
                                 :
-                             "QTabWidget::pane { border-top: 1px solid #E2E8F0; } QTabBar::tab { background: transparent; color: #64748B; padding: 10px 20px; font-weight: bold; font-size: 14px; border-bottom: 2px solid transparent; } QTabBar::tab:selected { color: #4F46E5; border-bottom: 2px solid #4F46E5; } QTabBar::tab:hover:!selected { color: #1E293B; }";
+                             // 亮色模式：
+                             "QTabWidget { background: transparent; }"
+                             "QTabWidget::pane { border-top: 1px solid #E2E8F0; background: transparent; }"
+                             "QTabBar { background: transparent; }"
+                             "QTabBar::tab { background: transparent; color: #64748B; padding: 10px 20px; font-weight: bold; font-size: 14px; border-bottom: 2px solid transparent; }"
+                             "QTabBar::tab:selected { color: #4F46E5; border-bottom: 2px solid #4F46E5; }"
+                             "QTabBar::tab:hover:!selected { color: #1E293B; }";
+
         tabs->setStyleSheet(tabQss);
 
         QString inputQss = isDark ?
@@ -272,7 +284,27 @@ VisualizePage::VisualizePage(QWidget* parent) : QWidget(parent) {
         if(analyzeBtn_) analyzeBtn_->setStyleSheet(primaryBtn);
         if(presetBtn_) presetBtn_->setStyleSheet(primaryBtn);
 
-        if(infoBrowser_) infoBrowser_->setStyleSheet(isDark ? "QTextBrowser { border:none; border-bottom:1px solid #3B395A; padding:12px; background:transparent; }" : "QTextBrowser { border:none; border-bottom:1px solid #E2E8F0; padding:12px; background:transparent; }");
+        if(infoBrowser_) {
+            infoBrowser_->setStyleSheet(isDark ?
+                                            "QTextBrowser { border:none; border-bottom:1px solid #3B395A; padding:12px; background:transparent; color: #FFFFFF; }"
+                                               :
+                                            "QTextBrowser { border:none; border-bottom:1px solid #E2E8F0; padding:12px; background:transparent; color: #1E293B; }");
+        }
+        if (tabs->currentIndex() == 0) {
+            // 如果用户停留在“方程输入”页面
+            std::vector<double> coeffs(10);
+            for (int i = 0; i < 10; ++i) {
+                if (coeffEdit_[i]) coeffs[i] = coeffEdit_[i]->text().toDouble();
+            }
+            int cls = classifyQuadric(coeffs);
+            int idx = classIdToIndex(cls);
+            if (idx >= 0) updateInfo(idx);
+        } else {
+            // 如果用户停留在“预设选择”页面
+            if (presetCombo_) {
+                updateInfo(presetCombo_->currentIndex());
+            }
+        }
     };
 
     applyTheme();
@@ -283,11 +315,14 @@ VisualizePage::VisualizePage(QWidget* parent) : QWidget(parent) {
 
 QWidget* VisualizePage::createInputTab() {
     auto* page = new QWidget;
+    page->setObjectName("inputTabMainPage");
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-
+    scroll->setStyleSheet("QScrollArea { background: transparent; } "
+                          "QScrollArea > QWidget > QWidget { background: transparent; }");
     auto* content = new QWidget;
+    content->setAttribute(Qt::WA_TranslucentBackground);
     auto* lay = new QVBoxLayout(content);
     lay->setContentsMargins(16, 12, 16, 16);
     lay->setSpacing(10);
@@ -330,11 +365,14 @@ QWidget* VisualizePage::createInputTab() {
 
 QWidget* VisualizePage::createPresetTab() {
     auto* page = new QWidget;
+    page->setObjectName("presetTabMainPage");
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-
+    scroll->setStyleSheet("QScrollArea { background: transparent; } "
+                          "QScrollArea > QWidget > QWidget { background: transparent; }");
     auto* content = new QWidget;
+    content->setAttribute(Qt::WA_TranslucentBackground);
     auto* lay = new QVBoxLayout(content);
     lay->setContentsMargins(16, 12, 16, 16);
     lay->setSpacing(10);
@@ -447,10 +485,7 @@ void VisualizePage::renderPreset(int id, double a, double b, double c, double p)
     setPresetSurface(quadric_, id, a, b, c, p);
 }
 
-// ======================================================================
-// 【新增】辅助函数：使用原生 HTML table 精妙模拟 Typora 风格的 LaTeX 公式渲染
-// ======================================================================
-static QString getTyporaStyleEquation(int id) {
+static QString getTyporaStyleEquation(int id,const QString& color) {
     QStringList tops, bots, ops;
 
     // 变量斜体，数字正体；使用 &minus; 保证负号显示美观
@@ -511,36 +546,36 @@ static QString getTyporaStyleEquation(int id) {
     QString row1 = "<tr>", row2 = "<tr>";
     for (int i = 0; i < tops.size(); ++i) {
         if (bots[i].isEmpty()) {
-            // 没有分母（例如等式右边的 1 ），跨两行垂直居中
             row1 += QString("<td rowspan='2' valign='middle' align='center' style='padding:0 2px;'>%1</td>").arg(tops[i]);
         } else {
-            // 有分母，通过 border-bottom 绘制完美的分数线（继承父级文本颜色 currentColor）
-            row1 += QString("<td align='center' style='border-bottom:1px solid currentColor; padding:0 4px;'>%1</td>").arg(tops[i]);
+            row1 += QString("<td align='center' style='border-bottom:1px solid %1; padding:0 4px;'>%2</td>").arg(color, tops[i]);
+
             row2 += QString("<td align='center' style='padding:0 4px;'>%1</td>").arg(bots[i]);
         }
 
-        // 渲染操作符 (+, -, =)
         if (i < ops.size()) {
             row1 += QString("<td rowspan='2' valign='middle' align='center' style='padding:0 6px;'>%1</td>").arg(ops[i]);
         }
     }
     row1 += "</tr>"; row2 += "</tr>";
 
-    // 组合成完整表格代码，使用经典的数学罗马字体渲染
     return QString("<table border='0' cellpadding='0' cellspacing='0' "
-                   "style='font-family:\"Cambria Math\", \"Times New Roman\", serif; font-size:16px; font-weight:bold; margin:0;'>%1%2</table>")
-        .arg(row1, row2);
+                   "style='font-family:\"Cambria Math\", \"Times New Roman\", serif; font-size:16px; font-weight:bold; margin:0; color:%1;'>%2%3</table>")
+        .arg(color, row1, row2);
 }
 
 void VisualizePage::updateInfo(int cls) {
-    auto th = RenderTheme::forCurrent();
+    bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
+    // 暗色模式下使用亮白色 #FFFFFF，亮色模式下使用深色 #1E293B
+    QString textColor = isDark ? QStringLiteral("#FFFFFF") : QStringLiteral("#1E293B");
+
     auto* doc = infoBrowser_->document();
     doc->clear();
 
-    // 1. 生成 Typora 风格渲染公式 HTML
-    QString eqHtml = getTyporaStyleEquation(kClasses[cls].id);
+    // 1. 生成 Typora 风格渲染公式 HTML（传入刚刚决定的 textColor）
+    QString eqHtml = getTyporaStyleEquation(kClasses[cls].id, textColor);
 
-    // 2. 利用嵌套 table 来保证“标准方程：”与后面“二维垂直分数表格”能够严格同一行并水平对齐
+    // 2. 将 html 中的 th.text 占位符也替换为绝对的 textColor
     QString html = QStringLiteral(
                        "<div style='padding:2px;'>"
                        // 第一行：标题与分类
@@ -551,17 +586,17 @@ void VisualizePage::updateInfo(int cls) {
 
                        // 第二行：带垂直对齐的公式区
                        "<table border='0' cellpadding='0' cellspacing='0' style='margin-bottom:8px;'><tr>"
-                       "<td valign='middle'><span style='font-size:13px; color:#64748B;'>标准方程：</span></td>"
+                       "<td valign='middle'><span style='font-size:13px; color:#A0AEC0;'>标准方程：</span></td>" // 暗色下这里也可以调亮一点
                        "<td valign='middle' style='color:%1;'>%4</td>"
                        "</tr></table>"
 
                        // 第三行：特征属性
                        "<div>"
-                       "<span style='font-size:13px; color:#64748B;'>惯性指数 (p,q,r) = (%5, %6, %7)</span>&nbsp;&nbsp;&nbsp;&nbsp;"
+                       "<span style='font-size:13px; color:#A0AEC0;'>惯性指数 (p,q,r) = (%5, %6, %7)</span>&nbsp;&nbsp;&nbsp;&nbsp;"
                        "<span style='font-size:13px; color:#8A8FA3;'>%8</span>"
                        "</div>"
                        "</div>"
-                       ).arg(th.text,
+                       ).arg(textColor, // 替换这里
                             QString::fromUtf8(kClasses[cls].name),
                             QString::fromUtf8(kClasses[cls].cat),
                             eqHtml)

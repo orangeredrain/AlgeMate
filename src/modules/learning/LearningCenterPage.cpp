@@ -1,5 +1,7 @@
 #include "LearningCenterPage.h"
 #include "core/ThemeManager.h"
+#include "ui/TomatoManager.h"
+#include "ui/TomatoClockDialog.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -47,7 +49,8 @@ static QVector<ModuleStat> moduleDefinitions()
         {QStringLiteral("practice"), QStringLiteral("练习模式"), QColor(QStringLiteral("#F28E63")), 0},
         {QStringLiteral("exam"), QStringLiteral("考试模式"), QColor(QStringLiteral("#E8618C")), 0},
         {QStringLiteral("wrongbook"), QStringLiteral("错题本"), QColor(QStringLiteral("#4CB3A4")), 0},
-        {QStringLiteral("management"), QStringLiteral("学习管理"), QColor(QStringLiteral("#9B72E6")), 0}
+        {QStringLiteral("management"), QStringLiteral("学习管理"), QColor(QStringLiteral("#9B72E6")), 0},
+        {QStringLiteral("other"), QStringLiteral("其他"), QColor(QStringLiteral("#FFD700")), 0}
     };
 }
 
@@ -59,6 +62,7 @@ static QString dateKey(const QDate& date)
 static int studySecondsForDate(const QDate& date)
 {
     QSettings settings;
+    // QSettings专门用来保存和读取应用的配置信息
     settings.beginGroup(QStringLiteral("learning/studySecondsByDate"));
     const int seconds = settings.value(dateKey(date), 0).toInt();
     settings.endGroup();
@@ -93,6 +97,7 @@ static QVector<ModuleStat> moduleStatsForDate(const QDate& date)
     int knownSeconds = 0;
     for (ModuleStat& stat : stats) {
         stat.seconds = settings.value(stat.key, 0).toInt();
+        //settings里有键值对，值是时间，键（mac有些许不同，但也能这么查）
         knownSeconds += stat.seconds;
     }
 
@@ -101,7 +106,7 @@ static QVector<ModuleStat> moduleStatsForDate(const QDate& date)
 
     const int totalSeconds = studySecondsForDate(date);
     if (totalSeconds > knownSeconds && !stats.isEmpty()) {
-        stats[0].seconds += totalSeconds - knownSeconds;
+        stats[6].seconds += totalSeconds - knownSeconds;
     }
     return stats;
 }
@@ -144,7 +149,7 @@ static QVector<ModuleStat> moduleStatsForDateRange(const QDate& startDate, const
         settings.endGroup();
 
         if (totalDaySeconds > knownDaySeconds && !stats.isEmpty()) {
-            stats[0].seconds += totalDaySeconds - knownDaySeconds;
+            stats[6].seconds += totalDaySeconds - knownDaySeconds;
         }
     }
     return stats;
@@ -1219,7 +1224,17 @@ LearningCenterPage::LearningCenterPage(QWidget* parent) : QWidget(parent)
     t->setObjectName(QStringLiteral("PageTitle"));
     top->addWidget(back);
     top->addWidget(t);
+
     top->addStretch();
+
+    m_lblTomatoCount = new QLabel(this);
+    m_lblTomatoCount->setObjectName(QStringLiteral("LearningTomatoCount"));
+    m_lblTomatoCount->setAlignment(Qt::AlignCenter);
+
+    auto& tomatoMgr = AlgeMate::TomatoManager::instance();
+    m_lblTomatoCount->setText(QStringLiteral("🍅 今日已专注: %1 次").arg(tomatoMgr.completedTomatoes()));
+
+    top->addWidget(m_lblTomatoCount);
 
     auto* trendPanel = makeTrendPanel(this);
 

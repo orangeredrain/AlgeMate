@@ -6,7 +6,6 @@
 #include "latex/LatexRenderer.h"
 #include "latex/LatexTextBrowser.h"
 
-// 主题管理器: 用于在暗色 / 亮色模式间切换页面内嵌样式表.
 #include "core/ThemeManager.h"
 
 #include <QVBoxLayout>
@@ -59,22 +58,37 @@ namespace AlgeMate::Learning {
 static QPushButton* makeBackBtn(QWidget* parent = nullptr) {
     auto* btn = new QPushButton(QStringLiteral("← 返回"), parent);
     btn->setObjectName(QStringLiteral("LearnBackBtn"));
-    btn->setStyleSheet(
-        "QPushButton#LearnBackBtn {"
-        "    background-color: transparent;"
-        "    border: 1px solid #dcdfe6;"
-        "    color: #606266;"
-        "    padding: 6px 12px;"
-        "    border-radius: 4px;"
-        "    font-size: 13px;"
-        "}"
-        "QPushButton#LearnBackBtn:hover {"
-        "    background-color: #f5f7fa;"
-        "    color: #409eff;"
-        "    border-color: #c6e2ff;"
-        "}"
-        );
     return btn;
+}
+
+static QString getBackBtnStyle(bool dark) {
+    if (dark) {
+        return "QPushButton#LearnBackBtn, QPushButton { "
+               "    background: transparent; "
+               "    border: 1px solid #3A3754; "
+               "    color: #C9CCE6; "
+               "    padding: 6px 12px; "
+               "    border-radius: 4px; "
+               "    font-size: 13px; "
+               "} "
+               "QPushButton#LearnBackBtn:hover, QPushButton:hover { "
+               "    background: #312F4A; "
+               "    color: #B8ACFF; "
+               "}";
+    } else {
+        return "QPushButton#LearnBackBtn, QPushButton { "
+               "    background: transparent; "
+               "    border: 1px solid #dcdfe6; "
+               "    color: #606266; "
+               "    padding: 6px 12px; "
+               "    border-radius: 4px; "
+               "    font-size: 13px; "
+               "} "
+               "QPushButton#LearnBackBtn:hover, QPushButton:hover { "
+               "    background: #f5f7fa; "
+               "    color: #409eff; "
+               "}";
+    }
 }
 
 static ClickableCard* makeCardItem(const QString& icon, const QString& title,
@@ -139,34 +153,20 @@ PracticePage::PracticePage(QWidget* parent) : QWidget(parent)
     root->addLayout(top);
     root->addLayout(grid);
     root->addStretch();
+    // PracticePage::PracticePage 构造函数内部末尾处
+    auto updateTheme = [this, back]() {
+        const bool dark = AlgeMate::ThemeManager::instance().currentTheme()
+        == AlgeMate::ThemeManager::Theme::Dark;
+        back->setStyleSheet(getBackBtnStyle(dark));
+    };
+    updateTheme();
+
+    connect(&AlgeMate::ThemeManager::instance(),
+            &AlgeMate::ThemeManager::themeChanged,
+            this, [updateTheme](AlgeMate::ThemeManager::Theme){ updateTheme(); });
+
 }
 
-// // ==================== CalculationProblemPage ====================
-
-// CalculationProblemPage::CalculationProblemPage(QWidget* parent) : QWidget(parent)
-// {
-//     auto* lay = new QVBoxLayout(this);
-//     lay->setContentsMargins(24, 16, 24, 24);
-//     lay->setSpacing(14);
-
-//     auto* top = new QHBoxLayout;
-//     auto* back = makeBackBtn(this);
-//     connect(back, &QPushButton::clicked, this, &CalculationProblemPage::backRequested);
-//     auto* t = new QLabel(QStringLiteral("计算题练习"));
-//     t->setObjectName(QStringLiteral("PageTitle"));
-//     top->addWidget(back);
-//     top->addWidget(t);
-//     top->addStretch();
-
-//     auto* ph = new QLabel(QStringLiteral("（计算题功能开发中...）"));
-//     ph->setAlignment(Qt::AlignCenter);
-//     ph->setObjectName(QStringLiteral("PlaceholderLabel"));
-
-//     lay->addLayout(top);
-//     lay->addWidget(ph, 1);
-// }
-
-// ==================== CalculationProblemPage ====================
 CalculationProblemPage::CalculationProblemPage(QWidget* parent)
     : QWidget(parent), totalAttempted(0), totalCorrect(0)
 {
@@ -208,6 +208,15 @@ void CalculationProblemPage::buildCatalog() {
     top->addWidget(title);
     top->addStretch();
     lay->addLayout(top);
+    auto updateCatalogTheme = [back]() {
+        const bool dark = AlgeMate::ThemeManager::instance().currentTheme()
+        == AlgeMate::ThemeManager::Theme::Dark;
+        back->setStyleSheet(getBackBtnStyle(dark));
+    };
+    updateCatalogTheme();
+    connect(&AlgeMate::ThemeManager::instance(),
+            &AlgeMate::ThemeManager::themeChanged,
+            m_catalogWidget, [updateCatalogTheme](AlgeMate::ThemeManager::Theme){ updateCatalogTheme(); });
 
     auto* scrollArea = new QScrollArea;
     scrollArea->setWidgetResizable(true);
@@ -220,7 +229,6 @@ void CalculationProblemPage::buildCatalog() {
     gridLay->setSpacing(16);
     gridLay->setContentsMargins(0, 0, 0, 0);
 
-    // 【修改点】：直接使用 Unicode 数学字符，不再依赖 LaTeX 图片渲染
     struct TaskType { QString icon; QString title; QString desc; };
     QVector<TaskType> tasks = {
         {"rank(A)", "矩阵的秩", "求矩阵的秩"},
@@ -248,7 +256,6 @@ void CalculationProblemPage::addCard(QGridLayout* grid, int row, int col, const 
     lay->setContentsMargins(20, 20, 20, 20);
     lay->setSpacing(8);
 
-    // 直接使用 QLabel 渲染 Unicode 文本图标，指定 Serif 字体使其看起来像数学公式
     auto* iconLbl = new QLabel(icon);
     iconLbl->setStyleSheet("font-size: 24px; font-weight: bold; color: #6d5bd0; font-family: 'Cambria Math', 'Times New Roman', serif;");
 
@@ -2175,32 +2182,7 @@ bool ChapterPracticePage::eventFilter(QObject* watched, QEvent* event)
     return QWidget::eventFilter(watched, event);
 }
 
-// // ==================== TopicPracticePage ====================
 
-// TopicPracticePage::TopicPracticePage(QWidget* parent) : QWidget(parent)
-// {
-//     auto* lay = new QVBoxLayout(this);
-//     lay->setContentsMargins(24, 16, 24, 24);
-//     lay->setSpacing(14);
-
-//     auto* top = new QHBoxLayout;
-//     auto* back = makeBackBtn(this);
-//     connect(back, &QPushButton::clicked, this, &TopicPracticePage::backRequested);
-//     auto* t = new QLabel(QStringLiteral("专题练习"));
-//     t->setObjectName(QStringLiteral("PageTitle"));
-//     top->addWidget(back);
-//     top->addWidget(t);
-//     top->addStretch();
-
-//     auto* ph = new QLabel(QStringLiteral("（专题练习功能开发中...）"));
-//     ph->setAlignment(Qt::AlignCenter);
-//     ph->setObjectName(QStringLiteral("PlaceholderLabel"));
-
-//     lay->addLayout(top);
-//     lay->addWidget(ph, 1);
-// }
-
-// ==================== 自动化错题入库 ====================
 void ChapterPracticePage::saveToWrongBook(const Question& q)
 {
     const QString fileName = QStringLiteral("wrong_questions.json");
