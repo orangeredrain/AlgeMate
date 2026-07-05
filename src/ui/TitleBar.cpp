@@ -78,22 +78,39 @@ void TitleBar::buildUi() {
     // 主题切换部分
     auto* themeLabel = new QLabel(QStringLiteral("主题"));
     themeLabel->setStyleSheet("color:#8A8FA3; font-size:12px;");
-    themeLabel->setVisible(false);
+    themeLabel->setVisible(true);
     btnLight_ = makeIconBtn(QStringLiteral("☀"), QStringLiteral("亮色主题"));
     btnDark_  = makeIconBtn(QStringLiteral("☾"), QStringLiteral("暗色主题"));
     btnLight_->setAutoExclusive(true);
     btnDark_->setAutoExclusive(true);
-    btnLight_->setVisible(false);
-    btnDark_->setVisible(false);
+    btnLight_->setVisible(true);
+    btnDark_->setVisible(true);
 
     root->addWidget(themeLabel);
     root->addWidget(btnLight_);
     root->addWidget(btnDark_);
 
+    // 字号调节部分
+    auto* fontLabel = new QLabel(QStringLiteral("字号"));
+    fontLabel->setStyleSheet("color:#8A8FA3; font-size:12px;");
+    btnIncreaseFont_ = new QPushButton(QStringLiteral("A+"));
+    btnIncreaseFont_->setProperty("iconBtn", true);
+    btnIncreaseFont_->setCursor(Qt::PointingHandCursor);
+    btnIncreaseFont_->setToolTip(QStringLiteral("放大字号"));
+    btnDecreaseFont_ = new QPushButton(QStringLiteral("A-"));
+    btnDecreaseFont_->setProperty("iconBtn", true);
+    btnDecreaseFont_->setCursor(Qt::PointingHandCursor);
+    btnDecreaseFont_->setToolTip(QStringLiteral("缩小字号"));
+
+    root->addSpacing(8);
+    root->addWidget(fontLabel);
+    root->addWidget(btnIncreaseFont_);
+    root->addWidget(btnDecreaseFont_);
+
     auto* sep1 = new QFrame;
     sep1->setFrameShape(QFrame::VLine);
     sep1->setFixedHeight(24);
-    sep1->setVisible(false);
+    sep1->setVisible(true);
     root->addSpacing(4); root->addWidget(sep1); root->addSpacing(4);
 
     btnTomato_ = new QToolButton;
@@ -136,6 +153,8 @@ void TitleBar::buildUi() {
 
     connect(btnLight_, &QPushButton::clicked, this, &TitleBar::onLightClicked);
     connect(btnDark_,  &QPushButton::clicked, this, &TitleBar::onDarkClicked);
+    connect(btnIncreaseFont_, &QPushButton::clicked, this, &TitleBar::onIncreaseFontClicked);
+    connect(btnDecreaseFont_, &QPushButton::clicked, this, &TitleBar::onDecreaseFontClicked);
     connect(btnUser_, &QToolButton::clicked, this, &TitleBar::onUserClicked);
     connect(btnTomato_, &QToolButton::clicked, this, &TitleBar::onTomatoClicked);
 
@@ -199,6 +218,9 @@ void TitleBar::onTomatoClicked() {
 
 void TitleBar::onLightClicked() { ThemeManager::instance().applyTheme(ThemeManager::Theme::Light); }
 void TitleBar::onDarkClicked()  { ThemeManager::instance().applyTheme(ThemeManager::Theme::Dark); }
+
+void TitleBar::onIncreaseFontClicked() { ThemeManager::instance().increaseFont(); }
+void TitleBar::onDecreaseFontClicked() { ThemeManager::instance().decreaseFont(); }
 
 void TitleBar::syncThemeButtons() {
     const bool dark = ThemeManager::instance().currentTheme() == ThemeManager::Theme::Dark;

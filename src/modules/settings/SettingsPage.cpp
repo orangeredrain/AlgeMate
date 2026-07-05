@@ -62,7 +62,7 @@ void SettingsPage::setupUI() {
     contentLayout->setSpacing(16);
 
     // 3. 添加各个设置模块卡片
-    // contentLayout->addWidget(createThemeCard());
+    contentLayout->addWidget(createThemeCard());
     contentLayout->addWidget(createAccountCard());
     contentLayout->addWidget(createApiCard());
     contentLayout->addWidget(createShortcutCard());

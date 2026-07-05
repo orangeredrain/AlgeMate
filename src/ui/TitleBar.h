@@ -21,6 +21,8 @@ private slots:
     void onDarkClicked();
     void onUserClicked();
     void onTomatoClicked();
+    void onIncreaseFontClicked();
+    void onDecreaseFontClicked();
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
@@ -34,6 +36,8 @@ private:
 private:
     QPushButton* btnLight_ = nullptr;
     QPushButton* btnDark_ = nullptr;
+    QPushButton* btnIncreaseFont_ = nullptr;
+    QPushButton* btnDecreaseFont_ = nullptr;
     QToolButton* btnUser_ = nullptr;
     QToolButton* btnTomato_ = nullptr;
 
