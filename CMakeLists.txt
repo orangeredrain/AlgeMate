@@ -100,6 +100,10 @@ qt_add_executable(AlgeMate
     WIN32 MACOSX_BUNDLE
     ${MACOS_APP_ICON}
     ${ALGEMATE_SOURCES}
+    src/ui/TomatoManager.cpp
+    src/ui/TomatoManager.h
+    src/ui/TomatoClockDialog.h
+    src/ui/TomatoClockDialog.cpp
 )
 
 target_include_directories(AlgeMate PRIVATE ${ALGEMATE_SRC_DIR})

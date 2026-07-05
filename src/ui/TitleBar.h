@@ -6,6 +6,7 @@
 class QPushButton;
 class QLabel;
 class QAbstractButton;
+class QToolButton;
 
 namespace AlgeMate {
 
@@ -14,28 +15,32 @@ class TitleBar : public QWidget {
 public:
     explicit TitleBar(QWidget* parent = nullptr);
 
+    // 1. 确保 private slots 里声明了点击的槽函数
 private slots:
     void onLightClicked();
     void onDarkClicked();
     void onUserClicked();
-    void refreshUser();
+    void onTomatoClicked();
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* e) override;
 
 private:
     void buildUi();
     void syncThemeButtons();
+    void refreshUser();
 
+    // 2. 在 private 变量区域声明按钮指针
+private:
     QPushButton* btnLight_ = nullptr;
-    QPushButton* btnDark_  = nullptr;
-    QPushButton* btnFontDec_ = nullptr;
-    QPushButton* btnFontNorm_= nullptr;
-    QPushButton* btnFontInc_ = nullptr;
-    QAbstractButton* btnUser_ = nullptr;
-    QLabel*      avatarLabel_ = nullptr;
-    QLabel*      nameLabel_   = nullptr;
-protected:
-    bool eventFilter(QObject* obj, QEvent* e) override;
+    QPushButton* btnDark_ = nullptr;
+    QToolButton* btnUser_ = nullptr;
+    QToolButton* btnTomato_ = nullptr;
+
+    QLabel* avatarLabel_ = nullptr;
+    QLabel* nameLabel_ = nullptr;
 };
 
-}
+} // namespace AlgeMate
 
 #endif

@@ -393,7 +393,11 @@ void ExamProgressPage::loadQuestion(int index) {
     updateUIForQuestion(q);
 }
 
-void ExamProgressPage::updateNavButtons() {
+void ExamProgressPage::updateNavButtons()
+{
+    const bool dark =
+        AlgeMate::ThemeManager::instance().currentTheme()
+        == AlgeMate::ThemeManager::Theme::Dark;
 
     for (int i = 0; i < navButtons.size(); ++i) {
 
@@ -401,43 +405,83 @@ void ExamProgressPage::updateNavButtons() {
 
         if (i == currentQuestionIndex) {
 
-            style = R"(
-            QPushButton {
-                background: #2563eb;
-                color: white;
-                border-radius: 18px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-        )";
+            style = dark ? R"(
+                QPushButton{
+                    background:#6B7CFF;
+                    color:white;
+                    border:1px solid #7E8DFF;
+                    border-radius:18px;
+                    font-size:16px;
+                    font-weight:bold;
+                }
+            )"
+                         :
+                        R"(
+                QPushButton{
+                    background:#2563eb;
+                    color:white;
+                    border-radius:18px;
+                    font-size:16px;
+                    font-weight:bold;
+                }
+            )";
 
-        } else if (!questions[i].userAnswer.isEmpty()) {
+        }
+        else if (!questions[i].userAnswer.isEmpty()) {
 
-            style = R"(
-            QPushButton {
-                background: #10b981;
-                color: white;
-                border-radius: 18px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-        )";
+            style = dark ? R"(
+                QPushButton{
+                    background:#22C55E;
+                    color:white;
+                    border:1px solid #34D399;
+                    border-radius:18px;
+                    font-size:16px;
+                    font-weight:bold;
+                }
+            )"
+                         :
+                        R"(
+                QPushButton{
+                    background:#10b981;
+                    color:white;
+                    border-radius:18px;
+                    font-size:16px;
+                    font-weight:bold;
+                }
+            )";
 
-        } else {
+        }
+        else {
 
-            style = R"(
-            QPushButton {
-                background: #f3f4f6;
-                color: #374151;
-                border-radius: 18px;
-                font-size: 16px;
-                font-weight: bold;
-            }
+            style = dark ? R"(
+                QPushButton{
+                    background:#2C2A45;
+                    color:#E6E7F0;
+                    border:1px solid #3A3754;
+                    border-radius:18px;
+                    font-size:16px;
+                    font-weight:bold;
+                }
 
-            QPushButton:hover {
-                background: #dbeafe;
-            }
-        )";
+                QPushButton:hover{
+                    background:#373454;
+                    border:1px solid #6B7CFF;
+                }
+            )"
+                         :
+                        R"(
+                QPushButton{
+                    background:#f3f4f6;
+                    color:#374151;
+                    border-radius:18px;
+                    font-size:16px;
+                    font-weight:bold;
+                }
+
+                QPushButton:hover{
+                    background:#dbeafe;
+                }
+            )";
         }
 
         navButtons[i]->setStyleSheet(style);
