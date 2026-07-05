@@ -13,12 +13,10 @@ namespace algemate::math {
 
 namespace {
 
-// 10^e
 BigInt pow10_(unsigned int e) {
     return BigInt::pow(BigInt(10), e);
 }
 
-// 是否全为数字
 bool allDigits_(const std::string& x) {
     for (char c : x) {
         if (c < '0' || c > '9') return false;
@@ -26,7 +24,6 @@ bool allDigits_(const std::string& x) {
     return true;
 }
 
-// 去除首尾空格
 std::string trim_(const std::string& s) {
     size_t lo = s.find_first_not_of(" \t\n\r");
     size_t hi = s.find_last_not_of(" \t\n\r");

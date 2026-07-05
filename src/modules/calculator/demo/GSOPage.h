@@ -37,7 +37,7 @@ private:
 
     int curN_ = 0;
     int curM_ = 0;
-    std::vector<QLineEdit*> cells_;  // column-major: cells_[j * curN_ + i]
+    std::vector<QLineEdit*> cells_;  
 };
 
 }

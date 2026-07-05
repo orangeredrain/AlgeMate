@@ -31,9 +31,6 @@ using AlgeMate::Calculator::Interactive::RenderTheme;
 
 namespace AlgeMate::Calculator::Demo {
 
-// ---- helpers ----
-
-// λI - A determinant (vmatrix)
 static QString detLtx(const Matrix<Fraction>& A) {
     const auto n = A.rows();
     QString body;
@@ -58,7 +55,6 @@ static QString detLtx(const Matrix<Fraction>& A) {
     return QStringLiteral("\\begin{vmatrix}%1\\end{vmatrix}").arg(body);
 }
 
-// Numerical nullspace: Gaussian elimination on double matrix with relative threshold
 static std::vector<std::vector<double>> numNullspace(const Matrix<Fraction>& A, double lambda) {
     auto n = A.rows();
     std::vector<std::vector<double>> M(n, std::vector<double>(n));
@@ -106,7 +102,6 @@ static std::vector<std::vector<double>> numNullspace(const Matrix<Fraction>& A, 
     return result;
 }
 
-// Format a column vector as decimal LaTeX (no normalization, ghost column)
 static QString decColLtx(const Matrix<Fraction>& v) {
     QString body;
     for (std::size_t i = 0; i < v.rows(); ++i) {
@@ -121,7 +116,6 @@ static QString decColLtx(const Matrix<Fraction>& v) {
     return QStringLiteral("\\left(\\begin{array}{cr}%1\\end{array}\\right)").arg(body);
 }
 
-// Format a column vector as decimal LaTeX (normalized by √ns, ghost column)
 static QString decVecLtx(const Matrix<Fraction>& v, const Fraction& ns) {
     QString body;
     for (std::size_t i = 0; i < v.rows(); ++i) {
@@ -136,7 +130,6 @@ static QString decVecLtx(const Matrix<Fraction>& v, const Fraction& ns) {
     return QStringLiteral("\\left(\\begin{array}{cr}%1\\end{array}\\right)").arg(body);
 }
 
-// Gram-Schmidt on a set of column vectors (in-place, returns orthogonalized)
 static std::vector<Matrix<Fraction>> gramSchmidt(std::vector<Matrix<Fraction>> vecs) {
     std::vector<Matrix<Fraction>> result;
     for (auto& v : vecs) {
@@ -150,10 +143,6 @@ static std::vector<Matrix<Fraction>> gramSchmidt(std::vector<Matrix<Fraction>> v
     }
     return result;
 }
-
-// =====================================================================
-//  Constructor
-// =====================================================================
 
 SymDiagPage::SymDiagPage(QWidget* parent) : QWidget(parent) {
     auto* root = new QVBoxLayout(this);
@@ -300,7 +289,6 @@ void SymDiagPage::onSolve() {
     try {
     if (curN_ == 0) return;
 
-    // ---- 1. Parse ----
     Matrix<Fraction> A(static_cast<std::size_t>(curN_), static_cast<std::size_t>(curN_));
     for (int i = 0; i < curN_; ++i)
         for (int j = 0; j < curN_; ++j) {
@@ -310,7 +298,6 @@ void SymDiagPage::onSolve() {
             }
         }
 
-    // ---- 2. Symmetry check ----
     bool sym = true;
     for (std::size_t i = 0; i < A.rows() && sym; ++i)
         for (std::size_t j = i + 1; j < A.cols() && sym; ++j)
@@ -333,7 +320,6 @@ void SymDiagPage::onSolve() {
     parts << formulaHtml(QStringLiteral("A = ") + matLtx(A), th, doc);
     parts << sectionHtml(QStringLiteral("解"), th);
 
-    // ---- 3. Characteristic polynomial ----
     Polynomial<Fraction> cp = charpoly(A);
     auto rf = factorOverQ(cp);
 
@@ -355,7 +341,6 @@ void SymDiagPage::onSolve() {
     parts << formulaHtml(QStringLiteral("|\\lambda I - A| = %1 = %2 = %3.")
         .arg(detLtx(A), polyLtx(cp), factoredLtx), th, doc, 15);
 
-    // ---- 4. Eigenvalues ----
     std::vector<std::pair<Fraction, int>> eigenvals;
     bool allLinear = true;
     for (const auto& f : rf.factors) {
@@ -365,10 +350,9 @@ void SymDiagPage::onSolve() {
         } else allLinear = false;
     }
 
-    // ---- 4b. If Q-irreducible factors exist, use numerical eigenvalues ----
-    std::vector<std::pair<double, int>> numEvals; // (value, multiplicity)
+    std::vector<std::pair<double, int>> numEvals; 
     if (!allLinear) {
-        // Durand-Kerner on characteristic polynomial
+
         const auto& cs = cp.coeffs();
         int deg = cp.degree();
         double lc = cs[deg].toDouble();
@@ -376,7 +360,6 @@ void SymDiagPage::onSolve() {
         for (int i = 0; i <= deg; ++i)
             compCoeffs[i] = std::complex<double>(cs[i].toDouble() / lc, 0.0);
 
-        // Durand-Kerner iteration
         std::vector<std::complex<double>> roots(deg);
         {
             std::complex<double> seed(0.4, 0.9), cur(1.0, 0.0);
@@ -401,7 +384,6 @@ void SymDiagPage::onSolve() {
             if (maxD < 1e-12) break;
         }
 
-        // Real symmetric matrix: all eigenvalues are real. Treat each root separately.
         for (const auto& r : roots) {
             double th = std::max(1e-7, 1e-10 * std::abs(r.real()));
             if (std::abs(r.imag()) < th) numEvals.push_back({r.real(), 1});
@@ -410,7 +392,6 @@ void SymDiagPage::onSolve() {
             [](auto& a, auto& b){ return a.first < b.first; });
     }
 
-    // ---- 5. Display eigenvalues ----
     if (allLinear) {
         QString eigStr;
         for (std::size_t i = 0; i < eigenvals.size(); ++i) {
@@ -423,7 +404,7 @@ void SymDiagPage::onSolve() {
         QString eigStr;
         for (std::size_t i = 0; i < numEvals.size(); ++i) {
             if (i > 0) eigStr += QStringLiteral(", ");
-            // Strip trailing zeros: 5.000 → 5, 2.50 → 2.5
+
             double v = numEvals[i].first;
             QString vs = QString::number(v, 'f', 6);
             if (vs.contains('.')) { while (vs.endsWith('0')) vs.chop(1); if (vs.endsWith('.')) vs.chop(1); }
@@ -433,17 +414,14 @@ void SymDiagPage::onSolve() {
         parts << paraHtml(QStringLiteral("因此 $A$ 的全部特征值是 %1.").arg(eigStr), th, doc);
     }
 
-    // Helper: format double as clean string for Fraction construction
     auto doubleToFrac = [](double x) -> Fraction {
         long long num = static_cast<long long>(std::round(x * 1e8));
         return Fraction(BigInt(num), BigInt(100000000LL));
     };
 
-    // ---- 6. Eigenvectors + Gram-Schmidt + normalize ----
     std::vector<std::pair<Fraction, std::vector<Matrix<Fraction>>>> allEtas;
     int alphaIdx = 1;
 
-    // Merge exact and numerical eigenvalues for processing
     std::vector<std::pair<Fraction, int>> allEvals;
     for (const auto& ev : eigenvals) allEvals.push_back(ev);
     for (const auto& ev : numEvals)
@@ -465,7 +443,7 @@ void SymDiagPage::onSolve() {
             for (int j = 0; j < curN_; ++j) M(i, j) = -A(i, j);
             M(i, i) += lambda;
         }
-        // Try exact nullspace first; fall back to numerical; then inverse iteration
+
         std::vector<std::vector<double>> numBasis;
         Matrix<Fraction> N(static_cast<std::size_t>(curN_), 0);
         if (lambda.denominator() <= BigInt(10000))
@@ -473,7 +451,7 @@ void SymDiagPage::onSolve() {
         if (N.cols() == 0)
             numBasis = numNullspace(A, lambda.toDouble());
         if (N.cols() == 0 && numBasis.empty()) {
-            // Inverse iteration: (A - λI) is near-singular, solve with regularization
+
             auto n = static_cast<int>(A.rows());
             std::vector<std::vector<double>> MM(n, std::vector<double>(n));
             for (int i = 0; i < n; ++i) {
@@ -482,7 +460,7 @@ void SymDiagPage::onSolve() {
             }
             std::vector<double> x(n, 1.0 / std::sqrt(static_cast<double>(n)));
             for (int it = 0; it < 3; ++it) {
-                // Gaussian elimination with pivoting
+
                 auto A2 = MM;
                 auto b = x;
                 std::vector<int> perm(n);
@@ -526,7 +504,6 @@ void SymDiagPage::onSolve() {
             parts << paraHtml(QStringLiteral("对于特征值 $%1$，求出 $(%1 I - A)X = 0$ 的一个基础解系：")
                 .arg(lamStr), th, doc);
 
-        // Show basis vectors
         std::vector<Matrix<Fraction>> alphas;
         {
             QString basisStr;
@@ -541,7 +518,6 @@ void SymDiagPage::onSolve() {
             parts << formulaHtml(basisStr, th, doc, 15);
         }
 
-        // If geom > 1 for a repeated eigenvalue, need Gram-Schmidt
         if (geom > 1) {
             parts << paraHtml(QStringLiteral("正交化，令"), th);
 
@@ -564,7 +540,6 @@ void SymDiagPage::onSolve() {
                 }
                 betas.push_back(beta);
 
-                // Show detailed step
                 QString detail = QStringLiteral("\\beta_{%1}")
                     .arg(alphaIdx - static_cast<int>(geom) + static_cast<int>(k));
                 detail += QStringLiteral(" = %1").arg(matLtx(alphas[k]));
@@ -578,7 +553,6 @@ void SymDiagPage::onSolve() {
                 parts << formulaHtml(detail, th, doc, 14);
             }
 
-            // Normalize
             parts << paraHtml(QStringLiteral("单位化："), th);
             int betaStart = alphaIdx - static_cast<int>(geom);
             QString etaStr;
@@ -589,16 +563,14 @@ void SymDiagPage::onSolve() {
                 etaStr += QStringLiteral("\\eta_{%1} = \\frac{1}{|\\beta_{%2}|}\\beta_{%2}")
                     .arg(betaStart + static_cast<int>(k) + 1).arg(betaStart + static_cast<int>(k) + 1);
                 etaStr += QStringLiteral(" = ") + (allLinear ? normVecLtx(betas[k], ns) : decVecLtx(betas[k], ns));
-                etas.push_back(betas[k]); // store for later
+                etas.push_back(betas[k]); 
             }
             parts << formulaHtml(etaStr, th, doc, 14);
-            // Store with original eigenvalue for T construction
-            // (etas are the beta vectors, not yet normalized — but we store them as symbolic)
-            // For simplicity, store the beta vectors
+
             for (const auto& b : betas)
                 allEtas.push_back({lambda, {b}});
         } else {
-            // Single eigenvector: just normalize
+
             Fraction ns = normSq(alphas[0]);
             int idx = alphaIdx - 1;
             QString etaLine = QStringLiteral("\\eta_{%1} = \\frac{1}{|\\alpha_{%2}|}\\alpha_{%2}")
@@ -612,8 +584,6 @@ void SymDiagPage::onSolve() {
         }
     }
 
-    // ---- 6. Build orthogonal matrix T and diagonal Λ ----
-    // Collect all eta vectors in order
     std::vector<Matrix<Fraction>> columns;
     std::vector<Fraction> diagEntries;
     for (const auto& p : allEtas) {
@@ -624,7 +594,7 @@ void SymDiagPage::onSolve() {
     }
 
     if (columns.size() == static_cast<std::size_t>(curN_)) {
-        // Helper: format double cleanly
+
         auto fmtD = [](double v){
             if (std::abs(v) < 1e-10) v = 0.0;
             QString s = QString::number(v, 'f', 4);
@@ -633,7 +603,6 @@ void SymDiagPage::onSolve() {
             return s;
         };
 
-        // Build T
         QString tBody;
         for (std::size_t i = 0; i < static_cast<std::size_t>(curN_); ++i) {
             for (std::size_t j = 0; j < columns.size(); ++j) {
@@ -642,7 +611,7 @@ void SymDiagPage::onSolve() {
                     Fraction ns = normSq(columns[j]);
                     tBody += fracDivSqrtLtx(columns[j](i, 0), ns);
                 } else {
-                    // Numerical: normalize and show as decimal
+
                     Fraction ns = normSq(columns[j]);
                     double v = columns[j](i, 0).toDouble() / std::sqrt(ns.toDouble());
                     tBody += fmtD(v);
@@ -653,7 +622,6 @@ void SymDiagPage::onSolve() {
         QString colSpec(curN_, QLatin1Char('c'));
         QString tLtx = QStringLiteral("\\begin{pmatrix}%1\\end{pmatrix}").arg(tBody);
 
-        // Build Λ
         QString diagBody;
         for (std::size_t i = 0; i < static_cast<std::size_t>(curN_); ++i) {
             for (std::size_t j = 0; j < static_cast<std::size_t>(curN_); ++j) {
@@ -686,7 +654,7 @@ void SymDiagPage::onSolve() {
 
 void SymDiagPage::onDemo() {
     spinN_->setValue(3); onGenerate();
-    // A = [[1,-2,-4],[-2,4,-2],[-4,-2,1]]
+
     const std::vector<std::vector<int>> demo = {{1,-2,-4},{-2,4,-2},{-4,-2,1}};
     for (int i = 0; i < 3; ++i)
         for (int j = 0; j < 3; ++j)
@@ -694,4 +662,4 @@ void SymDiagPage::onDemo() {
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

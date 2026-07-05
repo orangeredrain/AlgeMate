@@ -3,7 +3,6 @@
 #include "visualize/VisualizePage.h"
 #include "demo/DemoPage.h"
 
-// 引入主题管理器
 #include "core/ThemeManager.h"
 
 #include <QButtonGroup>
@@ -31,10 +30,10 @@ namespace AlgeMate::Calculator {
 
 namespace {
 struct GreekItem {
-    const char* ch;     // UTF-8 小写 Unicode
-    const char* label;  // LaTeX 宏
+    const char* ch;     
+    const char* label;  
 };
-// 22 个小写希腊字母 (标准 LaTeX 宏)
+
 static const GreekItem kGreeks[] = {
     {"\xce\xb1", "\\alpha"   }, {"\xce\xb2", "\\beta"    }, {"\xce\xb3", "\\gamma"   },
     {"\xce\xb4", "\\delta"   }, {"\xce\xb5", "\\epsilon" }, {"\xce\xb6", "\\zeta"    },
@@ -46,14 +45,12 @@ static const GreekItem kGreeks[] = {
     {"\xcf\x89", "\\omega"   },
     };
 
-// 渲染根号的数组
 struct OpItem { const char* latex; const char* tip; int kind; };
 static const OpItem kOps[] = {
     { "\\sqrt{\\square}",    "根号 sqrt()",      0 },
     { "\\sqrt[n]{\\square}", "n 次根号 root(n, x)", 1 },
     };
 
-// 用 JKQTMathText 将单个 LaTeX 渲染为透明背景小图
 static QPixmap renderGlyphPixmap(const QString& latex, int fontPt, const QColor& color) {
     qreal dpr = 1.0;
     if (QGuiApplication::primaryScreen()) dpr = QGuiApplication::primaryScreen()->devicePixelRatio();
@@ -177,7 +174,6 @@ CalculatorPage::CalculatorPage(QWidget* parent) : QWidget(parent) {
     root->addLayout(topRow);
     root->addWidget(stack, 1);
 
-    // ==============================================================
     auto applyTheme = [this, title, subtitle, btnInteractive, btnVisualize, btnDemo, symBtns, opBtns]() {
         bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
 
@@ -220,4 +216,4 @@ CalculatorPage::CalculatorPage(QWidget* parent) : QWidget(parent) {
     connect(&AlgeMate::ThemeManager::instance(), &AlgeMate::ThemeManager::themeChanged, this, [applyTheme](AlgeMate::ThemeManager::Theme){ applyTheme(); });
 }
 
-} // namespace AlgeMate::Calculator
+} 

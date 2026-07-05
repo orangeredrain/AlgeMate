@@ -17,8 +17,6 @@
 
 namespace algemate::math {
 
-// 构造
-
 SymbolicExpr::SymbolicExpr() : node_(makeNum_(Complex()).node_) {}
 SymbolicExpr::SymbolicExpr(long long n)      : node_(makeNum_(Complex(n)).node_) {}
 SymbolicExpr::SymbolicExpr(const Fraction& q): node_(makeNum_(Complex(q)).node_) {}
@@ -27,8 +25,6 @@ SymbolicExpr::SymbolicExpr(const Complex& c) : node_(makeNum_(c).node_) {}
 
 SymbolicExpr SymbolicExpr::num(const Complex& c)      { return makeNum_(c); }
 SymbolicExpr SymbolicExpr::sym(const std::string& s)  { return makeSym_(s); }
-
-// 查询
 
 SymbolicExpr::Kind SymbolicExpr::kind() const { return node_->kind; }
 bool SymbolicExpr::isNum()  const { return node_->kind == Kind::Num; }
@@ -42,8 +38,6 @@ const Complex&     SymbolicExpr::asNum() const { return node_->num; }
 const std::string& SymbolicExpr::asSym() const { return node_->sym; }
 const std::vector<SymbolicExpr>& SymbolicExpr::children() const { return node_->args; }
 SymbolicExpr::FuncKind SymbolicExpr::funcKind() const { return node_->func; }
-
-// 等同
 
 bool SymbolicExpr::operator==(const SymbolicExpr& r) const {
     if (node_.get() == r.node_.get()) return true;
@@ -64,8 +58,6 @@ bool SymbolicExpr::operator==(const SymbolicExpr& r) const {
     return false;
 }
 
-// 工厂: 叶子
-
 SymbolicExpr SymbolicExpr::makeNum_(const Complex& c) {
     auto n = std::make_shared<Node>();
     n->kind = Kind::Num;
@@ -80,11 +72,8 @@ SymbolicExpr SymbolicExpr::makeSym_(const std::string& s) {
     return SymbolicExpr(n);
 }
 
-// 辅助
-
 namespace {
 
-// Num 是否是整数实数
 bool extractIntNum(const SymbolicExpr& e, long long& out) {
     if (!e.isNum()) return false;
     const Complex& c = e.asNum();
@@ -97,7 +86,6 @@ bool extractIntNum(const SymbolicExpr& e, long long& out) {
     return true;
 }
 
-// Num 是否是实有理数
 bool extractRatNum(const SymbolicExpr& e, Fraction& out) {
     if (!e.isNum()) return false;
     const Complex& c = e.asNum();
@@ -108,7 +96,6 @@ bool extractRatNum(const SymbolicExpr& e, Fraction& out) {
     return true;
 }
 
-// Complex 的整数幂 (k>=0)
 Complex complexIntPow(const Complex& c, long long k) {
     if (k < 0) throw std::domain_error("complexIntPow: k must be non-negative");
     Complex result(1LL);
@@ -121,12 +108,10 @@ Complex complexIntPow(const Complex& c, long long k) {
     return result;
 }
 
-} // namespace
-
-// 工厂: Add
+} 
 
 SymbolicExpr SymbolicExpr::makeAdd_(std::vector<SymbolicExpr> ch) {
-    // 扁平化 Add
+
     std::vector<SymbolicExpr> flat;
     flat.reserve(ch.size());
     for (auto& c : ch) {
@@ -137,7 +122,6 @@ SymbolicExpr SymbolicExpr::makeAdd_(std::vector<SymbolicExpr> ch) {
         }
     }
 
-    // 提取数值常量
     Complex konst(0LL);
     std::vector<SymbolicExpr> rest;
     rest.reserve(flat.size());
@@ -146,9 +130,8 @@ SymbolicExpr SymbolicExpr::makeAdd_(std::vector<SymbolicExpr> ch) {
         else           rest.push_back(std::move(c));
     }
 
-    // 对剩余项分离 (coef, body), 按 body 合并同类项
     std::vector<std::pair<std::string, std::pair<Complex, SymbolicExpr>>> groups;
-    // (key -> (coefSum, body))
+
     std::unordered_map<std::string, std::size_t> index;
 
     auto splitCoef = [](const SymbolicExpr& e) -> std::pair<Complex, SymbolicExpr> {
@@ -173,7 +156,6 @@ SymbolicExpr SymbolicExpr::makeAdd_(std::vector<SymbolicExpr> ch) {
         }
     }
 
-    // 组装: 丢弃 coef==0, coef==1 保留 body, 否则 Mul(coef, body)
     std::vector<SymbolicExpr> out;
     out.reserve(groups.size() + 1);
     for (auto& g : groups) {
@@ -184,7 +166,6 @@ SymbolicExpr SymbolicExpr::makeAdd_(std::vector<SymbolicExpr> ch) {
         out.push_back(SymbolicExpr::makeMul_({makeNum_(coef), body}));
     }
 
-    // 加入数值常量
     if (!konst.isZero()) out.push_back(makeNum_(konst));
 
     if (out.empty()) return makeNum_(Complex(0LL));
@@ -201,10 +182,8 @@ SymbolicExpr SymbolicExpr::makeAdd_(std::vector<SymbolicExpr> ch) {
     return SymbolicExpr(n);
 }
 
-// 工厂: Mul
-
 SymbolicExpr SymbolicExpr::makeMul_(std::vector<SymbolicExpr> ch) {
-    // 扁平化 Mul
+
     std::vector<SymbolicExpr> flat;
     flat.reserve(ch.size());
     for (auto& c : ch) {
@@ -215,7 +194,6 @@ SymbolicExpr SymbolicExpr::makeMul_(std::vector<SymbolicExpr> ch) {
         }
     }
 
-    // 收集数值常量
     Complex konst(1LL);
     std::vector<SymbolicExpr> rest;
     rest.reserve(flat.size());
@@ -226,7 +204,6 @@ SymbolicExpr SymbolicExpr::makeMul_(std::vector<SymbolicExpr> ch) {
 
     if (konst.isZero()) return makeNum_(Complex(0LL));
 
-    // 分离 (base, exp), 按 base 合并同底
     struct Grp { SymbolicExpr base; SymbolicExpr exp; };
     std::vector<Grp> groups;
     std::unordered_map<std::string, std::size_t> index;
@@ -248,7 +225,6 @@ SymbolicExpr SymbolicExpr::makeMul_(std::vector<SymbolicExpr> ch) {
         }
     }
 
-    // 组装
     std::vector<SymbolicExpr> out;
     out.reserve(groups.size() + 1);
     for (auto& g : groups) {
@@ -262,7 +238,6 @@ SymbolicExpr SymbolicExpr::makeMul_(std::vector<SymbolicExpr> ch) {
     if (out.empty()) return makeNum_(Complex(1LL));
     if (out.size() == 1) return out[0];
 
-    // 首位保留 Num, 其余按 toString 排序
     auto begin = out.begin();
     if (!out.empty() && out.front().isNum()) ++begin;
     std::sort(begin, out.end(),
@@ -276,17 +251,15 @@ SymbolicExpr SymbolicExpr::makeMul_(std::vector<SymbolicExpr> ch) {
     return SymbolicExpr(n);
 }
 
-// 工厂: Pow
-
 SymbolicExpr SymbolicExpr::makePow_(SymbolicExpr b, SymbolicExpr e) {
-    // 特殊值
+
     if (e.isZero()) {
         if (b.isZero()) throw std::domain_error("SymbolicExpr: 0^0 is undefined");
         return makeNum_(Complex(1LL));
     }
     if (e.isOne())  return b;
     if (b.isZero()) {
-        // exp != 0; 要求 exp 的实部 > 0
+
         long long k;
         Fraction q;
         if (extractIntNum(e, k)) {
@@ -299,7 +272,6 @@ SymbolicExpr SymbolicExpr::makePow_(SymbolicExpr b, SymbolicExpr e) {
     }
     if (b.isOne()) return makeNum_(Complex(1LL));
 
-    // 两者都是 Num: 仅当结果是有理复数(实虚部都是 Fraction) 时才数值化, 避免 sqrt(2) 被吸为 AlgReal 叶子.
     if (b.isNum() && e.isNum()) {
         auto isRatCplx = [](const Complex& c) {
             return c.real().isRational() && c.imag().isRational();
@@ -322,13 +294,12 @@ SymbolicExpr SymbolicExpr::makePow_(SymbolicExpr b, SymbolicExpr e) {
                         if (num >= 0) return makeNum_(complexIntPow(r, num));
                         return makeNum_(complexIntPow(Complex(1LL) / r, -num));
                     }
-                } catch (const std::exception&) { /* 落到符号保留 */ }
+                } catch (const std::exception&) {  }
             }
         }
-        // 其他 Num 指数 (非有理数 / 非实数) 或结果非有理数: 保留符号
+
     }
 
-    // base 是 Pow: (b2^e2)^e -> b2^(e2*e)
     if (b.kind() == Kind::Pow) {
         SymbolicExpr b2 = b.children()[0];
         SymbolicExpr e2 = b.children()[1];
@@ -340,8 +311,6 @@ SymbolicExpr SymbolicExpr::makePow_(SymbolicExpr b, SymbolicExpr e) {
     n->args = {b, e};
     return SymbolicExpr(n);
 }
-
-// 工厂: Func
 
 SymbolicExpr SymbolicExpr::makeFunc_(FuncKind k, SymbolicExpr arg) {
     if (k == FuncKind::Abs && arg.isNum()) {
@@ -357,8 +326,6 @@ SymbolicExpr SymbolicExpr::makeFunc_(FuncKind k, SymbolicExpr arg) {
     n->args = {std::move(arg)};
     return SymbolicExpr(n);
 }
-
-// 运算符
 
 SymbolicExpr SymbolicExpr::operator-() const {
     return makeMul_({makeNum_(Complex(-1LL)), *this});
@@ -394,8 +361,6 @@ SymbolicExpr SymbolicExpr::root(const SymbolicExpr& x, int n) {
 SymbolicExpr SymbolicExpr::abs_ (const SymbolicExpr& x) { return makeFunc_(FuncKind::Abs,  x); }
 SymbolicExpr SymbolicExpr::conj (const SymbolicExpr& x) { return makeFunc_(FuncKind::Conj, x); }
 
-// subs
-
 SymbolicExpr SymbolicExpr::subs(const std::string& var, const SymbolicExpr& val) const {
     switch (node_->kind) {
     case Kind::Num:  return *this;
@@ -420,8 +385,6 @@ SymbolicExpr SymbolicExpr::subs(const std::string& var, const SymbolicExpr& val)
     }
     return *this;
 }
-
-// diff
 
 SymbolicExpr SymbolicExpr::diff(const std::string& var) const {
     switch (node_->kind) {
@@ -460,8 +423,6 @@ SymbolicExpr SymbolicExpr::diff(const std::string& var) const {
     }
     return makeNum_(Complex(0LL));
 }
-
-// evaluate
 
 Complex SymbolicExpr::evaluate() const {
     switch (node_->kind) {
@@ -506,8 +467,6 @@ Complex SymbolicExpr::evaluate() const {
     }
     throw std::logic_error("SymbolicExpr::evaluate: unreachable");
 }
-
-// toString / toLatex
 
 namespace {
 
@@ -588,7 +547,7 @@ std::pair<bool, SymbolicExpr> splitSign(const SymbolicExpr& c) {
     return {false, c};
 }
 
-} // namespace
+} 
 
 std::string SymbolicExpr::toString() const {
     switch (node_->kind) {
@@ -705,8 +664,6 @@ std::string SymbolicExpr::toLatex() const {
 std::ostream& operator<<(std::ostream& os, const SymbolicExpr& e) {
     return os << e.toString();
 }
-
-// fromString: tokenizer + 递归下降
 
 namespace {
 
@@ -840,7 +797,7 @@ private:
         if (cur_.kind == TokKind::Ident) {
             std::string name = cur_.text; std::size_t col = cur_.col;
             advance();
-            // 函数调用
+
             if (cur_.kind == TokKind::LParen) {
                 advance();
                 std::vector<SymbolicExpr> args;
@@ -864,9 +821,9 @@ private:
                 throw std::invalid_argument("SymbolicExpr::fromString: unknown function '" + name
                                             + "' or bad arity at col " + std::to_string(col));
             }
-            // 变量 / 虚数单位
+
             if (name == "i") return SymbolicExpr(Complex::i());
-            // 保留字不能单独作变量
+
             if (name == "sqrt" || name == "cbrt" || name == "root"
                 || name == "abs"  || name == "conj") {
                 throw std::invalid_argument("SymbolicExpr::fromString: '" + name
@@ -878,23 +835,19 @@ private:
     }
 };
 
-} // namespace
+} 
 
 SymbolicExpr SymbolicExpr::fromString(const std::string& s) {
     Parser p(s);
     return p.parse();
 }
 
-// 多项式桥
-
 namespace {
 
-// 把 SymbolicExpr 按 var 收集为 map<k, coef>. 返回成功与否, 失败表示非多项式
 bool collectPoly_(const SymbolicExpr& e,
                   const std::string& var,
                   std::map<int, SymbolicExpr>& out);
 
-// 合并两个系数表 (乘法): out = a * b
 void mulPolyMaps_(const std::map<int, SymbolicExpr>& a,
                   const std::map<int, SymbolicExpr>& b,
                   std::map<int, SymbolicExpr>& out) {
@@ -955,7 +908,7 @@ bool collectPoly_(const SymbolicExpr& e,
         const SymbolicExpr& base = e.children()[0];
         const SymbolicExpr& exp  = e.children()[1];
         long long k;
-        // 只接受非负整数指数
+
         if (!extractIntNum(exp, k) || k < 0) {
             if (base.kind() != Kind::Sym || base.asSym() != var) {
                 std::map<int, SymbolicExpr> sub;
@@ -965,12 +918,12 @@ bool collectPoly_(const SymbolicExpr& e,
             }
             return false;
         }
-        // 幂指数为非负整数
+
         if (base.kind() == Kind::Sym && base.asSym() == var) {
             out[static_cast<int>(k)] = SymbolicExpr(1LL);
             return true;
         }
-        // 底递归展开 k 次
+
         std::map<int, SymbolicExpr> sub;
         if (!collectPoly_(base, var, sub)) return false;
         std::map<int, SymbolicExpr> acc;
@@ -989,7 +942,7 @@ bool collectPoly_(const SymbolicExpr& e,
         return true;
     }
     case Kind::Func: {
-        // 若函数参数不含 var 则作为常数
+
         std::map<int, SymbolicExpr> sub;
         if (!collectPoly_(e.children()[0], var, sub)) return false;
         if (sub.size() == 1 && sub.count(0)) { out[0] = e; return true; }
@@ -1008,7 +961,7 @@ bool symToRational_(const SymbolicExpr& e, Fraction& out) {
     return true;
 }
 
-} // namespace
+} 
 
 bool SymbolicExpr::isPolynomialIn(const std::string& var) const {
     std::map<int, SymbolicExpr> m;
@@ -1069,8 +1022,6 @@ SymbolicExpr SymbolicExpr::fromPoly(const Polynomial<SymbolicExpr>& p, const std
     return r;
 }
 
-// expand
-
 namespace {
 
 SymbolicExpr distribMul_(const SymbolicExpr& a, const SymbolicExpr& b) {
@@ -1087,7 +1038,7 @@ SymbolicExpr distribMul_(const SymbolicExpr& a, const SymbolicExpr& b) {
     return acc;
 }
 
-} // namespace
+} 
 
 SymbolicExpr SymbolicExpr::expand() const {
     switch (node_->kind) {
@@ -1095,7 +1046,7 @@ SymbolicExpr SymbolicExpr::expand() const {
     case Kind::Sym:
         return *this;
     case Kind::Func: {
-        // 函数内部不展开
+
         return *this;
     }
     case Kind::Add: {
@@ -1127,14 +1078,11 @@ SymbolicExpr SymbolicExpr::expand() const {
     return *this;
 }
 
-// factor
-
 SymbolicExpr SymbolicExpr::factor(const std::string& var) const {
     SymbolicExpr self = this->expand();
     Polynomial<SymbolicExpr> ps = self.toPoly(var);
     if (ps.degree() <= 0) return self;
 
-    // 所有系数转 Fraction
     std::vector<Fraction> fcoeffs(ps.coeffs().size());
     for (std::size_t i = 0; i < ps.coeffs().size(); ++i) {
         if (!symToRational_(ps.coeffs()[i], fcoeffs[i]))
@@ -1145,12 +1093,12 @@ SymbolicExpr SymbolicExpr::factor(const std::string& var) const {
         pf = pf + Polynomial<Fraction>::monomial(i, fcoeffs[i]);
 
     std::vector<Fraction> roots = rationalRoots(pf);
-    if (roots.empty()) return self; // 无有理根, 不分解
+    if (roots.empty()) return self; 
 
     std::vector<Fraction> linRoots;
     Polynomial<Fraction> remain = pf;
     for (const Fraction& r : roots) {
-        Polynomial<Fraction> linear = {-r, Fraction(1)}; // x - r
+        Polynomial<Fraction> linear = {-r, Fraction(1)}; 
         while (true) {
             auto dm = remain.divmod(linear);
             if (dm.remainder.isZero()) {
@@ -1162,12 +1110,10 @@ SymbolicExpr SymbolicExpr::factor(const std::string& var) const {
 
     if (linRoots.empty()) return self;
 
-    // 结果: remain * \prod (x - r_i)
     SymbolicExpr x = SymbolicExpr::sym(var);
     SymbolicExpr result;
     bool first = true;
 
-    // remain 转 SymbolicExpr
     if (!(remain.degree() == 0 && remain.constant() == Fraction(1))) {
         SymbolicExpr remainExpr = SymbolicExpr(0LL);
         for (std::size_t i = 0; i < remain.coeffs().size(); ++i) {

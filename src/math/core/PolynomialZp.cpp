@@ -12,9 +12,6 @@ namespace algemate::math {
 
 using Z = PolynomialZp::Z;
 
-
-//  算数工具
-
 Z PolynomialZp::modp(Z a, Z p) {
     Z r = a % p;
     if (r < 0) r += p;
@@ -22,8 +19,7 @@ Z PolynomialZp::modp(Z a, Z p) {
 }
 
 Z PolynomialZp::mulmod(Z a, Z b, Z p) {
-    // a,b 已 in [0,p). p < 2^31 ⇒ a*b < 2^62, int64_t 足够.
-    // 保守起见用 __int128.
+
     __int128 r = (__int128)a * (__int128)b;
     return (Z)(r % p);
 }
@@ -45,8 +41,6 @@ Z PolynomialZp::invmod(Z a, Z p) {
     return powmod(a, p - 2, p);
 }
 
-//  构造 & 规范化
-
 PolynomialZp::PolynomialZp() : coeffs_(), p_(0) {}
 
 PolynomialZp::PolynomialZp(Z prime) : coeffs_(), p_(prime) {
@@ -66,7 +60,7 @@ void PolynomialZp::normalize_() {
 
 void PolynomialZp::requireSamePrime_(const PolynomialZp& a, const PolynomialZp& b) {
     if (a.p_ != b.p_) {
-        // 允许其中一方是未设素数的零多项式
+
         if (!(a.isZero() && a.p_ == 0) && !(b.isZero() && b.p_ == 0))
             throw std::invalid_argument("PolynomialZp: prime mismatch");
     }
@@ -115,8 +109,6 @@ PolynomialZp PolynomialZp::derivative() const {
     return PolynomialZp(std::move(r), p_);
 }
 
-
-//  四则
 PolynomialZp PolynomialZp::add(const PolynomialZp& a, const PolynomialZp& b) {
     requireSamePrime_(a, b);
     Z p = a.p_ ? a.p_ : b.p_;
@@ -207,16 +199,15 @@ PolynomialZp PolynomialZp::powMod(const PolynomialZp& base, Z e, const Polynomia
     return r;
 }
 
-//  Q[x] → F_p[x]
 PolynomialZp PolynomialZp::fromPoly(const Polynomial<Fraction>& f, Z prime) {
     if (f.isZero()) return PolynomialZp(prime);
     std::vector<Z> c(f.size());
     for (std::size_t i = 0; i < f.size(); ++i) {
         const Fraction& q = f[i];
-        // Fraction = num/den. 分母必须与 p 互素.
+
         BigInt num = q.numerator();
         BigInt den = q.denominator();
-        // 归约 num mod p
+
         BigInt P = BigInt((long long)prime);
         BigInt nm = num % P;
         BigInt dm = den % P;
@@ -237,7 +228,7 @@ Polynomial<Fraction> PolynomialZp::toPoly() const {
     for (std::size_t i = 0; i < coeffs_.size(); ++i) {
         c[i] = Fraction(BigInt((long long)coeffs_[i]));
     }
-    // 低位优先构造
+
     Polynomial<Fraction> r;
     for (int i = (int)c.size() - 1; i >= 0; --i) {
         r = r * Polynomial<Fraction>::x() + Polynomial<Fraction>(c[i]);
@@ -245,16 +236,13 @@ Polynomial<Fraction> PolynomialZp::toPoly() const {
     return r;
 }
 
-
-//  平方自由分解 (支持 p-power 路径)
-// 返回 g = f^(1/p), 要求 f = sum a_i x^{ip} (形式化 p-根)
 static PolynomialZp pthRoot_(const PolynomialZp& f) {
     Z p = f.prime();
     std::vector<Z> c((f.degree() / p) + 1, 0);
     for (std::size_t i = 0; i < f.coeffs().size(); ++i) {
         if (f.coeffs()[i] == 0) continue;
         if ((Z)i % p != 0) throw std::logic_error("pthRoot_: exponent not multiple of p");
-        // Frobenius 逆: 在 F_p 上, a^p = a, 所以 p-根 = 系数本身
+
         c[i / p] = f.coeffs()[i];
     }
     return PolynomialZp(std::move(c), p);
@@ -267,23 +255,21 @@ PolynomialZp::squarefreeFactorization(const PolynomialZp& fIn) {
     Z p = f.prime();
     std::vector<SqfFactor> result;
 
-    // Musser / Yun 算法 (F_p 上需要处理 f'=0 情形)
-    // 递归函数:
     std::function<void(PolynomialZp, int)> sqf = [&](PolynomialZp h, int mul0) {
         if (h.degree() <= 0) return;
         PolynomialZp fp = h.derivative();
         if (fp.isZero()) {
-            // h = g(x^p) ⇒ 递归 h^(1/p) 但重数 × p
+
             PolynomialZp g = pthRoot_(h);
             sqf(g, mul0 * (int)p);
             return;
         }
-        PolynomialZp c = gcd(h, fp);        // c = gcd(h, h')
-        PolynomialZp w = divmod(h, c).q;    // w = h / c (squarefree part 部分)
+        PolynomialZp c = gcd(h, fp);        
+        PolynomialZp w = divmod(h, c).q;    
         int i = 1;
         while (!w.isOne()) {
             PolynomialZp y = gcd(w, c);
-            PolynomialZp z = divmod(w, y).q; // z 是 h 中重数恰为 i * mul0 的因子
+            PolynomialZp z = divmod(w, y).q; 
             if (!z.isOne()) {
                 result.push_back({z, i * mul0});
             }
@@ -291,7 +277,7 @@ PolynomialZp::squarefreeFactorization(const PolynomialZp& fIn) {
             c = divmod(c, y).q;
             ++i;
         }
-        // c 剩余部分: 它的所有因子重数都是 p 的倍数
+
         if (!c.isOne()) {
             PolynomialZp g = pthRoot_(c);
             sqf(g, mul0 * (int)p);
@@ -301,23 +287,21 @@ PolynomialZp::squarefreeFactorization(const PolynomialZp& fIn) {
     return result;
 }
 
-
-//  DDF: Distinct Degree Factorization
 std::vector<PolynomialZp::DDFPart>
 PolynomialZp::distinctDegreeFactorization(const PolynomialZp& fIn) {
     Z p = fIn.prime();
     PolynomialZp f = fIn.makeMonic();
     std::vector<DDFPart> result;
-    PolynomialZp h({0, 1}, p); // h = x
+    PolynomialZp h({0, 1}, p); 
     int d = 1;
     while (f.degree() >= 2 * d) {
-        // h := h^p mod f
+
         h = powMod(h, p, f);
         PolynomialZp g = gcd(f, sub(h, PolynomialZp({0, 1}, p)));
         if (!g.isOne()) {
             result.push_back({g.makeMonic(), d});
             f = divmod(f, g).q;
-            // h 也要 mod 新的 f
+
             h = divmod(h, f).r;
         }
         ++d;
@@ -328,14 +312,13 @@ PolynomialZp::distinctDegreeFactorization(const PolynomialZp& fIn) {
     return result;
 }
 
-//  EDF: Cantor-Zassenhaus
 static std::mt19937_64& czRng_() {
     static std::mt19937_64 g(0x12345678);
     return g;
 }
 
 static PolynomialZp czSplitOdd_(const PolynomialZp& g, int d) {
-    // p 为奇素数: 计算 a = r^{(p^d-1)/2} - 1, 取 gcd(g, a).
+
     Z p = g.prime();
     int dg = g.degree();
     auto& rng = czRng_();
@@ -343,15 +326,15 @@ static PolynomialZp czSplitOdd_(const PolynomialZp& g, int d) {
     while (true) {
         std::vector<Z> rc(dg);
         for (auto& v : rc) v = dist(rng);
-        rc.push_back(1); // 让它 deg = dg
-        // 规约 mod g 后再操作
+        rc.push_back(1); 
+
         PolynomialZp r(std::move(rc), p);
         r = PolynomialZp::divmod(r, g).r;
         if (r.degree() <= 0) continue;
         __int128 pd = 1;
         for (int i = 0; i < d; ++i) pd *= (__int128)p;
         __int128 e = (pd - 1) / 2;
-        // 若 e 超 63 位, 用二进制迭代
+
         PolynomialZp acc({1}, p);
         PolynomialZp base = r;
         while (e > 0) {
@@ -366,7 +349,7 @@ static PolynomialZp czSplitOdd_(const PolynomialZp& g, int d) {
 }
 
 static PolynomialZp czSplitTwo_(const PolynomialZp& g, int d) {
-    // p = 2: 用 Trace 算子 T(r) = r + r^2 + r^4 + ... + r^{2^{d-1}}, 取 gcd(g, T(r)).
+
     Z p = 2;
     int dg = g.degree();
     auto& rng = czRng_();
@@ -404,7 +387,6 @@ PolynomialZp::equalDegreeFactorization(const PolynomialZp& gIn, int d) {
     return out;
 }
 
-//  完整因式分解
 PolynomialZp::Factorization PolynomialZp::factor(const PolynomialZp& fIn) {
     Factorization out;
     if (fIn.isZero()) throw std::domain_error("PolynomialZp::factor: zero polynomial");
@@ -424,21 +406,19 @@ PolynomialZp::Factorization PolynomialZp::factor(const PolynomialZp& fIn) {
     return out;
 }
 
-//  不可约判定
 bool PolynomialZp::isIrreducible(const PolynomialZp& fIn) {
     if (fIn.degree() < 1) return false;
     Z p = fIn.prime();
     PolynomialZp f = fIn.makeMonic();
     int n = f.degree();
-    // x^{p^n} mod f 必须等于 x
+
     PolynomialZp x({0, 1}, p);
     PolynomialZp h = x;
     for (int i = 0; i < n; ++i) {
         h = powMod(h, p, f);
     }
     if (!sub(h, x).isZero()) return false;
-    // 对每个 n 的素因子 q, 检查 gcd(f, x^{p^{n/q}} - x) == 1
-    // 先求 n 的所有素因子
+
     std::vector<int> primes;
     int nn = n;
     for (int d = 2; (long long)d * d <= nn; ++d) {
@@ -458,7 +438,6 @@ bool PolynomialZp::isIrreducible(const PolynomialZp& fIn) {
     return true;
 }
 
-//  输出
 std::ostream& operator<<(std::ostream& os, const PolynomialZp& f) {
     if (f.isZero()) { os << "0"; return os; }
     bool first = true;
@@ -480,4 +459,4 @@ std::ostream& operator<<(std::ostream& os, const PolynomialZp& f) {
     return os;
 }
 
-} // namespace algemate::math
+} 

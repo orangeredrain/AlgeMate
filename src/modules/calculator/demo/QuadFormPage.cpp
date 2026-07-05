@@ -26,7 +26,6 @@ using AlgeMate::Calculator::Interactive::RenderTheme;
 
 namespace AlgeMate::Calculator::Demo {
 
-// Augmented matrix [A; P] LaTeX with horizontal line
 static QString augMatLtx(const Matrix<Fraction>& A, const Matrix<Fraction>& P) {
     const auto n = A.rows();
     QString body;
@@ -49,14 +48,9 @@ static QString augMatLtx(const Matrix<Fraction>& A, const Matrix<Fraction>& P) {
     return QStringLiteral("\\left(\\begin{array}{%1}%2\\end{array}\\right)").arg(cols, body);
 }
 
-// Arrow with text annotation below (for row or col op)
 static QString opArrow(const QString& label) {
     return QStringLiteral("\\underset{\\text{%1}}{\\longrightarrow}").arg(label);
 }
-
-// =====================================================================
-//  Constructor (same pattern as SymDiagPage)
-// =====================================================================
 
 QuadFormPage::QuadFormPage(QWidget* parent) : QWidget(parent) {
     auto* root = new QVBoxLayout(this);
@@ -187,14 +181,9 @@ bool QuadFormPage::eventFilter(QObject* obj, QEvent* ev) {
     return QWidget::eventFilter(obj, ev);
 }
 
-// =====================================================================
-//  Solve
-// =====================================================================
-
 void QuadFormPage::onSolve() {
     if (curN_ == 0) return;
 
-    // ---- 1. Parse ----
     Matrix<Fraction> A(static_cast<std::size_t>(curN_), static_cast<std::size_t>(curN_));
     for (int i = 0; i < curN_; ++i)
         for (int j = 0; j < curN_; ++j) {
@@ -208,7 +197,6 @@ void QuadFormPage::onSolve() {
     auto* doc = resultBrowser_->document(); doc->clear();
     QStringList parts;
 
-    // ---- 2. Quadratic form expression ----
     QString quadExpr;
     bool first = true;
     for (std::size_t i = 0; i < A.rows(); ++i) {
@@ -236,18 +224,15 @@ void QuadFormPage::onSolve() {
     parts << paraHtml(QStringLiteral("$g$ 的矩阵是"), th, doc);
     parts << formulaHtml(QStringLiteral("A = ") + matLtx(A) + QStringLiteral("."), th, doc);
 
-    // ---- 3. Congruence diagonalization ----
     Matrix<Fraction> D = A;
     Matrix<Fraction> P(curN_, curN_);
     for (std::size_t i = 0; i < P.rows(); ++i) P(i, i) = Fraction(1);
 
     parts << paraHtml(QStringLiteral("对 $A$ 作成对的初等行、列变换："), th, doc);
 
-    // Collect step formulas
     QStringList steps;
     steps << augMatLtx(D, P);
 
-    // Annotation helper: r_i + r_j · c   →  (i)+(j)·c
     auto rowAnnot = [](int i, int j, const Fraction& c) {
         if (c.isOne()) return QStringLiteral("(%1)+(%2)").arg(i+1).arg(j+1);
         if (c == Fraction(-1)) return QStringLiteral("(%1)-(%2)").arg(i+1).arg(j+1);
@@ -255,9 +240,8 @@ void QuadFormPage::onSolve() {
         return QStringLiteral("(%1)+(%2)\\cdot %3").arg(i+1).arg(j+1).arg(fracLtx(c));
     };
 
-    // Process each pivot
     for (std::size_t i = 0; i < static_cast<std::size_t>(curN_); ++i) {
-        // If pivot is 0, try to create a non-zero pivot by adding another row
+
         if (D(i, i).isZero()) {
             for (std::size_t j = i + 1; j < static_cast<std::size_t>(curN_); ++j) {
                 if (!D(j, i).isZero()) {
@@ -274,7 +258,6 @@ void QuadFormPage::onSolve() {
         }
         if (D(i, i).isZero()) continue;
 
-        // Eliminate below
         for (std::size_t j = i + 1; j < static_cast<std::size_t>(curN_); ++j) {
             if (D(j, i).isZero()) continue;
             Fraction factor = -D(j, i) / D(i, i);
@@ -288,15 +271,12 @@ void QuadFormPage::onSolve() {
         }
     }
 
-    // Render each step as a formula
     for (std::size_t s = 0; s < steps.size(); ++s)
         parts << formulaHtml(steps[s], th, doc, 12);
 
-    // ---- 4. Final D and C ----
     parts << paraHtml(QStringLiteral("因此"), th, doc);
     parts << formulaHtml(QStringLiteral("D = ") + matLtx(D) + QStringLiteral(", \\quad C = ") + matLtx(P) + QStringLiteral("."), th, doc);
 
-    // ---- 5. Standard form ----
     QString stdForm;
     first = true;
     for (std::size_t i = 0; i < D.rows(); ++i) {
@@ -313,7 +293,6 @@ void QuadFormPage::onSolve() {
     parts << paraHtml(QStringLiteral("令 $X = CY$，得"), th, doc);
     parts << formulaHtml(QStringLiteral("g(%1) = %2.").arg(vars, stdForm), th, doc);
 
-    // ---- 6. Linear substitution X = CY ----
     QString subst;
     for (std::size_t i = 0; i < P.rows(); ++i) {
         QString line = QStringLiteral("x_{%1} = ").arg(i + 1);
@@ -341,7 +320,7 @@ void QuadFormPage::onSolve() {
 
 void QuadFormPage::onDemo() {
     spinN_->setValue(3); onGenerate();
-    // g = x1*x2 + x1*x3 - 3*x2*x3 → A = [[0,1/2,1/2],[1/2,0,-3/2],[1/2,-3/2,0]]
+
     cells_[0*3+0]->setText(QStringLiteral("0"));
     cells_[0*3+1]->setText(QStringLiteral("1/2"));
     cells_[0*3+2]->setText(QStringLiteral("1/2"));
@@ -354,4 +333,4 @@ void QuadFormPage::onDemo() {
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

@@ -7,7 +7,6 @@
 
 namespace AlgeMate::Calculator::Visualize {
 
-// ── Surface shader: enhanced Phong + Fresnel rim + hemisphere ambient ──
 static const char* kSurfVert = R"(
 #version 330 core
 layout(location = 0) in vec3 aPos;
@@ -69,7 +68,6 @@ void main() {
 }
 )";
 
-// ── Line shader ──
 static const char* kLineVert = R"(
 #version 330 core
 layout(location = 0) in vec3 aPos;
@@ -91,8 +89,6 @@ void main() {
 }
 )";
 
-// Constructor
-
 QuadricWidget::QuadricWidget(QWidget* parent) : QOpenGLWidget(parent) {
     setFocusPolicy(Qt::StrongFocus);
     setSurface([](float u, float v) -> QVector3D {
@@ -108,14 +104,12 @@ void QuadricWidget::resetView() {
     update();
 }
 
-// setSurface
-
 void QuadricWidget::setSurface(SurfaceFunc fn,
                                 float uMin, float uMax,
                                 float vMin, float vMax,
                                 int uSteps, int vSteps) {
     surface_ = std::move(fn);
-    hasSurf2_ = false;  // 切换曲面时清除第二曲面
+    hasSurf2_ = false;  
     uMin_ = uMin; uMax_ = uMax;
     vMin_ = vMin; vMax_ = vMax;
     uSteps_ = uSteps; vSteps_ = vSteps;
@@ -143,8 +137,6 @@ void QuadricWidget::setSecondSurface(SurfaceFunc fn,
     }
     update();
 }
-
-// initializeGL
 
 void QuadricWidget::initializeGL() {
     auto* f = QOpenGLContext::currentContext()->functions();
@@ -174,8 +166,6 @@ void QuadricWidget::initializeGL() {
     buildAxesMesh();
     buildGridMesh();
 }
-
-// Surface mesh
 
 void QuadricWidget::rebuildMesh() {
     if (!surface_) return;
@@ -222,7 +212,6 @@ void QuadricWidget::rebuildMesh() {
     prog_->setAttributeBuffer(1, GL_FLOAT, offsetof(Vertex, nx), 3, sizeof(Vertex));
     surfVao_.release();
 
-    // Build second surface if set
     if (hasSurf2_ && surface2_) {
         struct Vertex { float x, y, z, nx, ny, nz; };
         std::vector<Vertex> verts;
@@ -270,36 +259,32 @@ void QuadricWidget::rebuildMesh() {
     }
 }
 
-// Axes mesh with arrow tips
-
 void QuadricWidget::buildAxesMesh() {
     struct V { float x, y, z, r, g, b; };
     std::vector<V> v;
     float len = 3.0f;
 
-    // X axis (warm red)
     v.push_back({0, 0, 0, 0.85f, 0.30f, 0.25f});
     v.push_back({len, 0, 0, 0.85f, 0.30f, 0.25f});
-    // Y axis (green)
+
     v.push_back({0, 0, 0, 0.30f, 0.80f, 0.35f});
     v.push_back({0, len, 0, 0.30f, 0.80f, 0.35f});
-    // Z axis (blue)
+
     v.push_back({0, 0, 0, 0.35f, 0.50f, 1.0f});
     v.push_back({0, 0, len, 0.35f, 0.50f, 1.0f});
 
-    // Arrow tips (small lines forming a V at each axis end)
     float t = 0.15f, s = 0.06f;
-    // X arrow
+
     v.push_back({len, 0, 0, 0.85f, 0.30f, 0.25f}); v.push_back({len-t, s, 0, 0.85f, 0.30f, 0.25f});
     v.push_back({len, 0, 0, 0.85f, 0.30f, 0.25f}); v.push_back({len-t, -s, 0, 0.85f, 0.30f, 0.25f});
     v.push_back({len, 0, 0, 0.85f, 0.30f, 0.25f}); v.push_back({len-t, 0, s, 0.85f, 0.30f, 0.25f});
     v.push_back({len, 0, 0, 0.85f, 0.30f, 0.25f}); v.push_back({len-t, 0, -s, 0.85f, 0.30f, 0.25f});
-    // Y arrow
+
     v.push_back({0, len, 0, 0.30f, 0.80f, 0.35f}); v.push_back({s, len-t, 0, 0.30f, 0.80f, 0.35f});
     v.push_back({0, len, 0, 0.30f, 0.80f, 0.35f}); v.push_back({-s, len-t, 0, 0.30f, 0.80f, 0.35f});
     v.push_back({0, len, 0, 0.30f, 0.80f, 0.35f}); v.push_back({0, len-t, s, 0.30f, 0.80f, 0.35f});
     v.push_back({0, len, 0, 0.30f, 0.80f, 0.35f}); v.push_back({0, len-t, -s, 0.30f, 0.80f, 0.35f});
-    // Z arrow
+
     v.push_back({0, 0, len, 0.35f, 0.50f, 1.0f}); v.push_back({s, 0, len-t, 0.35f, 0.50f, 1.0f});
     v.push_back({0, 0, len, 0.35f, 0.50f, 1.0f}); v.push_back({-s, 0, len-t, 0.35f, 0.50f, 1.0f});
     v.push_back({0, 0, len, 0.35f, 0.50f, 1.0f}); v.push_back({0, s, len-t, 0.35f, 0.50f, 1.0f});
@@ -317,8 +302,6 @@ void QuadricWidget::buildAxesMesh() {
     lineProg_->setAttributeBuffer(1, GL_FLOAT, offsetof(V, r), 3, sizeof(V));
     axesVao_.release();
 }
-
-// Grid mesh
 
 void QuadricWidget::buildGridMesh() {
     struct V { float x, y, z, r, g, b; };
@@ -351,11 +334,7 @@ void QuadricWidget::buildGridMesh() {
     gridVao_.release();
 }
 
-// resizeGL
-
 void QuadricWidget::resizeGL(int, int) {}
-
-// paintGL
 
 void QuadricWidget::paintGL() {
     auto* f = QOpenGLContext::currentContext()->functions();
@@ -377,7 +356,6 @@ void QuadricWidget::paintGL() {
 
     QVector3D eyePos(0, 0, zoom_);
 
-    // Draw grid
     if (drawGrid_ && gridVertCount_ > 0) {
         f->glLineWidth(1.0f);
         lineProg_->bind();
@@ -388,7 +366,6 @@ void QuadricWidget::paintGL() {
         lineProg_->release();
     }
 
-    // Draw axes
     if (drawAxes_ && axesVertCount_ > 0) {
         f->glLineWidth(2.0f);
         lineProg_->bind();
@@ -401,7 +378,6 @@ void QuadricWidget::paintGL() {
 
     f->glEnable(GL_BLEND);
 
-    // Draw surface 1
     auto drawSurf = [&](GLsizei count, QOpenGLVertexArrayObject& vao) {
         f->glCullFace(GL_FRONT);
         f->glEnable(GL_CULL_FACE);
@@ -425,7 +401,6 @@ void QuadricWidget::paintGL() {
         prog_->release();
     }
 
-    // Draw surface 2
     if (surf2IndexCount_ > 0) {
         prog_->bind();
         prog_->setUniformValue("uMVP", mvp);
@@ -440,8 +415,6 @@ void QuadricWidget::paintGL() {
         prog_->release();
     }
 }
-
-// Mouse interaction
 
 void QuadricWidget::mousePressEvent(QMouseEvent* ev) {
     lastMouse_ = ev->pos();
@@ -470,4 +443,4 @@ void QuadricWidget::wheelEvent(QWheelEvent* ev) {
     update();
 }
 
-} // namespace AlgeMate::Calculator::Visualize
+} 

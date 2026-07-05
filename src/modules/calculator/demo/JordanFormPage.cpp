@@ -31,7 +31,6 @@ namespace AlgeMate::Calculator::Demo {
 
 namespace {
 
-// λ-矩阵 → LaTeX（矩阵元素为多项式）
 QString lambdaMatLtx(const LambdaMatrix& M) {
     const auto R = M.rows(), C = M.cols();
     if (R == 0 || C == 0) return QStringLiteral("()");
@@ -51,11 +50,8 @@ QString lambdaMatLtx(const LambdaMatrix& M) {
         .arg(cols, body);
 }
 
-// ---- 数值求根: Durand-Kerner 方法 (来自特征值与特征向量) ----
-
 using Cmplx = std::complex<double>;
 
-// 多项式系数低位优先 → std::complex<double>
 std::vector<Cmplx> polyToCoeffs(const Polynomial<Fraction>& p) {
     std::vector<Cmplx> c;
     for (const auto& coeff : p.coeffs())
@@ -63,7 +59,6 @@ std::vector<Cmplx> polyToCoeffs(const Polynomial<Fraction>& p) {
     return c;
 }
 
-// Horner 求值
 Cmplx evalPoly(const std::vector<Cmplx>& c, Cmplx x) {
     Cmplx r(0.0, 0.0);
     for (int i = static_cast<int>(c.size()) - 1; i >= 0; --i)
@@ -71,7 +66,6 @@ Cmplx evalPoly(const std::vector<Cmplx>& c, Cmplx x) {
     return r;
 }
 
-// Durand-Kerner 同时求全部复根
 std::vector<Cmplx> durandKerner(const std::vector<Cmplx>& c) {
     int n = static_cast<int>(c.size()) - 1;
     if (n <= 0) return {};
@@ -99,7 +93,6 @@ std::vector<Cmplx> durandKerner(const std::vector<Cmplx>& c) {
     return roots;
 }
 
-// 格式化 double（去尾随零，与 EigenPage 一致）
 QString fmtDouble(double v) {
     if (std::abs(v) < 1e-12) v = 0.0;
     QString s = QString::number(v, 'f', 2);
@@ -110,9 +103,8 @@ QString fmtDouble(double v) {
     return s;
 }
 
-// 数值复数 → LaTeX（fmtDouble 本身就把 <0.005 的虚部格式化成 "0"，直接利用这点）
 QString complexNumLtx(double re, double im) {
-    // 虚部格式化后为 "0" → 纯实数，不显示 +0i
+
     if (fmtDouble(std::abs(im)) == QStringLiteral("0"))
         return fmtDouble(re);
     if (fmtDouble(std::abs(re)) == QStringLiteral("0")) {
@@ -124,17 +116,16 @@ QString complexNumLtx(double re, double im) {
     return fmtDouble(re) + sign + fmtDouble(im) + QStringLiteral("i");
 }
 
-// 对多项式数值求根, 合并相近根得到重数, 返回 (实部, 虚部, 重数)
 struct NumRoot { double re; double im; int mult; };
 std::vector<NumRoot> numericalRoots(const Polynomial<Fraction>& p) {
     if (p.degree() <= 0) return {};
     auto coeffs = polyToCoeffs(p);
     auto roots = durandKerner(coeffs);
-    // 清理微小虚部（fmtDouble 认为 <0.005 就是 0，一致处理）
+
     for (auto& r : roots) {
         if (std::abs(r.imag()) < 1e-3) r = Cmplx(r.real(), 0.0);
     }
-    // 按重数合并相近根
+
     std::vector<NumRoot> result;
     std::vector<bool> used(roots.size(), false);
     for (std::size_t i = 0; i < roots.size(); ++i) {
@@ -155,12 +146,10 @@ std::vector<NumRoot> numericalRoots(const Polynomial<Fraction>& p) {
     return result;
 }
 
-// 单个因子 → LaTeX
-// 格式参照：(λ-3)(λ-2i)(λ-(1+2i))
 QString formatFactorLtx(double re, double im, int mult) {
     QString factor;
     if (fmtDouble(std::abs(im)) == QStringLiteral("0")) {
-        // 实特征值
+
         if (fmtDouble(std::abs(re)) == QStringLiteral("0"))
             factor = QStringLiteral("\\lambda");
         else if (re > 0)
@@ -168,20 +157,19 @@ QString formatFactorLtx(double re, double im, int mult) {
         else
             factor = QStringLiteral("(\\lambda + %1)").arg(fmtDouble(-re));
     } else if (fmtDouble(std::abs(re)) == QStringLiteral("0")) {
-        // 纯虚数: (λ - bi) 或 (λ + |b|i)
+
         if (im > 0)
             factor = QStringLiteral("(\\lambda - %1)").arg(complexNumLtx(0, im));
         else
             factor = QStringLiteral("(\\lambda + %1)").arg(complexNumLtx(0, -im));
     } else {
-        // 一般复数: (λ - (a+bi))
+
         factor = QStringLiteral("(\\lambda - (%1))").arg(complexNumLtx(re, im));
     }
     if (mult > 1) factor += QStringLiteral("^{%1}").arg(mult);
     return factor;
 }
 
-// 数值分解多项式 → LaTeX 乘积形式
 QString factorPolyNumLtx(const Polynomial<Fraction>& p) {
     if (p.degree() <= 0) return polyLtx(p);
     auto roots = numericalRoots(p);
@@ -192,7 +180,7 @@ QString factorPolyNumLtx(const Polynomial<Fraction>& p) {
     return parts.join(QString());
 }
 
-} // anonymous namespace
+} 
 
 JordanFormPage::JordanFormPage(QWidget* parent)
     : QWidget(parent)
@@ -201,7 +189,6 @@ JordanFormPage::JordanFormPage(QWidget* parent)
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // ---------- top bar ----------
     auto* topBar = new QWidget;
     topBar->setFixedHeight(48);
     auto* topLay = new QHBoxLayout(topBar);
@@ -223,7 +210,6 @@ JordanFormPage::JordanFormPage(QWidget* parent)
 
     root->addWidget(topBar);
 
-    // ---------- scrollable content ----------
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -233,7 +219,6 @@ JordanFormPage::JordanFormPage(QWidget* parent)
     cLay->setContentsMargins(24, 16, 24, 24);
     cLay->setSpacing(16);
 
-    // -- parameter row --
     auto* paramW = new QWidget;
     auto* pLay = new QHBoxLayout(paramW);
     pLay->setContentsMargins(0, 0, 0, 0);
@@ -258,13 +243,11 @@ JordanFormPage::JordanFormPage(QWidget* parent)
 
     cLay->addWidget(paramW);
 
-    // -- grid container --
     gridContainer_ = new QWidget;
     gridContainerLay_ = new QVBoxLayout(gridContainer_);
     gridContainerLay_->setContentsMargins(0, 0, 0, 0);
     cLay->addWidget(gridContainer_);
 
-    // -- solve button --
     solveBtn_ = new QPushButton(QStringLiteral("开始求解"));
     solveBtn_->setEnabled(false);
     solveBtn_->setCursor(Qt::PointingHandCursor);
@@ -277,7 +260,6 @@ JordanFormPage::JordanFormPage(QWidget* parent)
     connect(solveBtn_, &QPushButton::clicked, this, &JordanFormPage::onSolve);
     cLay->addWidget(solveBtn_);
 
-    // -- demo button --
     auto* demoBtn = new QPushButton(QStringLiteral("演示例题"));
     demoBtn->setCursor(Qt::PointingHandCursor);
     demoBtn->setStyleSheet(QStringLiteral(
@@ -287,7 +269,6 @@ JordanFormPage::JordanFormPage(QWidget* parent)
     connect(demoBtn, &QPushButton::clicked, this, &JordanFormPage::onDemo);
     cLay->addWidget(demoBtn);
 
-    // -- result browser --
     resultBrowser_ = new QTextBrowser;
         attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setOpenLinks(false);
@@ -395,7 +376,6 @@ void JordanFormPage::onSolve()
 {
     if (curN_ == 0) return;
 
-    // ---- 1. Parse input → Matrix<Fraction> A ----
     Matrix<Fraction> A(static_cast<std::size_t>(curN_),
                        static_cast<std::size_t>(curN_));
     for (int i = 0; i < curN_; ++i) {
@@ -427,14 +407,12 @@ void JordanFormPage::onSolve()
 
     parts << sectionHtml(QStringLiteral("解"), th);
 
-    // ---- 2. Build characteristic λ-matrix ----
     LambdaMatrix lamM = lambdaMinus(A);
 
     parts << paraHtml(QStringLiteral(
         "写出特征矩阵 $\\lambda I - A$："), th, doc);
     parts << formulaHtml(QStringLiteral("\\lambda I - A = ") + lambdaMatLtx(lamM), th, doc, 14);
 
-    // ---- 3. Compute determinantal divisors D_k (from large to small) ----
     std::vector<Polynomial<Fraction>> D = determinantalDivisors(lamM);
     const std::size_t n = static_cast<std::size_t>(curN_);
 
@@ -450,11 +428,10 @@ void JordanFormPage::onSolve()
             th, doc, 14);
     }
 
-    // ---- 4. Compute ALL invariant factors d_k = D_k / D_{k-1} (including 1s) ----
     std::vector<Polynomial<Fraction>> allInvs;
     std::vector<Polynomial<Fraction>> nonOneInvs;
     {
-        Polynomial<Fraction> D_prev(Fraction(1));  // D_0(λ) = 1
+        Polynomial<Fraction> D_prev(Fraction(1));  
         for (std::size_t k = 0; k < D.size(); ++k) {
             auto qr = D[k].divmod(D_prev);
             allInvs.push_back(qr.quotient);
@@ -475,12 +452,10 @@ void JordanFormPage::onSolve()
             th, doc, 14);
     }
 
-    // ---- 5. Elementary divisors (grouped by invariant factor, factored over C) ----
     parts << paraHtml(QStringLiteral(
         "初等因子"
         "（将每个非常数不变因子在复数域上分解为一次因式的幂）："), th, doc);
 
-    // 同时保存数值块信息用于显示
     struct BlockInfo { double re; double im; int size; };
     std::vector<std::pair<Complex, int>> jordanBlockSpecs;
     std::vector<BlockInfo> blockInfos;
@@ -501,10 +476,8 @@ void JordanFormPage::onSolve()
         }
     }
 
-    // ---- 6. Construct Jordan canonical form from blocks ----
     auto jcf = jordanFromBlocks(jordanBlockSpecs);
 
-    // ---- 7. Show Jordan blocks ----
     parts << paraHtml(QStringLiteral(
         "由初等因子写出 Jordan 块："), th, doc);
     for (const auto& bi : blockInfos) {
@@ -514,13 +487,12 @@ void JordanFormPage::onSolve()
             th, doc, 14);
     }
 
-    // ---- 8. Show Jordan form matrix (numerical values only) ----
     parts << paraHtml(QStringLiteral(
         "所以，矩阵 $A$ 的 Jordan 标准形为"), th, doc);
     {
         std::size_t total = 0;
         for (const auto& bi : blockInfos) total += static_cast<std::size_t>(bi.size);
-        // JKQTMathText 单列 array 有 bug，需 ghost 列
+
         const bool ghost = (total == 1);
         QString cols = ghost ? QStringLiteral("cr")
                              : QString(static_cast<int>(total), QLatin1Char('c'));
@@ -560,7 +532,6 @@ void JordanFormPage::onDemo()
     spinN_->setValue(3);
     onGenerate();
 
-    // A = [2, 3, 2; 1, 8, 2; -2, -14, -3]
     const std::vector<std::vector<int>> demo = {
         {2, 3, 2},
         {1, 8, 2},
@@ -573,4 +544,4 @@ void JordanFormPage::onDemo()
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

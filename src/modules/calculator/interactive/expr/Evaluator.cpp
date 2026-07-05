@@ -35,15 +35,7 @@ using algemate::math::Matrix;
 using algemate::math::Polynomial;
 using algemate::math::PolynomialZp;
 
-// 类型转换辅助
-
 namespace {
-
-// ================ Jordan / 复根数值化辅助 (参考 demo/JordanFormPage) ================
-//
-// 原 “jordan(A)” 走 algemate::math::jordanForm 的精确复数路径，在含重根或复特征
-// 值时会崩溃。现改为：先走 λ-矩阵 → 行列式因子 → 不变因子（均精确），再在 ℂ 上
-// 用 Durand–Kerner 数值求根得到初等因子 / Jordan 块。与 demo 页一致。
 
 using JCmplx = std::complex<double>;
 
@@ -123,7 +115,6 @@ inline QString jFmtDouble(double v) {
     return s;
 }
 
-// 复数 (re, im) → LaTeX. 纯实 / 纯虚 / 一般复数 三种格式。
 inline QString jComplexNumLtx(double re, double im) {
     if (jFmtDouble(std::abs(im)) == QStringLiteral("0"))
         return jFmtDouble(re);
@@ -136,7 +127,6 @@ inline QString jComplexNumLtx(double re, double im) {
     return jFmtDouble(re) + sign + jFmtDouble(im) + QStringLiteral("i");
 }
 
-// 初等因子的单个一次因式 LaTeX, 例如 (\lambda - 3) / (\lambda + 2) / (\lambda - 2i) / (\lambda - (1+2i))
 inline QString jFormatFactorLtx(double re, double im, int mult) {
     QString factor;
     if (jFmtDouble(std::abs(im)) == QStringLiteral("0")) {
@@ -158,7 +148,7 @@ inline QString jFormatFactorLtx(double re, double im, int mult) {
     return factor;
 }
 
-} // anonymous namespace
+} 
 
 static Matrix<Fraction> toFractionMatrix(const MatrixA& M, const char* op) {
     Matrix<Fraction> F(M.rows(), M.cols());
@@ -180,7 +170,6 @@ static MatrixA toAlgRealMatrix(const Matrix<Fraction>& F) {
             M(i, j) = AlgReal(F(i, j));
     return M;
 }
-
 
 static bool hasAlgebraicElem_(const MatrixA& M) {
     for (std::size_t i = 0; i < M.rows(); ++i)
@@ -205,8 +194,6 @@ static MatrixA fromDoubleMatrix_(const algemate::math::Matrix<double>& D) {
     return M;
 }
 
-// Faddeev-LeVerrier: 数值计算 double 矩阵的特征多项式系数
-// 返回 c[0]..c[n], 其中 c[n]=1, 多项式为 λ^n + c[n-1]λ^{n-1} + ... + c[0]
 static std::vector<double> charpolyDouble(const algemate::math::Matrix<double>& A) {
     std::size_t n = A.rows();
     algemate::math::Matrix<double> M = A;
@@ -226,7 +213,6 @@ static std::vector<double> charpolyDouble(const algemate::math::Matrix<double>& 
     return c;
 }
 
-// double 版 Gauss 消元
 static algemate::math::Matrix<double> gaussEliminateDouble_(algemate::math::Matrix<double> M,
                                                            bool fullReduce, int* swaps = nullptr) {
     const std::size_t R = M.rows();
@@ -236,7 +222,7 @@ static algemate::math::Matrix<double> gaussEliminateDouble_(algemate::math::Matr
     int sw = 0;
     for (std::size_t r = 0; r < R; ++r) {
         if (lead >= C) break;
-        // 部分主元: 选 |pivot| 最大的行
+
         std::size_t best = r;
         double bestAbs = std::abs(M(r, lead));
         for (std::size_t i = r + 1; i < R; ++i) {
@@ -277,7 +263,6 @@ static algemate::math::Matrix<double> gaussEliminateDouble_(algemate::math::Matr
     return M;
 }
 
-// RREF: 返回行最简阶梯形, swaps 记录行交换次数
 static MatrixA gaussEliminateAlg(MatrixA M, bool fullReduce, int* swaps = nullptr) {
     const std::size_t R = M.rows();
     const std::size_t C = M.cols();
@@ -293,15 +278,15 @@ static MatrixA gaussEliminateAlg(MatrixA M, bool fullReduce, int* swaps = nullpt
             continue;
         }
         if (i != r) { M.swapRows(i, r); ++sw; }
-        // 归一 (满秩阶梯形) 或 保留主元 (仅 REF)
+
         Scalar pivot = M(r, lead);
         if (fullReduce) {
-            // M(r, *) /= pivot
+
             for (std::size_t c = 0; c < C; ++c) {
                 if (c == lead) M(r, c) = Scalar((long long)1);
                 else M(r, c) = M(r, c) / pivot;
             }
-            // 消去其他行的 lead 列
+
             for (std::size_t k = 0; k < R; ++k) {
                 if (k == r) continue;
                 Scalar f = M(k, lead);
@@ -311,7 +296,7 @@ static MatrixA gaussEliminateAlg(MatrixA M, bool fullReduce, int* swaps = nullpt
                 }
             }
         } else {
-            // 只消交下方
+
             for (std::size_t k = r + 1; k < R; ++k) {
                 Scalar f = M(k, lead);
                 if (f.isZero()) continue;
@@ -330,7 +315,7 @@ static MatrixA gaussEliminateAlg(MatrixA M, bool fullReduce, int* swaps = nullpt
 static Scalar detAlg(const MatrixA& M) {
     if (!M.isSquare()) throw std::runtime_error("det 要求方阵");
     if (hasAlgebraicElem_(M)) {
-        // 代数数矩阵 → double 降级 (稳定优先)
+
         int sw = 0;
         auto U = gaussEliminateDouble_(toDoubleMatrix_(M), false, &sw);
         double d = 1.0;
@@ -383,7 +368,7 @@ static MatrixA invAlg(const MatrixA& M) {
     if (!M.isSquare()) throw std::runtime_error("inv 要求方阵");
     const std::size_t N = M.rows();
     if (hasAlgebraicElem_(M)) {
-        // 代数数矩阵 → double 降级
+
         algemate::math::Matrix<double> aug(N, 2 * N);
         auto D = toDoubleMatrix_(M);
         for (std::size_t i = 0; i < N; ++i) {
@@ -412,7 +397,7 @@ static MatrixA invAlg(const MatrixA& M) {
             aug(i, N + j) = (i == j) ? Scalar((long long)1) : Scalar();
     }
     MatrixA R = gaussEliminateAlg(aug, true);
-    // 左半必须是单位矩阵
+
     for (std::size_t i = 0; i < N; ++i) {
         for (std::size_t j = 0; j < N; ++j) {
             bool ok = (i == j) ? (R(i, j) - Scalar((long long)1)).isZero()
@@ -427,10 +412,6 @@ static MatrixA invAlg(const MatrixA& M) {
     return Inv;
 }
 
-// 判断 AST 子树是否只含纯代数结构 (Number/Ident/Unary/Binary),
-// 用于赋值分派: 只有纯多项式表达式才走 astToPolyCoeffs_ 路径,
-// 含 Call/Matrix 等节点的 RHS 走普通 eval_ (避免 bug 2:
-// m = squarefree(x^3-x^2) 因 astToPolyCoeffs_ 不支持 K::Call 而抛错).
 static bool isPureArithmeticAst_(const NodePtr& n) {
     using K = Node::Kind;
     if (!n) return false;
@@ -439,7 +420,7 @@ static bool isPureArithmeticAst_(const NodePtr& n) {
         case K::Unary:  return isPureArithmeticAst_(n->child);
         case K::Binary: return isPureArithmeticAst_(n->lhs)
                             && isPureArithmeticAst_(n->rhs);
-        default: return false; // Call / Matrix / Assign
+        default: return false; 
     }
 }
 
@@ -455,9 +436,6 @@ static int algRealToInt(const Scalar& x, const char* ctx) {
     return (int)n;
 }
 
-// ---------------- 多项式辅助 ----------------
-
-// 从 Value(Polynomial) 提取 Polynomial<Fraction>. 系数必须全为有理数.
 static Polynomial<Fraction> valueToPoly(const Value& v, const char* op) {
     if (!v.isPolynomial())
         throw std::runtime_error(std::string(op) + " 需要多项式参数");
@@ -481,8 +459,6 @@ static Value polyToValue(const Polynomial<Fraction>& p, const QString& var) {
     return Value(out, var);
 }
 
-// 将 Polynomial<Fraction> 转为 LaTeX 片段 (不包 $), 用于 note 内联显示.
-// var 为变量的 LaTeX 形式 (如 "x" / "\\lambda ").
 static QString polyFractionToLatex_(const Polynomial<Fraction>& p, const QString& var) {
     const auto& coeffs = p.coeffs();
     if (coeffs.empty()) return QStringLiteral("0");
@@ -513,8 +489,6 @@ static QString polyFractionToLatex_(const Polynomial<Fraction>& p, const QString
     return out;
 }
 
-// 多项式函数集: 这些函数可以接受含符号变量的表达式作为参数.
-// 名称统一为全小写 (调用点已在 K::Call 处 toLower), 别名在此列出.
 static bool isPolyFn_(const std::string& fn) {
     return fn == "gcd" || fn == "polygcd"
         || fn == "factor"
@@ -527,37 +501,35 @@ static bool isPolyFn_(const std::string& fn) {
         || fn == "roots";
 }
 
-// Evaluator
-
 std::vector<QString> Evaluator::supportedFunctions() {
     return {
-        // 数值
+
         QStringLiteral("sqrt(x)"),  QStringLiteral("root(n, x)"),  QStringLiteral("abs(x)"),
-        // 复数 (精确模式下仅 Q[i]; 参数含 sqrt 等按数值近似)
+
         QStringLiteral("re(z)"),  QStringLiteral("im(z)"),
         QStringLiteral("conj(z)"),  QStringLiteral("arg(z)"),
-        // 矩阵构造
+
         QStringLiteral("Identity(n)"),  QStringLiteral("zeros(m, n)"),  QStringLiteral("ones(m, n)"),
-        // 矩阵基础
+
         QStringLiteral("tr(M)"),  QStringLiteral("transpose(M)"),
         QStringLiteral("det(M)"),  QStringLiteral("rank(M)"),
         QStringLiteral("inv(M)"),  QStringLiteral("rref(M)"),
-        // 线性方程
+
         QStringLiteral("solve(A, b)"),  QStringLiteral("nullspace(M)"),
-        // 特征结构
+
         QStringLiteral("charpoly(M)"),  QStringLiteral("eigs(M)"),
         QStringLiteral("ceigs(M)"),
-        // 二次型 / 对称矩阵
+
         QStringLiteral("issym(A)"),   QStringLiteral("signature(A)"),
         QStringLiteral("definiteness(A)"),
         QStringLiteral("congdiag(A)"),
-        // 矩阵分解
+
         QStringLiteral("lu(A)"),  QStringLiteral("qr(A)"),
         QStringLiteral("svd(A)"),
         QStringLiteral("gramschmidt(V)"),
-        // 标准形
+
         QStringLiteral("jordan(A)"),  QStringLiteral("rcf(A)"),
-        // 多项式
+
         QStringLiteral("polygcd(p, q)"),  QStringLiteral("factor(p)"),
         QStringLiteral("resultant(f, g)"),  QStringLiteral("discriminant(f)"),
         QStringLiteral("rationalroots(p)"),
@@ -584,11 +556,10 @@ EvalResult Evaluator::evaluate(const QString& source) {
     try {
         lastCallNote_.clear();
         if (pr.root->kind == Node::Kind::Assign) {
-            // i 保留作为虚数单位, 不允许被用户赋值覆盖.
+
             if (pr.root->name == "i")
                 throw std::runtime_error("i 保留作为虚数单位, 不允许赋值");
-            // 赋值 RHS 含唯一自由变量 → 构造多项式 Value (支持  f = x^2+1  /  f(x) = x^2+1).
-            //   多变量或无自由变量的 RHS 仍走普通 eval_ 路径.
+
             Value v;
             std::set<std::string> fvs;
             collectFreeVars_(pr.root->child, fvs);
@@ -597,7 +568,7 @@ EvalResult Evaluator::evaluate(const QString& source) {
                 auto coeffs = astToPolyCoeffs_(pr.root->child, var);
                 v = Value(coeffs, QString::fromStdString(var));
             } else {
-                // RHS 含 Call (如 squarefree(...)) / Matrix / 多变量 → 普通求值.
+
                 v = eval_(pr.root->child);
             }
             env_[pr.root->name] = v;
@@ -625,20 +596,20 @@ Value Evaluator::eval_(const NodePtr& n) {
     using K = Node::Kind;
     switch (n->kind) {
     case K::Number: {
-        // 字符串 -> Fraction -> AlgReal
+
         const std::string& s = n->name;
         if (s.find('.') == std::string::npos) {
             return Value(Scalar(Fraction(BigInt(s))));
         }
-        // 小数: 把 a.bcd 转 (abcd) / 10^3
+
         auto dot = s.find('.');
         std::string intPart = s.substr(0, dot);
         std::string fracPart = s.substr(dot + 1);
         if (intPart.empty()) intPart = "0";
         if (fracPart.empty()) return Value(Scalar(Fraction(BigInt(intPart))));
-        // 合并
+
         std::string whole = intPart + fracPart;
-        // 除去负号处理: 若 intPart 负, 小数部分按绝对值处理
+
         bool neg = (!intPart.empty() && intPart[0] == '-');
         if (neg) whole = "-" + intPart.substr(1) + fracPart;
         BigInt num(whole);
@@ -647,7 +618,7 @@ Value Evaluator::eval_(const NodePtr& n) {
         return Value(Scalar(Fraction(num, den)));
     }
     case K::Ident: {
-        // 虚数单位 i 保留, 不受环境变量覆盖 (Assign 路径已拦截 i 的赋值).
+
         if (n->name == "i") return Value(Complex::i());
         auto it = env_.find(n->name);
         if (it == env_.end())
@@ -687,13 +658,11 @@ Value Evaluator::eval_(const NodePtr& n) {
         throw std::runtime_error("未知二元运算: " + n->name);
     }
     case K::Call: {
-        // 函数名大小写不敏感: 统一转小写再分发; 变量名 (env 查找) 仍保持原始大小写.
+
         std::string fn = n->name;
         std::transform(fn.begin(), fn.end(), fn.begin(),
                        [](unsigned char c) { return std::tolower(c); });
-        // 用户自定义多项式函数调用: env 里 name 是多项式 → 代入求值.
-        //   f = x^2 + 1  之后  f(2) → 5,  f(y) → 换元后的多项式(y),  f(2x+1) → 展开新多项式.
-        //   为避免和 i 这类特殊标识混淆, 此处过滤 name == "i".
+
         if (n->name != "i") {
             auto it = env_.find(n->name);
             if (it != env_.end() && it->second.isPolynomial()) {
@@ -703,9 +672,7 @@ Value Evaluator::eval_(const NodePtr& n) {
                 const Value& poly = it->second;
                 const auto& cs = poly.asPolyCoeffs();
                 Value argv = eval_(n->args[0]);
-                // 标量求值. 若系数全为有理数, 用 AlgReal::evaluatePoly
-                // (内部通过结式, 度数不膨胀) 一次求值, 避免 Horner 循环中
-                // AlgReal 的 minPoly 度数指数爆炸 (4→16→64→256 导致崩溃, bug 3).
+
                 if (argv.isScalar()) {
                     if (cs.empty()) return Value(Scalar(Fraction(0)));
                     bool allRational = true;
@@ -721,13 +688,13 @@ Value Evaluator::eval_(const NodePtr& n) {
                         }
                         return Value(AlgReal::evaluatePoly(fp, argv.asScalar()));
                     }
-                    // 系数含代数数 (罕见): 退化为 Horner (可能仍有爆炸风险, 但至少不是默认路径)
+
                     Scalar acc = cs.back();
                     for (int i = (int)cs.size() - 2; i >= 0; --i)
                         acc = acc * argv.asScalar() + cs[i];
                     return Value(acc);
                 }
-                // 复标量: 复数 Horner
+
                 if (argv.isComplexScalar()) {
                     if (cs.empty()) return Value(ComplexC());
                     ComplexC acc(cs.back());
@@ -735,13 +702,13 @@ Value Evaluator::eval_(const NodePtr& n) {
                         acc = acc * argv.asComplex() + ComplexC(cs[i]);
                     return Value(acc);
                 }
-                // 多项式: 代入展开得到新多项式
+
                 if (argv.isPolynomial()) {
                     const auto& ac = argv.asPolyCoeffs();
                     std::vector<Scalar> acc;
                     if (!cs.empty()) acc = { cs.back() };
                     for (int i = (int)cs.size() - 2; i >= 0; --i) {
-                        // tmp = acc * ac
+
                         std::vector<Scalar> tmp;
                         if (acc.empty() || ac.empty()) tmp = {};
                         else {
@@ -750,7 +717,7 @@ Value Evaluator::eval_(const NodePtr& n) {
                                 for (std::size_t b = 0; b < ac.size(); ++b)
                                     tmp[a + b] = tmp[a + b] + acc[a] * ac[b];
                         }
-                        // + cs[i]
+
                         if (tmp.empty()) tmp.push_back(cs[i]);
                         else tmp[0] = tmp[0] + cs[i];
                         acc = std::move(tmp);
@@ -763,7 +730,7 @@ Value Evaluator::eval_(const NodePtr& n) {
                     "多项式 " + n->name + " 调用参数类型不支持");
             }
         }
-        // 多项式函数 + 参数含符号变量: 走 AST→多项式路径, 避开对未定义变量的 eval.
+
         if (isPolyFn_(fn)) {
             std::set<std::string> fvs;
             for (auto& a : n->args) collectFreeVars_(a, fvs);
@@ -799,7 +766,6 @@ Value Evaluator::eval_(const NodePtr& n) {
     throw std::runtime_error("内部错误: 未知 AST 类型");
 }
 
-// Durand-Kerner: 求首一多项式 c[0..n] (c[n]=1) 的全部复根
 static std::vector<std::complex<double>> durandKernerRoots(std::vector<std::complex<double>> c) {
     std::size_t deg = c.size() - 1;
     if (deg == 0) return {};
@@ -838,10 +804,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             throw std::runtime_error(fn + " 需要 " + std::to_string(k) + " 个参数");
     };
 
-    // 标量函数
-    // sqrt / root 走精确代数数路径: sqrt(2) 返回真正的 √2 (而非有理近似),
-    //   保证 minpoly(sqrt(2)+sqrt(3)) = x^4 - 10x^2 + 1 精确正确.
-    //   复数参数仍走数值路径 (Complex 未实现符号开方).
     if (fn == "sqrt") {
         need(1);
         if (args[0].isComplexScalar()) {
@@ -856,7 +818,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         int sg = x.sign();
         if (sg == 0) return Value(Scalar());
         if (sg < 0) {
-            // sqrt(-k) = i * sqrt(k)
+
             Scalar pos = -x;
             Scalar r = pos.isRational()
                 ? AlgReal::sqrt(pos.asRational())
@@ -880,7 +842,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         if ((nIdx % 2 == 0) && sg < 0)
             throw std::runtime_error("root 偶次幂要求参数非负");
         if (sg < 0) {
-            // 奇次负根: -root(n, -x)
+
             Scalar pos = -x;
             Scalar r = pos.isRational()
                 ? AlgReal::nthRoot(pos.asRational(), nIdx)
@@ -912,7 +874,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
     if (fn == "im" || fn == "imag") {
         need(1);
         if (args[0].isComplexScalar()) return Value(args[0].asComplex().imag());
-        if (args[0].isScalar())        return Value(Scalar());  // 实数的虚部 = 0
+        if (args[0].isScalar())        return Value(Scalar());  
         throw std::runtime_error("im 需要标量/复标量");
     }
     if (fn == "conj" || fn == "conjugate") {
@@ -936,7 +898,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value(AlgReal::fromDouble(std::atan2(im, re)));
     }
 
-    // ---- 矩阵构造 ----
     if (fn == "Identity" || fn == "identity") {
         need(1);
         int k = algRealToInt(args[0].asScalar(), fn.c_str());
@@ -953,7 +914,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             : MatrixA::ones ((std::size_t)m, (std::size_t)p));
     }
 
-    // ---- 矩阵查询 / 运算 ----
     if (fn == "tr" || fn == "trace") {
         need(1);
         if (!args[0].isMatrix()) throw std::runtime_error(fn + " 需要矩阵参数");
@@ -968,7 +928,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return args[0].transpose();
     }
 
-    // ---- 代数数矩阵支持的函数 ----
     if (fn == "det") {
         need(1);
         if (!args[0].isMatrix()) throw std::runtime_error("det 需要矩阵参数");
@@ -990,7 +949,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value(invAlg(args[0].asMatrix()));
     }
 
-    // ---- ceigs/complexeigs: 支持代数数矩阵 (自动转 double 数值计算) ----
     if (fn == "ceigs" || fn == "complexeigs") {
         need(1);
         if (!args[0].isMatrix())
@@ -1003,7 +961,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         };
 
         if (hasAlgebraicElem_(M)) {
-            // 代数数矩阵: 转 double → charpoly → Durand-Kerner 求全部复根
+
             auto D = toDoubleMatrix_(M);
             auto coeffs = charpolyDouble(D);
             std::size_t deg = coeffs.size() - 1;
@@ -1028,7 +986,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             lastCallNote_ = QStringLiteral("数值解");
             return Value::makeRootList(std::move(out), QString::fromUtf8("\xce\xbb"));
         } else {
-            // 有理数矩阵: 精确复特征值算法
+
             Matrix<Fraction> F = toFractionMatrix(M, fn.c_str());
             auto res = algemate::math::complexEigenvalues(F);
             std::vector<std::pair<Scalar, Scalar>> out;
@@ -1052,7 +1010,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         }
     }
 
-    // ---- 以下函数仍需有理数矩阵 (特征多项式 / 实特征值求解) ----
     if (fn == "charpoly" || fn == "eigs" || fn == "eigenvalues"
         || fn == "nullspace") {
         need(1);
@@ -1072,7 +1029,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         }
         if (fn == "eigs" || fn == "eigenvalues") {
             if (!F.isSquare()) throw std::runtime_error(fn + " 要求方阵");
-            // charpoly + Durand-Kerner: 返回 RootList (按 λ_i = ... 逐行显示, 含重根).
+
             auto cp = algemate::math::charpoly(F);
             const auto& cs = cp.coeffs();
             std::size_t deg = cs.empty() ? 0 : cs.size() - 1;
@@ -1085,8 +1042,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             for (std::size_t i = 0; i <= deg; ++i)
                 c[i] = std::complex<double>(cs[i].toDouble() / lc, 0.0);
             auto roots = durandKernerRoots(std::move(c));
-            // 混合阈: 给定根, 虚部 Θ(|re|*1e-10) 以下 或 绝对 1e-7 以下, 都视为 0.
-            // eigs 仅返回实特征值: 虚部大于阈值的根跳过; 全复根时返回空列表 (渲染为 "无").
+
             auto toScalar = [](double x){
                 return Scalar(algemate::math::AlgReal::fromDouble(x, 1000000000));
             };
@@ -1094,7 +1050,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             out.reserve(deg);
             for (auto& r : roots) {
                 double th = std::max(1e-7, 1e-10 * std::abs(r.real()));
-                if (std::abs(r.imag()) >= th) continue;  // 非实根 → 丢弃
+                if (std::abs(r.imag()) >= th) continue;  
                 out.emplace_back(toScalar(r.real()), Scalar());
             }
             if (out.empty())
@@ -1106,7 +1062,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         if (fn == "nullspace") {
             auto ns = algemate::math::nullspace(F);
             auto nsA = toAlgRealMatrix(ns);
-            // 拆列 → 向量列表 (空则渲染为 "无", 即平凡零空间).
+
             std::vector<MatrixA> vecs;
             vecs.reserve(nsA.cols());
             for (std::size_t j = 0; j < nsA.cols(); ++j) {
@@ -1123,7 +1079,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         }
     }
 
-    // ---- 线性方程: solve(A, b) ----
     if (fn == "solve") {
         need(2);
         if (!args[0].isMatrix() || !args[1].isMatrix())
@@ -1145,7 +1100,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value(toAlgRealMatrix(res.particular));
     }
 
-    // ---- 多项式上的函数 ----
     if (fn == "polygcd" || fn == "gcd") {
         need(2);
         auto a = valueToPoly(args[0], fn.c_str());
@@ -1162,7 +1116,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         auto res = algemate::math::factorOverQ(p);
         QString var = args[0].polyVar();
         if (var.isEmpty()) var = QStringLiteral("x");
-        // Fraction → Scalar 转换
+
         std::vector<Scalar> origCoeffs;
         origCoeffs.reserve(p.coeffs().size());
         for (const auto& q : p.coeffs()) origCoeffs.emplace_back(q);
@@ -1217,14 +1171,14 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             c[i] = std::complex<double>(cs[i].toDouble() / lc, 0.0);
         auto roots = durandKernerRoots(std::move(c));
         auto toScalar = [](double x){
-            // 用大分母分数强制显示为小数（denom > 10000 时 scalarToStr 输出小数）
+
             long long num = static_cast<long long>(std::round(x * 1e8));
             return Scalar(algemate::math::Fraction(
                 algemate::math::BigInt(num), algemate::math::BigInt(100000000LL)));
         };
         std::vector<std::pair<Scalar, Scalar>> out;
         out.reserve(roots.size());
-        // roots 返回全部复根（实+虚），虚部接近于 0 的视为实根
+
         for (auto& r : roots) {
             double th = std::max(1e-7, 1e-10 * std::abs(r.real()));
             double im = (std::abs(r.imag()) < th) ? 0.0 : r.imag();
@@ -1253,8 +1207,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                 for (const auto& q : fe.first.coeffs()) fc.emplace_back(q);
                 facs.emplace_back(std::move(fc), fe.second);
             } else {
-                // Irreducible factor of degree ≥ 2 over ℚ
-                // Use Durand-Kerner to find all complex roots, pair conjugates
+
                 const auto& fcs = fe.first.coeffs();
                 double lc = fcs[deg].toDouble();
                 std::vector<std::complex<double>> c(deg + 1);
@@ -1262,7 +1215,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                     c[i] = std::complex<double>(fcs[i].toDouble() / lc, 0.0);
                 auto roots = durandKernerRoots(std::move(c));
 
-                // Separate real roots from complex conjugate pairs
                 std::vector<double> reals;
                 std::vector<std::pair<double,double>> cplx;
                 std::vector<bool> used(roots.size(), false);
@@ -1286,13 +1238,12 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                     used[i] = true;
                 }
 
-                // Build linear factors from real roots
                 for (double r : reals) {
                     long long num = static_cast<long long>(std::round(r * 1e8));
                     Fraction fr(BigInt(num), BigInt(100000000LL));
                     facs.emplace_back(std::vector<Scalar>{Scalar(-fr), Scalar(Fraction(1))}, 1);
                 }
-                // Build quadratic factors from complex pairs
+
                 for (const auto& cp : cplx) {
                     double r = cp.first, s = cp.second;
                     double b = -2.0 * r;
@@ -1322,7 +1273,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         long long q = getInt(args[1], "irredcnt: q");
         if (n < 1) throw std::runtime_error("irredcnt: n 必须是正整数");
         if (q < 2) throw std::runtime_error("irredcnt: q 必须是大于 1 的整数");
-        // 验证 q 是素数的方幂
+
         {
             long long qq = q;
             long long p = 0; int k = 0;
@@ -1333,13 +1284,13 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                 }
             }
             if (p == 0) {
-                // qq 本身是素数 (包含 q=2,3,5,7 等一次幂情况): p^1
+
                 p = qq; k = 1; qq = 1;
             }
             if (qq != 1) throw std::runtime_error(
                 "irredcnt: 有限域的阶一定是素数的方幂, q=" + std::to_string(q) + " 不合法");
         }
-        // Möbius function μ(d)
+
         auto mobius = [](long long d) -> int {
             if (d == 1) return 1;
             int cnt = 0;
@@ -1354,7 +1305,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             if (d > 1) ++cnt;
             return (cnt % 2) ? -1 : 1;
         };
-        // Compute (1/n) Σ_{d|n} μ(d) · q^{n/d}
+
         BigInt result(0);
         for (long long d = 1; d * d <= n; ++d) {
             if (n % d == 0) {
@@ -1388,7 +1339,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             }
         }
         BigInt nn(n);
-        // result / n → Fraction
+
         Fraction answer(result, nn);
         if (answer.denominator().isOne())
             return Value(Scalar(answer.numerator()));
@@ -1438,9 +1389,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value::makeText(QString::fromStdString(result));
     }
 
-    // 最小多项式
-    //   minpoly(α): 代数数 α 在 Q 上的最小多项式 (AlgReal::minPoly)
-    //   minpoly(A): 方阵 A 的最小多项式 (= 最大不变因子, Frobenius)
     if (fn == "minpoly" || fn == "minimalpolynomial") {
         need(1);
         if (args[0].isScalar()) {
@@ -1457,9 +1405,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         throw std::runtime_error("minpoly 需要代数数或方阵参数");
     }
 
-    // ---- 不可约判定 ----
-    //   irreducible(f)   : f 在 Q 上是否不可约 (调 factorOverQ, 因式数 == 1 且重数 == 1)
-    //   irreducible(f, p): f 在 F_p 上是否不可约 (p 为素数)
     if (fn == "irreducible" || fn == "irred") {
         if (args.size() != 1 && args.size() != 2)
             throw std::runtime_error(fn + " 需要 1 或 2 个参数");
@@ -1473,8 +1418,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                                 : QStringLiteral("$\\mathbb{Q}[x]$ 中可约");
             return Value(Scalar(Fraction(irr ? 1 : 0)));
         }
-        // F_p 分支
-        // polyFn 路径下 p 会被包成常数多项式, 需提取标量.
+
         Scalar pScalar;
         if (args[1].isScalar()) {
             pScalar = args[1].asScalar();
@@ -1511,7 +1455,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value(Scalar(Fraction(irr ? 1 : 0)));
     }
 
-    // 无平方部分
     if (fn == "squarefree" || fn == "sqfree") {
         need(1);
         auto f = valueToPoly(args[0], fn.c_str());
@@ -1521,7 +1464,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return polyToValue(sp, var);
     }
 
-    // ================ 二次型 / 对称矩阵 ================
     if (fn == "issym" || fn == "issymmetric") {
         need(1);
         if (!args[0].isMatrix()) throw std::runtime_error(fn + " 需要矩阵参数");
@@ -1573,7 +1515,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value::makeText(std::move(tag));
     }
 
-    // ================ 正交化 / 合同对角化 / 矩阵分解 ================
     if (fn == "gramschmidt" || fn == "gso") {
         need(1);
         if (!args[0].isMatrix()) throw std::runtime_error(fn + " 需要矩阵参数");
@@ -1635,12 +1576,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         return Value::makeNamedMatrices(std::move(items));
     }
 
-    // ================ Jordan 标准形 (复数域数值化; 参考 demo/JordanFormPage) ================
-    //
-    // 不再调用 algemate::math::jordanForm (含重根 / 复特征值时会崩溃), 改为:
-    //   1) 精确: λI - A → 行列式因子 D_k(λ) → 不变因子 d_k = D_k / D_{k-1}
-    //   2) 数值: 对每个非常量不变因子用 Durand–Kerner 在 ℂ 上求复根 → 初等因子 → Jordan 块
-    //   3) 输出: J 以 LaTeX 矩阵的形式返回 (元素可为复数), 不再提供似实矩阵 Q.
     if (fn == "jordan") {
         need(1);
         if (!args[0].isMatrix()) throw std::runtime_error("jordan 需要矩阵参数");
@@ -1648,12 +1583,10 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         if (!Ma.isSquare()) throw std::runtime_error("jordan 要求方阵");
         Matrix<Fraction> A = toFractionMatrix(Ma, "jordan");
 
-        // ---- 1. 行列式因子 D_k (精确) ----
         auto lamM = algemate::math::lambdaMinus(A);
         std::vector<Polynomial<Fraction>> D = algemate::math::determinantalDivisors(lamM);
         const std::size_t n = A.rows();
 
-        // ---- 2. 不变因子 d_k = D_k / D_{k-1} (含连续的 1) ----
         std::vector<Polynomial<Fraction>> allInvs;
         std::vector<Polynomial<Fraction>> nonOneInvs;
         {
@@ -1668,10 +1601,9 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             }
         }
 
-        // ---- 3. 初等因子 + Jordan 块 (复数域数值) ----
         struct JBlockInfo { double re; double im; int size; };
         std::vector<JBlockInfo> blockInfos;
-        std::vector<QString>    elemFactorLtx;   // 按不变因子分组拼成一个乘积字符串
+        std::vector<QString>    elemFactorLtx;   
         for (const auto& inv : nonOneInvs) {
             auto roots = jNumericalRoots(inv);
             QStringList terms;
@@ -1682,10 +1614,9 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
             elemFactorLtx.push_back(terms.join(QStringLiteral(",\\quad ")));
         }
 
-        // ---- 4. 拼出 Jordan 矩阵的 LaTeX (让完整于不变因子乘积为 1 的退化情况也能走) ----
         QString jLtx;
         if (blockInfos.empty()) {
-            // 所有不变因子都是 1 → 只能是 n=0; 多举步逻辑会报 "要求方阵", 这里避免除零.
+
             jLtx = QStringLiteral("J = ()");
         } else {
             std::size_t total = 0;
@@ -1719,7 +1650,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                 .arg(cols, body);
         }
 
-        // ---- 5. 说明垃圈 (行列式因子 / 不变因子 / 初等因子 / Jordan 块) ----
         QString note;
         note += QStringLiteral("Jordan 标准形 (复数域, 数值解); 特征值含复数时已以 $a+bi$ 形式呈现.");
         note += QStringLiteral("\n行列式因子:");
@@ -1751,7 +1681,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
                             .arg(jComplexNumLtx(bi.re, bi.im));
         }
         lastCallNote_ = note;
-        // makeText 走 renderNoteWithLatex, 需以 $...$ 包裹才会被当作 LaTeX 渲染.
+
         return Value::makeText(QStringLiteral("$") + jLtx + QStringLiteral("$"));
     }
     if (fn == "rcf" || fn == "frobenius" || fn == "rationalcanonical") {
@@ -1764,7 +1694,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         auto cp = algemate::math::charpoly(A);
         auto fact = algemate::math::factorOverQ(cp);
         QString note;
-        // 特征多项式 Q 不可约分解
+
         note += QStringLiteral("$\\det(\\lambda I - A) = ");
         bool firstTerm = true;
         if (!(fact.leadingCoefficient == Fraction(1))) {
@@ -1782,7 +1712,7 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
         }
         if (firstTerm) note += QStringLiteral("1");
         note += QStringLiteral("$");
-        // 不变因子
+
         note += QStringLiteral("\n不变因子:");
         {
             const std::size_t n = A.rows();
@@ -1805,8 +1735,6 @@ Value Evaluator::callFn_(const std::string& fn, const std::vector<Value>& args) 
 
     throw std::runtime_error("未定义的函数: " + fn);
 }
-
-// ========== AST -> 多项式 辅助 (仅为 gcd/factor/... 等多项式函数服务) ==========
 
 void Evaluator::collectFreeVars_(const NodePtr& n, std::set<std::string>& out) {
     using K = Node::Kind;
@@ -1855,7 +1783,6 @@ std::vector<Scalar> Evaluator::astToPolyCoeffs_(const NodePtr& n, const std::str
         trim(r); return r;
     };
 
-    // 子树不含 var -> 转常数项
     if (!dependsOnVar_(n, var)) {
         Value v = eval_(n);
         if (!v.isScalar())
@@ -1865,7 +1792,7 @@ std::vector<Scalar> Evaluator::astToPolyCoeffs_(const NodePtr& n, const std::str
 
     switch (n->kind) {
     case K::Ident:
-        // 必定是 var (其他会在 !dependsOnVar 分支里 fallback 或抛错)
+
         return { Scalar(Fraction(0)), Scalar(Fraction(1)) };
     case K::Unary: {
         if (n->name == "-") {
@@ -1899,7 +1826,7 @@ std::vector<Scalar> Evaluator::astToPolyCoeffs_(const NodePtr& n, const std::str
             if (p < 0) throw std::runtime_error("多项式幂次必须 >= 0");
             auto base = astToPolyCoeffs_(n->lhs, var);
             std::vector<Scalar> r = { Scalar(Fraction(1)) };
-            // 快速幂
+
             while (p > 0) {
                 if (p & 1) r = polyMul(r, base);
                 p >>= 1;
@@ -1908,7 +1835,7 @@ std::vector<Scalar> Evaluator::astToPolyCoeffs_(const NodePtr& n, const std::str
             return r;
         }
         if (n->name == "/") {
-            // 只允许除以不含 var 的标量
+
             if (dependsOnVar_(n->rhs, var))
                 throw std::runtime_error("多项式不支持除以含 " + var + " 的表达式");
             Value e = eval_(n->rhs);

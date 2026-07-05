@@ -44,11 +44,9 @@ private:
     void renderPreset(int id, double a, double b, double c, double p);
     void updateInfo(int cls);
 
-    // Input
     QLineEdit* coeffEdit_[10] = {};
     QPushButton* analyzeBtn_ = nullptr;
 
-    // Preset
     QComboBox*    presetCombo_ = nullptr;
     QDoubleSpinBox* paramA_    = nullptr;
     QDoubleSpinBox* paramB_    = nullptr;
@@ -56,7 +54,6 @@ private:
     QDoubleSpinBox* paramP_    = nullptr;
     QPushButton*  presetBtn_  = nullptr;
 
-    // Render
     QuadricWidget* quadric_     = nullptr;
     QPushButton*   resetViewBtn_ = nullptr;
     QTextBrowser*  infoBrowser_  = nullptr;

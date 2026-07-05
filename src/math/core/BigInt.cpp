@@ -321,8 +321,6 @@ double BigInt::toDouble() const {
     return negative_ ? -v : v;
 }
 
-
-// Euclid 算法
 BigInt BigInt::gcd(BigInt a, BigInt b) {
     a.negative_ = false;
     b.negative_ = false;
@@ -334,7 +332,6 @@ BigInt BigInt::gcd(BigInt a, BigInt b) {
     return a;
 }
 
-// 快速幂
 BigInt BigInt::pow(BigInt base, unsigned int exponent) {
     BigInt result(1);
     while (exponent != 0) {

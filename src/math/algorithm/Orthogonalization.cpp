@@ -6,7 +6,6 @@
 
 namespace algemate::math {
 
-// 辅助: 检查是否为列向量 (1 列) 且非空
 static void ensureColumnVector_(const Matrix<Fraction>& v, const char* who) {
     if (v.cols() != 1 || v.rows() == 0) {
         throw std::invalid_argument(std::string(who) + ": expect non-empty column vector");
@@ -60,18 +59,16 @@ Matrix<Fraction> gramSchmidt(const Matrix<Fraction>& V) {
     const std::size_t n = V.rows();
     const std::size_t k = V.cols();
 
-    // 累积非零正交向量列表
     std::vector<Matrix<Fraction>> qs;
-    std::vector<Fraction>         qNorm2;  // <q_i, q_i>
+    std::vector<Fraction>         qNorm2;  
     qs.reserve(k);
     qNorm2.reserve(k);
 
     for (std::size_t i = 0; i < k; ++i) {
-        // 取第 i 列
+
         Matrix<Fraction> v(n, 1);
         for (std::size_t r = 0; r < n; ++r) v(r, 0) = V(r, i);
 
-        // q_i = v - sum_j (<v, q_j> / <q_j, q_j>) q_j
         Matrix<Fraction> q = v;
         for (std::size_t j = 0; j < qs.size(); ++j) {
             Fraction num(0);
@@ -83,7 +80,6 @@ Matrix<Fraction> gramSchmidt(const Matrix<Fraction>& V) {
             }
         }
 
-        // 检查是否为零向量
         Fraction nn = normSquared(q);
         if (nn == Fraction(0)) continue;
 

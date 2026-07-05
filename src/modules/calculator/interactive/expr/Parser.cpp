@@ -6,7 +6,6 @@ namespace AlgeMate::Calculator::Interactive {
 
 namespace {
 
-// 异常: 携带位置, 由顶层 parse 捕获并填 ParseResult
 struct ParseError : std::runtime_error {
     int pos;
     ParseError(const std::string& msg, int p) : std::runtime_error(msg), pos(p) {}
@@ -17,7 +16,7 @@ public:
     explicit Parser(const std::vector<Token>& toks) : toks_(toks) {}
 
     NodePtr parseStmt() {
-        // 赋值: IDENT '=' expr
+
         if (toks_.size() >= 3
             && toks_[0].kind == Tok::Ident
             && toks_[1].kind == Tok::Assign) {
@@ -29,9 +28,7 @@ public:
             expectEnd_();
             return n;
         }
-        // 多项式函数定义: IDENT '(' IDENT ')' '=' expr  ——
-        //   语义等同 IDENT '=' expr; 形参名由 Evaluator 的自由变量机制自动识别.
-        //   例: f(x) = x^2 + 1  存为 f → 多项式(x^2 + 1).
+
         if (toks_.size() >= 6
             && toks_[0].kind == Tok::Ident
             && toks_[1].kind == Tok::LParen
@@ -58,7 +55,6 @@ private:
     const Token& peek() const { return toks_[pos_]; }
     const Token& consume() { return toks_[pos_++]; }
 
-    // inMatrix: 矩阵行上下文, '+' '-' 前若有空格则视为新元素起点
     NodePtr parseExpr(bool inMatrix) {
         return parseAdd(inMatrix);
     }
@@ -66,7 +62,7 @@ private:
     NodePtr parseAdd(bool inMatrix) {
         auto left = parseMul(inMatrix);
         while (peek().kind == Tok::Plus || peek().kind == Tok::Minus) {
-            // 矩阵行内: 若 +/- 前有空格, 视为新元素起点, 不消费
+
             if (inMatrix && peek().spaceBefore) break;
             std::string op = peek().text;
             consume();
@@ -84,7 +80,7 @@ private:
     NodePtr parseMul(bool inMatrix) {
         auto left = parseUnary(inMatrix);
         while (true) {
-            // 显式 * / 
+
             if (peek().kind == Tok::Star || peek().kind == Tok::Slash) {
                 std::string op = peek().text;
                 consume();
@@ -97,8 +93,7 @@ private:
                 left = n;
                 continue;
             }
-            // 隐式乘法: 左端已是完整值表达式, 若紧跟 Number/Ident/'(' 则自动插入 '*'.
-            // 矩阵行内 spaceBefore 为真时跟过, 依然由空白分隔逻辑将其视为新元素.
+
             const Tok k = peek().kind;
             const bool canStartPrimary =
                 (k == Tok::Number || k == Tok::Ident || k == Tok::LParen);
@@ -132,7 +127,6 @@ private:
         return parsePow(inMatrix);
     }
 
-    // 幂 ^: 右结合
     NodePtr parsePow(bool inMatrix) {
         auto base = parsePostfix(inMatrix);
         if (peek().kind == Tok::Caret) {
@@ -148,7 +142,6 @@ private:
         return base;
     }
 
-    // 后缀: '  (转置, 可重复)
     NodePtr parsePostfix(bool inMatrix) {
         auto p = parsePrimary(inMatrix);
         while (peek().kind == Tok::Apos) {
@@ -212,11 +205,11 @@ private:
 
     NodePtr parseMatrix() {
         const Token& lb = peek();
-        consume();  // '['
+        consume();  
         auto n = std::make_shared<Node>();
         n->kind = Node::Kind::Matrix;
         std::size_t expectedCols = 0;
-        // 空矩阵 []
+
         if (peek().kind == Tok::RBracket) {
             consume();
             return n;
@@ -231,7 +224,7 @@ private:
                     row.push_back(parseExpr(true));
                     continue;
                 }
-                // 空白分隔: 下一个 token 为行内新元素的起始之一
+
                 if (t.spaceBefore &&
                     (t.kind == Tok::Number || t.kind == Tok::Ident ||
                      t.kind == Tok::LParen || t.kind == Tok::LBracket ||
@@ -266,7 +259,7 @@ private:
     }
 };
 
-}  // anonymous ns
+}  
 
 ParseResult parse(const std::string& src) {
     ParseResult r;

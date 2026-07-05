@@ -28,10 +28,6 @@ using AlgeMate::Calculator::Interactive::RenderTheme;
 
 namespace AlgeMate::Calculator::Demo {
 
-// =====================================================================
-//  Constructor
-// =====================================================================
-
 HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
     : QWidget(parent)
 {
@@ -39,7 +35,6 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // ---------- top bar ----------
     auto* topBar = new QWidget;
     topBar->setFixedHeight(48);
     auto* topLay = new QHBoxLayout(topBar);
@@ -61,7 +56,6 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
 
     root->addWidget(topBar);
 
-    // ---------- scrollable content ----------
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -71,7 +65,6 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
     cLay->setContentsMargins(24, 16, 24, 24);
     cLay->setSpacing(16);
 
-    // -- parameter row --
     auto* paramW = new QWidget;
     auto* pLay = new QHBoxLayout(paramW);
     pLay->setContentsMargins(0, 0, 0, 0);
@@ -103,13 +96,11 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
 
     cLay->addWidget(paramW);
 
-    // -- grid container --
     gridContainer_ = new QWidget;
     gridContainerLay_ = new QVBoxLayout(gridContainer_);
     gridContainerLay_->setContentsMargins(0, 0, 0, 0);
     cLay->addWidget(gridContainer_);
 
-    // -- solve button --
     solveBtn_ = new QPushButton(QStringLiteral("开始求解"));
     solveBtn_->setEnabled(false);
     solveBtn_->setCursor(Qt::PointingHandCursor);
@@ -122,7 +113,6 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
     connect(solveBtn_, &QPushButton::clicked, this, &HomoLinearSystemPage::onSolve);
     cLay->addWidget(solveBtn_);
 
-    // -- demo button --
     auto* demoBtn = new QPushButton(QStringLiteral("演示例题"));
     demoBtn->setCursor(Qt::PointingHandCursor);
     demoBtn->setStyleSheet(QStringLiteral(
@@ -132,7 +122,6 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
     connect(demoBtn, &QPushButton::clicked, this, &HomoLinearSystemPage::onDemo);
     cLay->addWidget(demoBtn);
 
-    // -- result browser --
     resultBrowser_ = new QTextBrowser;
         attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setOpenLinks(false);
@@ -144,10 +133,6 @@ HomoLinearSystemPage::HomoLinearSystemPage(QWidget* parent)
     scroll->setWidget(content);
     root->addWidget(scroll, 1);
 }
-
-// =====================================================================
-//  Generate coefficient grid
-// =====================================================================
 
 void HomoLinearSystemPage::onGenerate()
 {
@@ -200,10 +185,6 @@ void HomoLinearSystemPage::onGenerate()
     if (!cells_.empty()) cells_[0]->setFocus();
 }
 
-// =====================================================================
-//  Arrow-key navigation between coefficient cells
-// =====================================================================
-
 bool HomoLinearSystemPage::eventFilter(QObject* obj, QEvent* ev)
 {
     if (ev->type() == QEvent::KeyPress) {
@@ -255,15 +236,10 @@ bool HomoLinearSystemPage::eventFilter(QObject* obj, QEvent* ev)
     return QWidget::eventFilter(obj, ev);
 }
 
-// =====================================================================
-//  Solve & render
-// =====================================================================
-
 void HomoLinearSystemPage::onSolve()
 {
     if (curM_ == 0 || curN_ == 0) return;
 
-    // ---- 1. Parse input → Matrix<Fraction> A (m × n) ----
     Matrix<Fraction> A(static_cast<std::size_t>(curM_),
                        static_cast<std::size_t>(curN_));
     for (int i = 0; i < curM_; ++i) {
@@ -284,16 +260,13 @@ void HomoLinearSystemPage::onSolve()
         }
     }
 
-    // ---- 2. RREF with trace ----
     StepSequence trace;
     Matrix<Fraction> R = A;
     std::size_t rk = improvedRref(R, trace);
 
-    // ---- 3. Nullspace ----
     Matrix<Fraction> N = nullspace(A);
     std::size_t nullDim = N.cols();
 
-    // ---- 4. Pivot / free columns from RREF ----
     const std::size_t n = static_cast<std::size_t>(curN_);
     std::vector<std::size_t> pivotOfRow(R.rows(), n);
     std::vector<std::size_t> pivotCols;
@@ -312,7 +285,6 @@ void HomoLinearSystemPage::onSolve()
     for (std::size_t c = 0; c < n; ++c)
         if (!isPiv[c]) freeCols.push_back(c);
 
-    // ---- 5. Build result HTML ----
     auto th = RenderTheme::forCurrent();
     auto* doc = resultBrowser_->document();
     doc->clear();
@@ -327,7 +299,6 @@ void HomoLinearSystemPage::onSolve()
 
     parts << sectionHtml(QStringLiteral("解"), th);
 
-    // RREF chain: group ≤ 3 matrices per line
     auto ms = milestones(trace);
     if (!ms.empty()) {
         const std::size_t perLine = (ms.size() <= 4) ? ms.size() : 3;
@@ -345,7 +316,6 @@ void HomoLinearSystemPage::onSolve()
         }
     }
 
-    // Trivial-solution shortcut
     if (nullDim == 0) {
         parts << paraHtml(QStringLiteral(
             "方程组的秩等于未知量"
@@ -358,7 +328,6 @@ void HomoLinearSystemPage::onSolve()
         return;
     }
 
-    // General solution
     parts << paraHtml(QStringLiteral("于是方程组的一般解为"), th, doc);
 
     {
@@ -398,7 +367,6 @@ void HomoLinearSystemPage::onSolve()
         parts << formulaHtml(genSol, th, doc);
     }
 
-    // Free-variable note + basis header
     {
         QString freeList;
         for (std::size_t i = 0; i < freeCols.size(); ++i) {
@@ -411,7 +379,6 @@ void HomoLinearSystemPage::onSolve()
             "解系为").arg(freeList), th, doc);
     }
 
-    // Basis vectors
     {
         QString basisLtx;
         for (std::size_t k = 0; k < nullDim; ++k) {
@@ -426,7 +393,6 @@ void HomoLinearSystemPage::onSolve()
         parts << formulaHtml(basisLtx, th, doc);
     }
 
-    // Solution set W
     parts << paraHtml(QStringLiteral(
         "从而方程组的解集 $W$ 为"), th, doc);
 
@@ -450,10 +416,6 @@ void HomoLinearSystemPage::onSolve()
         .arg(parts.join(QString())));
 }
 
-// =====================================================================
-//  Demo button handler
-// =====================================================================
-
 void HomoLinearSystemPage::onDemo()
 {
     spinM_->setValue(3);
@@ -472,4 +434,4 @@ void HomoLinearSystemPage::onDemo()
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

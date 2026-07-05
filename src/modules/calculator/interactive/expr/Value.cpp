@@ -26,8 +26,6 @@ using algemate::math::AlgReal;
 using algemate::math::Fraction;
 using algemate::math::Complex;
 
-// ======================== 构造 ========================
-
 Value::Value() : kind_(Kind::Scalar), s_(Scalar()) {}
 Value::Value(const Scalar& s)  : kind_(Kind::Scalar), s_(s) {}
 Value::Value(const ComplexC& c) {
@@ -37,7 +35,7 @@ Value::Value(const ComplexC& c) {
 Value::Value(const MatrixA& m) : kind_(Kind::Matrix), m_(m) {}
 Value::Value(const std::vector<Scalar>& coeffs, const QString& var)
     : kind_(Kind::Polynomial), polyCoeffs_(coeffs), polyVar_(var) {
-    // 去掉高次末尾零
+
     while (!polyCoeffs_.empty() && polyCoeffs_.back().isZero())
         polyCoeffs_.pop_back();
 }
@@ -60,7 +58,7 @@ Value Value::makeFactored(std::vector<Scalar> origCoeffs,
     v.s_ = std::move(leading);
     v.factors_ = std::move(factors);
     v.polyVar_ = std::move(var);
-    // 去掉高次末尾零 (orig)
+
     while (!v.polyCoeffs_.empty() && v.polyCoeffs_.back().isZero())
         v.polyCoeffs_.pop_back();
     return v;
@@ -94,19 +92,14 @@ ComplexC Value::toComplex() const {
     throw std::runtime_error("内部错误: 非标量无法提升为复数");
 }
 
-// 辅助: 将复标量降级尝试 (如果虚部为 0, 返实标量 Value; 否则原 Complex)
 static Value demoteComplex(const ComplexC& z) {
     if (z.isReal()) return Value(z.real());
     return Value(z);
 }
 
-// ======================== 工具 ========================
-
 static bool sameShape(const MatrixA& a, const MatrixA& b) {
     return a.rows() == b.rows() && a.cols() == b.cols();
 }
-
-// ======================== 加减 ========================
 
 Value Value::add(const Value& r) const {
     if (isPolynomial() || r.isPolynomial())
@@ -140,8 +133,6 @@ Value Value::sub(const Value& r) const {
     throw std::runtime_error("标量和矩阵不能相减");
 }
 
-// ======================== 乘 ========================
-
 static MatrixA scalarTimesMatrix(const Scalar& k, const MatrixA& M) {
     MatrixA R(M.rows(), M.cols());
     for (std::size_t i = 0; i < M.rows(); ++i)
@@ -162,12 +153,10 @@ Value Value::mul(const Value& r) const {
     if (isMatrix() && r.isScalar()) return Value(scalarTimesMatrix(r.s_, m_));
     if (isComplexScalar() || (r.isComplexScalar() && r.isMatrix()))
         throw std::runtime_error("复标量与矩阵的乘法暂不支持 (矩阵元素限实数)");
-    // 矩阵 * 矩阵
+
     if (m_.cols() != r.m_.rows())
         throw std::runtime_error("矩阵乘法要求左矩阵列数等于右矩阵行数");
-    // 稳定性优先: 任一矩阵含代数数 (非有理) 元素 → 转 double 计算,
-    //   避免 AlgReal 累乘 squarefreePart/resultant 指数爆炸 (如 m*m*m*m).
-    //   矩阵分解函数 (qr/svd/lu/jordan/...) 走内部层 AlgReal 算法, 不经此入口.
+
     auto hasAlgebraicElem = [](const MatrixA& M) {
         for (std::size_t i = 0; i < M.rows(); ++i)
             for (std::size_t j = 0; j < M.cols(); ++j)
@@ -193,8 +182,6 @@ Value Value::mul(const Value& r) const {
     return Value(m_ * r.m_);
 }
 
-// ======================== 除 ========================
-
 Value Value::div(const Value& r) const {
     if (isPolynomial() || r.isPolynomial())
         throw std::runtime_error("多项式目前不参与算术");
@@ -208,7 +195,7 @@ Value Value::div(const Value& r) const {
             if (r.s_.isZero()) throw std::runtime_error("不能除以 0");
             return Value(s_ / r.s_);
         }
-        // 矩阵 / 实标量
+
         if (r.isComplexScalar())
             throw std::runtime_error("矩阵除以复标量暂不支持");
         if (r.s_.isZero()) throw std::runtime_error("不能除以 0");
@@ -218,11 +205,9 @@ Value Value::div(const Value& r) const {
                 R(i, j) = m_(i, j) / r.s_;
         return Value(R);
     }
-    // 矩阵除法: 暂不支持, 建议用 inv()
+
     throw std::runtime_error("不支持除以矩阵, 请使用 inv() 求逆后相乘");
 }
-
-// ======================== 幂 ========================
 
 Value Value::pow(const Value& r) const {
     if (isPolynomial() || r.isPolynomial())
@@ -260,21 +245,16 @@ Value Value::pow(const Value& r) const {
         if (neg) result = ComplexC((long long)1) / result;
         return demoteComplex(result);
     }
-    // 矩阵幂
+
     if (!m_.isSquare())
         throw std::runtime_error("只有方阵能取幂");
     if (n < 0)
         throw std::runtime_error("矩阵负整数幂暂未实现, 请先 inv() 再幂");
-    // 边界保护: 防止高次幂导致 BigInt 爆炸或 bad_alloc
+
     if (n > 1000000)
         throw std::runtime_error("矩阵幂次过大 (上限 1000000)");
     const std::size_t R = m_.rows();
 
-    // 数值降级策略 (稳定性优先):
-    //   (1) 矩阵含代数数 (非有理) 元素 → 无条件走 double,
-    //       AlgReal 累乘 squarefreePart/realRootsOf 会指数爆炸, 例如 [1,sqrt(2);2,3]^4 必崩.
-    //   (2) 全有理 + 规模/次数偏大 → 走 double, 避免 BigInt 分数爆炸.
-    //   其他 (小规模全有理) 走精确.
     bool hasAlgebraic = false;
     for (std::size_t i = 0; i < R && !hasAlgebraic; ++i)
         for (std::size_t j = 0; j < m_.cols() && !hasAlgebraic; ++j)
@@ -301,7 +281,6 @@ Value Value::pow(const Value& r) const {
         return Value(std::move(out));
     }
 
-    // 精确路径: 大规模×高幂次的预防性抦截
     if (R >= 6 && n > 2000)
         throw std::runtime_error("阶数偏大的矩阵高次幂易导致内存爆炸, 请降低次数或矩阵阶数");
     try {
@@ -312,8 +291,6 @@ Value Value::pow(const Value& r) const {
         throw std::runtime_error(std::string("矩阵幂运算失败: ") + e.what());
     }
 }
-
-// ======================== 一元 ========================
 
 Value Value::neg() const {
     if (isPolynomial()) {
@@ -333,8 +310,6 @@ Value Value::transpose() const {
     return Value(m_.transpose());
 }
 
-// ======================== 格式化 ========================
-
 QString Value::typeLabel() const {
     if (isScalar()) return QStringLiteral("标量");
     if (isComplexScalar()) return QStringLiteral("复标量");
@@ -353,13 +328,9 @@ QString Value::typeLabel() const {
     return QStringLiteral("%1 × %2 矩阵").arg(m_.rows()).arg(m_.cols());
 }
 
-// 纯文本 / HTML 共享: 单元格字符串表示 (按 format 决定精确/小数)
-// compact=true: 用于矩阵/多项式内部元素.
-//   简单符号形式 (sqrt(2), cbrt(5), root(7,4) 等) 保留; 只有 alg(...) 复杂形式回落小数,
-//   避免代数运算 (sum/prod via 结式) 在大矩阵运算中爆炸 (bug 1).
 static QString scalarToStr(const Scalar& s, const DisplayFormat& fmt, bool compact = false) {
     if (fmt.kind == DisplayFormat::Decimal) {
-        // 有理整数直接显示整数, 避免 "1.0000" 这类尾随零
+
         if (s.isRational()) {
             const auto& q = s.asRational();
             if (q.denominator() == algemate::math::BigInt(1)) {
@@ -368,9 +339,9 @@ static QString scalarToStr(const Scalar& s, const DisplayFormat& fmt, bool compa
         }
         double d = s.toDouble();
         int n = std::max(0, std::min(fmt.decimals, 15));
-        if (d == 0.0) d = 0.0;  // 消除 -0
+        if (d == 0.0) d = 0.0;  
         QString str = QString::number(d, 'f', n);
-        // 小数: 去掉尾随 0 (和孤立的小数点)
+
         if (str.contains(QLatin1Char('.'))) {
             while (str.endsWith(QLatin1Char('0'))) str.chop(1);
             if (str.endsWith(QLatin1Char('.'))) str.chop(1);
@@ -378,16 +349,15 @@ static QString scalarToStr(const Scalar& s, const DisplayFormat& fmt, bool compa
         if (str.isEmpty() || str == QStringLiteral("-")) str = QStringLiteral("0");
         return str;
     }
-    // Exact 模式
+
     QString str = QString::fromStdString(s.toString());
-    // AlgReal 非纯根式时会返回 "alg(p(x), [a, b])" 回落为小数近似 (无 ≈ 前缀).
+
     if (str.contains(QStringLiteral("alg("))) {
         double d = s.toDouble();
         if (d == 0.0) d = 0.0;
         return QString::number(d, 'f', 6);
     }
-    // 纯符号形式 (sqrt(2), cbrt(5), root(7,4) 等) 在 compact 模式下也直接保留.
-    // 有理数但分母过大也回落为小数, 避免显示庞大分数丑陋.
+
     if (s.isRational()) {
         const auto& den = s.asRational().denominator();
         if (den > algemate::math::BigInt(10000)) {
@@ -403,22 +373,18 @@ static std::vector<std::vector<QString>> matrixCellStrings(const MatrixA& M, con
     std::vector<std::vector<QString>> g(M.rows(), std::vector<QString>(M.cols()));
     for (std::size_t i = 0; i < M.rows(); ++i)
         for (std::size_t j = 0; j < M.cols(); ++j)
-            g[i][j] = scalarToStr(M(i, j), fmt, /*compact=*/true);
+            g[i][j] = scalarToStr(M(i, j), fmt, true);
     return g;
 }
 
-// ---------------- 多项式 辅助: 系数的符号拆分 + 是否需要括号 ----------------
-
-// 返回 (sign, absStr). sign = "+" 或 "-"
 static std::pair<QString, QString> splitSign(const QString& s) {
     if (s.startsWith('-'))
         return { QStringLiteral("-"), s.mid(1).trimmed() };
     return { QStringLiteral("+"), s };
 }
 
-// 符号内部还含 + 或 - 时 (如 "3 - sqrt(2)"), 需要加括号以避免歧义
 static bool needsParens(const QString& absStr) {
-    // 简单数字 / 分数 / 单一 token 不需括号
+
     for (int i = 1; i < absStr.size(); ++i) {
         QChar c = absStr[i];
         if (c == '+' || c == '-') return true;
@@ -426,7 +392,6 @@ static bool needsParens(const QString& absStr) {
     return false;
 }
 
-// 上标数字 (Unicode 上标): 0123456789
 static QString toSuperscript(int n) {
     static const QChar sup[10] = {
         QChar(0x2070), QChar(0x00B9), QChar(0x00B2), QChar(0x00B3), QChar(0x2074),
@@ -446,8 +411,8 @@ static QString polyToPlain(const std::vector<Scalar>& coeffs, const QString& var
     for (int i = (int)coeffs.size() - 1; i >= 0; --i) {
         const Scalar& c = coeffs[i];
         if (c.isZero()) continue;
-        // 多项式系数属于复合结构, 走 compact (代数数 → 6 位小数).
-        QString s = scalarToStr(c, fmt, /*compact=*/true);
+
+        QString s = scalarToStr(c, fmt, true);
         auto [sign, abs] = splitSign(s);
         bool parens = needsParens(abs);
         QString absTok = parens ? (QStringLiteral("(") + abs + QStringLiteral(")")) : abs;
@@ -473,7 +438,6 @@ static QString polyToPlain(const std::vector<Scalar>& coeffs, const QString& var
     return out;
 }
 
-// 复数格式化: "a+bi" / "a-bi" / "bi" / "a"; 按 format 小数/精确统一
 static QString complexToStr(const ComplexC& z, const DisplayFormat& fmt) {
     const Scalar& re = z.real();
     const Scalar& im = z.imag();
@@ -481,10 +445,10 @@ static QString complexToStr(const ComplexC& z, const DisplayFormat& fmt) {
     const bool reZero = re.isZero();
     if (reZero && imZero) return QStringLiteral("0");
     if (imZero) return scalarToStr(re, fmt);
-    // 虚部存在
+
     QString imAbs = scalarToStr(im.sign() < 0 ? -im : im, fmt);
     QString imPart;
-    // 去掉 "1i" → "i"; "-1i" → "-i"
+
     if (imAbs == QStringLiteral("1")) imPart = QStringLiteral("i");
     else                              imPart = imAbs + QStringLiteral("i");
     if (reZero) return (im.sign() < 0) ? QStringLiteral("-") + imPart : imPart;
@@ -493,7 +457,6 @@ static QString complexToStr(const ComplexC& z, const DisplayFormat& fmt) {
     return rePart + sign + imPart;
 }
 
-// 纯文本
 QString Value::toPlain(const DisplayFormat& fmt) const {
     if (isScalar()) return scalarToStr(s_, fmt);
     if (isComplexScalar()) return complexToStr(c_, fmt);
@@ -533,7 +496,6 @@ QString Value::toPlain(const DisplayFormat& fmt) const {
         return out;
     }
 
-    // ---- 向量列表 (零空间基等) ----
     if (isVectorList()) {
         if (vectors_.empty()) return QStringLiteral("无");
         QStringList lines;
@@ -548,7 +510,6 @@ QString Value::toPlain(const DisplayFormat& fmt) const {
         return lines.join('\n');
     }
 
-    // ---- 命名矩阵列表 (LU/QR/合同对角化等) ----
     if (isNamedMatrices()) {
         if (namedMats_.empty()) return QStringLiteral("无");
         QStringList lines;
@@ -567,9 +528,8 @@ QString Value::toPlain(const DisplayFormat& fmt) const {
         return lines.join('\n');
     }
 
-    // ---- 文本结果 ----
     if (isText()) {
-        // 去掉 $...$ 的边界符 (仅在纯文本场景, HTML 则渲染为 LaTeX)
+
         QString out = textContent_;
         out.replace(QLatin1Char('$'), QString());
         return out;
@@ -601,11 +561,6 @@ QString Value::toPlain(const DisplayFormat& fmt) const {
     return lines.join('\n');
 }
 
-// ---------------- LaTeX 生成 (用于 JKQTMathText) ----------------
-
-// 实标量 → LaTeX. 分数转 \frac; 代数数优先调 toLatex() 以输出 \sqrt{} 等标准根号.
-// 将非负整数 n 分解为 a² × sqfree, a 最大
-// n 要求 >= 1 且 ≤ 10^14 较稳定
 static std::pair<long long, long long> extractSquareFactorLL_(long long n) {
     if (n <= 0) return {1, std::max<long long>(n, 1)};
     long long a = 1, sf = n;
@@ -619,15 +574,13 @@ static std::pair<long long, long long> extractSquareFactorLL_(long long n) {
     return {a, sf};
 }
 
-// 尝试把非负有理 q 的平方根 sqrt(q) 表达为 (num/den) × sqrt(r), r 无平方因子.
-// 成功返回 true; 如果 q 的分子或分母 BigInt 过大无法分解，返回 false.
 static bool tryExtractSqrtRational_(const Fraction& q,
                                     long long& num, long long& den, long long& r) {
     if (q.sign() < 0) return false;
     if (q.isZero()) { num = 0; den = 1; r = 1; return true; }
     const algemate::math::BigInt& P = q.numerator();
     const algemate::math::BigInt& D = q.denominator();
-    // 10^14 级别的上限，防止试除过慢
+
     const algemate::math::BigInt limit(static_cast<long long>(100000000000000LL));
     if (P > limit || D > limit) return false;
     long long Pi = P.toLongLong();
@@ -635,8 +588,7 @@ static bool tryExtractSqrtRational_(const Fraction& q,
     if (Pi <= 0 || Di <= 0) return false;
     auto [aP, rP] = extractSquareFactorLL_(Pi);
     auto [aD, rD] = extractSquareFactorLL_(Di);
-    // sqrt(q) = (aP/aD) * sqrt(rP/rD) = (aP/aD) * sqrt(rP*rD)/rD = (aP)/(aD*rD) * sqrt(rP*rD)
-    // rP*rD 可能有残余平方因子，再抽一次
+
     long long RR = rP * rD;
     auto [aR, Rsf] = extractSquareFactorLL_(RR);
     num = aP * aR;
@@ -648,39 +600,34 @@ static bool tryExtractSqrtRational_(const Fraction& q,
     return true;
 }
 
-// 尝试将代数数 s 展开为  a + b·√r  闭式 (minPoly 为 2 次时适用).
-//   s 的 minPoly 是首一化的 x^2 + p x + q (有理系数), 根 = (-p ± √Δ)/2, Δ = p^2 - 4q.
-// 成功返回 true, 填充 latex (LaTeX 字符串).  不能展开返回 false.
 static bool tryAlgToBinomialLatex_(const Scalar& s, QString& latex) {
     const auto& p = s.minPoly();
     if (p.degree() != 2) return false;
-    const auto& cs = p.coeffs();                // low first: {c0, c1, c2}
+    const auto& cs = p.coeffs();                
     if (cs.size() != 3) return false;
     Fraction c2 = cs[2];
     if (c2.sign() == 0) return false;
-    // 首一化
-    Fraction bb = cs[1] / c2;                   // 对应 p
-    Fraction cc = cs[0] / c2;                   // 对应 q
-    Fraction disc = bb * bb - Fraction(4) * cc; // Δ
-    if (disc.sign() < 0) return false;          // 虚根, 不应出现在 AlgReal
-    // disc = 4 × (Δ/4),  根 = -bb/2 ± √(disc)/2
-    // 用 tryExtractSqrtRational_ 提取 √disc = (sn/sd) √r
+
+    Fraction bb = cs[1] / c2;                   
+    Fraction cc = cs[0] / c2;                   
+    Fraction disc = bb * bb - Fraction(4) * cc; 
+    if (disc.sign() < 0) return false;          
+
     long long sn = 0, sd = 1, r = 1;
     if (!tryExtractSqrtRational_(disc, sn, sd, r)) return false;
-    // s = -bb/2 ± (sn/sd)/2 · √r = (-bb/2) ± (sn/(2 sd)) √r
+
     Fraction a = Fraction(-1) * bb / Fraction(2);
-    // 正负号: 数值比较 sign
+
     double da = 0.0;
     try { da = a.toDouble(); } catch (...) { da = 0.0; }
     double ds = s.toDouble();
-    bool plus = (ds >= da);                     // √r 部分系数正/负
-    // b 的有理数绝对值 = sn / (2 sd)
+    bool plus = (ds >= da);                     
+
     long long bNum = sn;
     long long bDen = 2 * sd;
     long long g = std::gcd(std::llabs(bNum), std::llabs(bDen));
     if (g > 1) { bNum /= g; bDen /= g; }
-    // 组装 LaTeX
-    // a 部分
+
     QString aTex;
     if (a.sign() == 0) {
         aTex.clear();
@@ -694,9 +641,9 @@ static bool tryAlgToBinomialLatex_(const Scalar& s, QString& latex) {
         aTex = QStringLiteral("\\frac{%1}{%2}").arg(num, den);
         if (neg) aTex = QStringLiteral("-") + aTex;
     }
-    // √r 部分
+
     if (r == 0 || bNum == 0) {
-        // b = 0, s 纯有理 (理论上不应会, 但兼容)
+
         latex = aTex.isEmpty() ? QStringLiteral("0") : aTex;
         return true;
     }
@@ -727,7 +674,7 @@ static QString scalarToLatex(const Scalar& s, const DisplayFormat& fmt, bool com
     if (fmt.kind == DisplayFormat::Decimal) {
         return scalarToStr(s, fmt);
     }
-    // Exact 模式
+
     if (s.isRational()) {
         const auto& q = s.asRational();
         const auto& den = q.denominator();
@@ -741,18 +688,13 @@ static QString scalarToLatex(const Scalar& s, const DisplayFormat& fmt, bool com
         }
         return scalarToStr(s, fmt);
     }
-    // compact 模式: 先试简单符号形式 (√ / cbrt / nthroot); 只有 alg(...) 回落小数.
-    //   矩阵/多项式内部必须保持轻量, 禁止任何 AlgReal 二次运算 (如 s*s),
-    //   因为高次代数数 (如 svd 结果 √(15±√221)) 的 s*s 会触发结式爆炸, 导致崩溃.
+
     if (compact) {
         QString texTry = QString::fromStdString(s.toLatex());
         const bool hasAlg = texTry.contains(QStringLiteral("\\mathrm{alg}"))
                          || texTry.contains(QStringLiteral("alg("));
         if (!hasAlg) return texTry;
-        // 回退: 仅当 minPoly 度数 ≤ 2 时 尝试 s*s 有理性检验 (对 2 次代数数 s*s 很快),
-        //   可救 qr/svd 结果中 AlgReal 算术产生的 non-minimal minPoly 情形
-        //   (例如 1/√3 的 minPoly 未精化到 x²-1/3, 但 s*s = 1/3 仍可识别).
-        //   degree ≥ 3 直接跳过, 避免高次 resultant 卡死.
+
         try {
             if (s.minPoly().degree() <= 2) {
                 AlgReal sq = s * s;
@@ -779,18 +721,18 @@ static QString scalarToLatex(const Scalar& s, const DisplayFormat& fmt, bool com
                 }
             }
         } catch (...) {
-            // 任何异常回落小数
+
         }
         double d = s.toDouble();
         if (d == 0.0) d = 0.0;
         return QString::number(d, 'f', 6);
     }
-    // 代数数: 先用 AlgReal::toLatex() 试取 sqrt/nth-root 闭式
+
     QString tex = QString::fromStdString(s.toLatex());
     const bool isAlg = tex.contains(QStringLiteral("\\mathrm{alg}"))
                     || tex.contains(QStringLiteral("alg("));
     if (!isAlg) return tex;
-    // 回退策略 1: s² 是否为非负有理数 q, 则 s = ±(num/den) sqrt(r)
+
     try {
         AlgReal sq = s * s;
         if (sq.isRational()) {
@@ -815,14 +757,14 @@ static QString scalarToLatex(const Scalar& s, const DisplayFormat& fmt, bool com
             }
         }
     } catch (...) {
-        // 任何异常回退到 \mathrm{alg} 原样
+
     }
-    // 回退策略 2: minPoly 为 2 次 →  a + b√r  闭式 (如 1+√2, 2-√3, (1+√5)/2).
+
     {
         QString binom;
         if (tryAlgToBinomialLatex_(s, binom)) return binom;
     }
-    // 无法简化: 保持 \mathrm{alg}(..) 精确表示，不转小数
+
     return tex;
 }
 
@@ -847,8 +789,7 @@ static QString complexToLatex(const ComplexC& z, const DisplayFormat& fmt) {
 static QString matrixToLatex(const MatrixA& M, const DisplayFormat& fmt) {
     const std::size_t R = M.rows(), C = M.cols();
     if (R == 0 || C == 0) return QStringLiteral("[]");
-    // JKQTMathText 对单列 \begin{array} 有渲染 bug；单列时用对称 ghost {rcl}，
-    // 两侧各一个空列避免数字偏向括号一侧（单侧 ghost 会导致偏移）。
+
     const bool ghost = (C == 1);
     QString cols = ghost ? QStringLiteral("rcl")
                          : QString(static_cast<int>(C), QLatin1Char('c'));
@@ -857,7 +798,7 @@ static QString matrixToLatex(const MatrixA& M, const DisplayFormat& fmt) {
         if (ghost) body += QStringLiteral(" & ");
         for (std::size_t j = 0; j < C; ++j) {
             if (j) body += QStringLiteral(" & ");
-            body += scalarToLatex(M(i, j), fmt, /*compact=*/true);
+            body += scalarToLatex(M(i, j), fmt, true);
         }
         if (ghost) body += QStringLiteral(" & ");
         if (i + 1 < R) body += QStringLiteral(" \\\\ ");
@@ -876,7 +817,7 @@ static QString polyToLatex(const std::vector<Scalar>& coeffs, const QString& var
     for (int i = (int)coeffs.size() - 1; i >= 0; --i) {
         const Scalar& c = coeffs[i];
         if (c.isZero()) continue;
-        QString s = scalarToLatex(c, fmt, /*compact=*/true);
+        QString s = scalarToLatex(c, fmt, true);
         QString sign;
         QString absTex = s;
         if (absTex.startsWith('-')) { sign = QStringLiteral("-"); absTex = absTex.mid(1); }
@@ -900,7 +841,6 @@ static QString polyToLatex(const std::vector<Scalar>& coeffs, const QString& var
     return out;
 }
 
-// JKQTMathText 渲染: 3× 超采样 + 屏幕 dpr 自适应 + SmoothTransformation 缩放.
 static QPixmap renderLatexPixmap(const QString& latex, const RenderTheme& th,
                                  int fontPt = 22) {
     qreal dpr = 1.0;
@@ -948,18 +888,12 @@ static QPixmap renderLatexPixmap(const QString& latex, const RenderTheme& th,
     return scaled;
 }
 
-// 前置声明: URL -> LaTeX 映射表 (同一 namespace 下供 embedLatexAsImg 调用)
 QHash<QString, QString>& g_latexByUrl_();
 
-// 矢量化入口：走 LatexRenderer::embedAsImg 生成 latex-vec:// 占位图，
-// InteractivePage 在 append 后会调 LatexRenderer::postProcessDocument(doc) 把占
-// 位替换为矢量 inline object。同时为保证本文件原有的“calc-tex:// URL 反
-// 查”路径仍然有效（其他路径仍可能生成 calc-vec:// / calc-nm:// 等估计路径），
-// 这里也走 g_latexByUrl_() 补一份。
 static QString embedLatexAsImg(const QString& latex, const RenderTheme& th,
                                QTextDocument* doc, int fontPt = 15) {
     return AlgeMate::Latex::LatexRenderer::embedAsImg(
-        doc, latex, /*displayStyle=*/false, fontPt, QColor(th.text));
+        doc, latex, false, fontPt, QColor(th.text));
 }
 
 QHash<QString, QString>& g_latexByUrl_() {
@@ -974,8 +908,6 @@ QString latexForImageUrl(const QString& url) {
 void clearLatexImageCache() {
     g_latexByUrl_().clear();
 }
-
-// ---------------- 兼容: 旧版手工方括号矩阵 pixmap (仅作为 fallback) ----------------
 
 static QPixmap renderMatrixPixmap(const MatrixA& M, const RenderTheme& th,
                                   const DisplayFormat& fmt) {
@@ -1051,14 +983,11 @@ static QPixmap renderMatrixPixmap(const MatrixA& M, const RenderTheme& th,
     return px;
 }
 
-// ---------------- HTML 输出 ----------------
-
 QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
                       QTextDocument* doc) const {
-    // ---- 实标量 ----
+
     if (isScalar()) {
-        // 在 Exact 模式下, 包含分数 / 代数数 (非有理) 的标量走 LaTeX 路径,
-        // 以触发 √ / tryAlgToBinomialLatex_ 等符号展开.
+
         bool useLatex = false;
         if (fmt.kind != DisplayFormat::Decimal) {
             if (s_.isRational()) {
@@ -1067,7 +996,7 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
                 if (den > algemate::math::BigInt(1) && den <= algemate::math::BigInt(10000))
                     useLatex = true;
             } else {
-                // 代数数 (含 sqrt / 根式 / alg): 走 LaTeX 路径以保持符号形式
+
                 useLatex = true;
             }
         }
@@ -1080,7 +1009,6 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
             "font-size:15px; font-weight:600;\">%2</span>").arg(th.text, txt);
     }
 
-    // ---- 复标量 ----
     if (isComplexScalar()) {
         if (doc) return embedLatexAsImg(complexToLatex(c_, fmt), th, doc);
         QString txt = complexToStr(c_, fmt).toHtmlEscaped();
@@ -1089,7 +1017,6 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
             "font-size:15px; font-weight:600;\">%2</span>").arg(th.text, txt);
     }
 
-    // ---- 多项式 ----
     if (isPolynomial()) {
         if (doc) return embedLatexAsImg(polyToLatex(polyCoeffs_, polyVar_, fmt), th, doc);
         QString raw = polyToPlain(polyCoeffs_, polyVar_, fmt);
@@ -1098,12 +1025,11 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
             "font-size:15px;\">%2</span>").arg(th.text, raw.toHtmlEscaped());
     }
 
-    // ---- 根列表 (特征值 / 有理根) ----
     if (isRootList()) {
         if (roots_.empty()) {
             return QStringLiteral("<span style=\"color:%1;\">无</span>").arg(th.textMuted);
         }
-        // LaTeX 符号: λ → \lambda, 其余原样 (如 x)
+
         auto varLatex = [](const QString& v) -> QString {
             if (v == QString::fromUtf8("\xce\xbb")) return QStringLiteral("\\lambda");
             return v;
@@ -1129,13 +1055,12 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
         return html;
     }
 
-    // ---- 多项式因式分解 (factor 函数的输出) ----
     if (isFactored()) {
         QString lhs = polyToLatex(polyCoeffs_, polyVar_, fmt);
         QString lead = scalarToLatex(s_, fmt);
         const bool leadOne    = (lead == QStringLiteral("1"));
         const bool leadNegOne = (lead == QStringLiteral("-1"));
-        // 纯变量因式 (coeffs == [0, 1], 即 x 本身) 不加括号, 重数直接写 x^{n}.
+
         auto isPureVar = [](const std::vector<Scalar>& c) {
             return c.size() == 2 && c[0].isZero()
                 && (c[1] - Scalar(Fraction(1))).isZero();
@@ -1164,12 +1089,11 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
             .arg(th.text, toPlain(fmt).toHtmlEscaped());
     }
 
-    // ---- 向量列表 (零空间基 / 特征向量组) ----
     if (isVectorList()) {
         if (vectors_.empty()) {
             return QStringLiteral("<span style=\"color:%1;\">无</span>").arg(th.textMuted);
         }
-        // LaTeX 符号映射: η → \eta, ξ → \xi, λ → \lambda, 其余原样
+
         auto varLatex = [](const QString& v) -> QString {
             if (v == QString::fromUtf8("\xce\xb7")) return QStringLiteral("\\eta");
             if (v == QString::fromUtf8("\xce\xbe")) return QStringLiteral("\\xi");
@@ -1184,11 +1108,11 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
         }
         QString html;
         for (std::size_t i = 0; i < vectors_.size(); ++i) {
-            // 标签:  η_{i} =
+
             const QString label = QStringLiteral("%1_{%2} =")
                 .arg(varLatex(vecVar_)).arg(i + 1);
             const QString labelImg = embedLatexAsImg(label, th, doc);
-            // 向量本体: 走 LaTeX 路径 (matrixToLatex 含 ghost-column 绕过单列 bug)
+
             QString vecImg;
             try {
                 QString latex = matrixToLatex(vectors_[i], fmt);
@@ -1211,7 +1135,6 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
         return html;
     }
 
-    // ---- 命名矩阵列表 (LU/QR/合同对角化等) ----
     if (isNamedMatrices()) {
         if (namedMats_.empty()) {
             return QStringLiteral("<span style=\"color:%1;\">无</span>").arg(th.textMuted);
@@ -1229,11 +1152,11 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
             QString matImg;
             const std::size_t Rn = M.rows(), Cn = M.cols();
             if (Rn == 0 || Cn == 0) {
-                // 纯标签行: 只渲染 LaTeX 内容
+
                 html += QStringLiteral("<div style=\"margin:4px 0;\">%1</div>").arg(labelImg);
                 continue;
             } else {
-                // 统一走 LaTeX 路径 (matrixToLatex 含 ghost-column 绕过单列 bug)
+
                 try {
                     QString latex = matrixToLatex(M, fmt);
                     matImg = embedLatexAsImg(latex, th, doc);
@@ -1255,27 +1178,25 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
         return html;
     }
 
-    // ---- 文本结果 (definiteness/signature 等) ----
     if (isText()) {
         if (!doc) {
             return QStringLiteral(
                 "<span style=\"color:%1; font-size:16px; font-weight:600;\">%2</span>")
                 .arg(th.text, textContent_.toHtmlEscaped());
         }
-        // 主显示区用稍大字号渲染 (18pt)
+
         return QStringLiteral(
             "<div style=\"color:%1; font-size:16px; font-weight:600;\">%2</div>")
             .arg(th.text, renderNoteWithLatex(textContent_, th, doc, 18));
     }
 
-    // ---- 矩阵 ----
     const std::size_t R = m_.rows(), C = m_.cols();
     if (R == 0 || C == 0) {
         return QStringLiteral("<span style=\"color:%1;\">[]</span>").arg(th.accent);
     }
 
     if (doc) {
-        // 统一走 LaTeX 路径 (matrixToLatex 含 ghost-column 绕过单列 bug)
+
         try {
             QString latex = matrixToLatex(m_, fmt);
             return embedLatexAsImg(latex, th, doc);
@@ -1291,7 +1212,6 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
         }
     }
 
-    // ------- 退化: 纯 HTML 版 (不带 doc 时) -------
     auto g = matrixCellStrings(m_, fmt);
     const QString accent  = th.accent;
     const QString textCol = th.text;
@@ -1318,8 +1238,6 @@ QString Value::toHtml(const RenderTheme& th, const DisplayFormat& fmt,
     return html;
 }
 
-// 含 `$...$` 片段的说明文本渲染器.
-//   处理规则: 配对的 $...$ 走 embedLatexAsImg; 未配对的 $ 视为字面; 其余文本 toHtmlEscaped.
 QString renderNoteWithLatex(const QString& src, const RenderTheme& th,
                             QTextDocument* doc, int fontPt) {
     auto escapeWithNl = [](const QString& s) {
@@ -1340,14 +1258,14 @@ QString renderNoteWithLatex(const QString& src, const RenderTheme& th,
         if (lo > i) out += escapeWithNl(src.mid(i, lo - i));
         int hi = src.indexOf(QLatin1Char('$'), lo + 1);
         if (hi < 0) {
-            // 未配对 $: 当作字面。
+
             out += QStringLiteral("$");
             out += escapeWithNl(src.mid(lo + 1));
             break;
         }
         QString latex = src.mid(lo + 1, hi - lo - 1);
         if (latex.isEmpty()) {
-            // $$ 空片段: 输出字面 $$.
+
             out += QStringLiteral("$$");
         } else {
             out += embedLatexAsImg(latex, th, doc, fontPt);

@@ -28,7 +28,7 @@
 #include <QMouseEvent>
 #include <QShowEvent>
 #include <cmath>
-#include <functional> // 引入 std::function
+#include <functional> 
 
 using AlgeMate::Calculator::Interactive::RenderTheme;
 
@@ -40,7 +40,6 @@ bool isLatex(const QString& s) {
     return s.startsWith(QLatin1Char('$')) && s.endsWith(QLatin1Char('$')) && s.size() >= 2;
 }
 
-// 核心黑科技：继承自 QWidget，彻底摆脱全局 QPushButton 样式的裁剪！
 class BubbleWidget : public QWidget {
 public:
     BubbleWidget(int size, const QString& icon, const QString& title, const QString& desc, std::function<void()> onClick, QWidget* parent = nullptr)
@@ -49,10 +48,9 @@ public:
         setObjectName(QStringLiteral("DemoBubbleWidget"));
         setFixedSize(size, size);
         setCursor(Qt::PointingHandCursor);
-        setAttribute(Qt::WA_Hover, true); // 确保悬浮事件生效
+        setAttribute(Qt::WA_Hover, true); 
         setAttribute(Qt::WA_TranslucentBackground);
 
-        // 投影渲染（悬浮弥散感）
         shadow = new QGraphicsDropShadowEffect(this);
         shadow->setBlurRadius(32);
         shadow->setOffset(0, 12);
@@ -72,7 +70,7 @@ public:
     }
 
 protected:
-    // 监听鼠标点击，完美替代 QPushButton 的 clicked 信号
+
     void mouseReleaseEvent(QMouseEvent* event) override {
         if (event->button() == Qt::LeftButton && rect().contains(event->pos())) {
             if (m_onClick) m_onClick();
@@ -80,7 +78,6 @@ protected:
         QWidget::mouseReleaseEvent(event);
     }
 
-    // 监听悬浮状态触发重绘
     bool event(QEvent* e) override {
         if (e->type() == QEvent::HoverEnter || e->type() == QEvent::HoverLeave) {
             update();
@@ -98,7 +95,6 @@ protected:
         bool isDark = AlgeMate::ThemeManager::instance().currentTheme() == AlgeMate::ThemeManager::Theme::Dark;
         bool hover = underMouse();
 
-        // 1. 绘制逼真的多层渐变肥皂泡底色
         QRectF rect(0, 0, m_size, m_size);
         QRadialGradient grad(rect.width() * 0.3, rect.height() * 0.2, rect.width() * 0.85);
         if (isDark) {
@@ -124,7 +120,6 @@ protected:
         }
         p.setBrush(grad);
 
-        // 玻璃高光边框
         QPen pen;
         pen.setWidthF(hover ? 4.0 : 2.5);
         if (isDark) pen.setColor(hover ? QColor(143, 161, 255, 220) : QColor(130, 145, 255, 90));
@@ -132,11 +127,9 @@ protected:
         p.setPen(pen);
         p.drawEllipse(rect.adjusted(2, 2, -2, -2));
 
-        // 2. 依次渲染内部元素
         int cx = m_size / 2;
-        int currentY = m_size * 0.18; // 从气泡顶部 18% 处开始往下排
+        int currentY = m_size * 0.18; 
 
-        // 渲染公式/图标
         if (!m_iconPix.isNull()) {
             int logicW = m_iconPix.width() / m_iconPix.devicePixelRatio();
             int logicH = m_iconPix.height() / m_iconPix.devicePixelRatio();
@@ -150,7 +143,6 @@ protected:
             currentY += fm.height() + 8;
         }
 
-        // 渲染标题
         if (!m_titlePix.isNull()) {
             int logicW = m_titlePix.width() / m_titlePix.devicePixelRatio();
             int logicH = m_titlePix.height() / m_titlePix.devicePixelRatio();
@@ -164,7 +156,6 @@ protected:
             currentY += fm.height() + 10;
         }
 
-        // 3. 【核心技术】沿着圆形内壁严格包裹绘制说明文字
         p.setPen(isDark ? QColor(150, 155, 175, 240) : QColor(90, 105, 125, 240));
         QFont fDesc = p.font(); fDesc.setPixelSize(11); fDesc.setBold(false); p.setFont(fDesc);
         drawCircularWrappedText(p, m_desc, rect, currentY);
@@ -177,7 +168,6 @@ private:
     QGraphicsDropShadowEffect* shadow;
     std::function<void()> m_onClick;
 
-    // 圆形内壁包裹折行算法
     void drawCircularWrappedText(QPainter& p, const QString& text, const QRectF& bounds, int startY) {
         int R = bounds.width() / 2;
         int cx = bounds.center().x();
@@ -252,8 +242,7 @@ private:
     bool m_loaded = false;
 };
 
-} // anonymous namespace
-
+} 
 
 DemoPage::DemoPage(QWidget* parent) : QWidget(parent) {
     auto* root = new QVBoxLayout(this);
@@ -340,7 +329,6 @@ void DemoPage::buildCatalog() {
     outer->addWidget(subtitleLbl, 0, Qt::AlignHCenter);
     outer->addSpacing(30);
 
-    // 【核心】不使用 Layout，直接创建一个容器用于绝对定位
     auto* clusterContainer = new QWidget(page);
 
     struct AlgItem { QString icon, title, desc; int pageIdx; };
@@ -365,15 +353,13 @@ void DemoPage::buildCatalog() {
 
     for (int i = 0; i < 11; ++i) {
         uint h = qHash(items[i].title) ^ qHash(items[i].desc);
-        // 大小随机化，但进一步缩小下限让整体更聚拢
+
         int size = 145 + (h % 35);
         int r = size / 2;
 
         auto onClick = [this, pageIdx = items[i].pageIdx]() { stack_->setCurrentIndex(pageIdx); };
         auto* bubble = new BubbleWidget(size, items[i].icon, items[i].title, items[i].desc, onClick, clusterContainer);
 
-        // 【黑科技：阿基米德螺旋线碰撞算法】
-        // 从中心开始，随机选一个起始角度，沿着螺旋线向外探测，找到第一个不重叠的空隙就塞进去。
         double angle = (h % 360) * (M_PI / 180.0);
         double dist = 0.0;
         int cx = 0, cy = 0;
@@ -386,32 +372,29 @@ void DemoPage::buildCatalog() {
 
             for (const auto& p : placed) {
                 double d = std::hypot(cx - p.cx, cy - p.cy);
-                // "8" 是气泡间的极限缝隙（像素），数字越小贴得越紧
+
                 if (d < (r + p.r + 8)) {
                     collides = true;
                     break;
                 }
             }
             if (collides) {
-                dist += 2.0;    // 每次向外扩2像素
-                angle += 0.45;  // 螺旋旋转
+                dist += 2.0;    
+                angle += 0.45;  
             }
         }
 
         placed.append({bubble, cx, cy, r});
 
-        // 记录外包围盒的边界
         minX = std::min(minX, cx - r);
         minY = std::min(minY, cy - r);
         maxX = std::max(maxX, cx + r);
         maxY = std::max(maxY, cy + r);
     }
 
-    // 给阴影流出足够的安全边距（防止被容器切割）
     int padding = 45;
     clusterContainer->setFixedSize(maxX - minX + padding * 2, maxY - minY + padding * 2);
 
-    // 计算出容器大小后，将所有气泡移动到正数坐标轴的位置
     for (const auto& p : placed) {
         int finalX = p.cx - p.r - minX + padding;
         int finalY = p.cy - p.r - minY + padding;
@@ -448,8 +431,6 @@ void DemoPage::addCard(QWidget* grid, int row, int col,
 
     uint h = qHash(title) ^ qHash(desc);
 
-    // 1. 稍微缩小气泡的基础尺寸上限（原为 165+70=235，现改为 150+40=190）
-    // 这样不仅排列更紧凑，也显得更精致
     int size = 150 + (h % 40);
 
     auto onClick = [this, pageIndex]() { stack_->setCurrentIndex(pageIndex); };
@@ -458,15 +439,11 @@ void DemoPage::addCard(QWidget* grid, int row, int col,
     QWidget* wrapper = new QWidget(grid);
     auto* wlay = new QVBoxLayout(wrapper);
 
-    // 2. 减小中间列的错位下沉量（原为 120，现改为 50，让行与行贴合更紧密）
     int staggerY = (col == 1) ? 50 : 0;
 
-    // 3. 减小随机散布的偏移范围（原为 -40 到 40，现改为 -15 到 15）
     int dx = (h % 30) - 15;
     int dy = ((h >> 3) % 30) - 15;
 
-    // 4. 精确控制边距（原统设为50）：
-    // 左右上方留 20px 即可；但底部必须留 35px，否则悬浮时的下落阴影(Offset 12 + Blur 32)会被 wrapper 强行裁剪。
     int marginLeft   = 20 + dx;
     int marginTop    = 20 + staggerY + dy;
     int marginRight  = 20 - dx;

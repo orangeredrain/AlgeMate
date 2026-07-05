@@ -25,7 +25,6 @@ namespace AlgeMate::Calculator::Demo {
 
 using Poly = Polynomial<Fraction>;
 
-// ---- Polynomial parser for strings like "x^3 + x^2 - 7x + 2" ----
 static Poly parsePoly(const QString& s) {
     std::map<int, Fraction> coeffs;
     QString t = s;
@@ -34,13 +33,12 @@ static Poly parsePoly(const QString& s) {
 
     int i = 0, n = t.size();
     while (i < n) {
-        // Read sign
+
         int sign = 1;
         if (t[i] == '+') { ++i; }
         else if (t[i] == '-') { ++i; sign = -1; }
         if (i >= n) break;
 
-        // Read coefficient
         Fraction coef(sign);
         int start = i;
         while (i < n && (t[i].isDigit() || t[i] == '/')) ++i;
@@ -58,7 +56,6 @@ static Poly parsePoly(const QString& s) {
             if (sign < 0) coef = -coef;
         }
 
-        // Read x and exponent
         int deg = 0;
         if (i < n && (t[i] == 'x' || t[i] == 'X')) {
             ++i; deg = 1;
@@ -78,7 +75,6 @@ static Poly parsePoly(const QString& s) {
     return result;
 }
 
-// Polynomial → LaTeX (variable = x)
 static QString polyToLtx(const Poly& p) {
     const auto& c = p.coeffs();
     if (c.empty()) return QStringLiteral("0");
@@ -99,17 +95,12 @@ static QString polyToLtx(const Poly& p) {
     return first ? QStringLiteral("0") : out;
 }
 
-// Polynomial → LaTeX with scaled leading coef (e.g., 3f(x) = ...)
 static QString polyScaledLtx(const Poly& p, const Fraction& scale) {
     if (scale.isOne()) return polyToLtx(p);
     Poly sp = p;
     for (auto& c : const_cast<std::vector<Fraction>&>(sp.coeffs())) c = c * scale;
     return polyToLtx(sp);
 }
-
-// =====================================================================
-//  Constructor
-// =====================================================================
 
 PolyGCDPage::PolyGCDPage(QWidget* parent) : QWidget(parent) {
     auto* root = new QVBoxLayout(this);
@@ -133,7 +124,6 @@ PolyGCDPage::PolyGCDPage(QWidget* parent) : QWidget(parent) {
     auto* cLay = new QVBoxLayout(content);
     cLay->setContentsMargins(24, 16, 24, 24); cLay->setSpacing(16);
 
-    // Input area
     auto* inputW = new QWidget;
     auto* iLay = new QVBoxLayout(inputW);
     iLay->setSpacing(8);
@@ -174,10 +164,6 @@ PolyGCDPage::PolyGCDPage(QWidget* parent) : QWidget(parent) {
     root->addWidget(scroll, 1);
 }
 
-// =====================================================================
-//  Solve
-// =====================================================================
-
 void PolyGCDPage::onSolve() {
     QString sf = inputF_->text().trimmed();
     QString sg = inputG_->text().trimmed();
@@ -196,14 +182,11 @@ void PolyGCDPage::onSolve() {
     parts << formulaHtml(QStringLiteral("f(x) = ") + polyToLtx(f) + QStringLiteral(", \\quad g(x) = ") + polyToLtx(g) + QStringLiteral("."), th, doc);
     parts << sectionHtml(QStringLiteral("解"), th);
 
-    // ---- Euclidean algorithm ----
     if (f.degree() < g.degree()) std::swap(f, g);
 
-    // Scale f by lc(g) to avoid fractions
     Fraction lcg = g.coeffs()[g.degree()];
     Poly A = f * Poly::monomial(0, lcg), B = g;
 
-    // Table: 被除式 | 除式 | 商式 | 余式
     struct DivRow { Poly dividend, divisor, quotient, remainder; };
     std::vector<DivRow> divSteps;
     QString table;
@@ -233,14 +216,12 @@ void PolyGCDPage::onSolve() {
     table += QStringLiteral("\\end{array}");
     parts << formulaHtml(table, th, doc, 12);
 
-    // ---- GCD ----
     Poly gcd = A;
     if (!gcd.isZero() && !gcd.coeffs()[gcd.degree()].isOne())
         gcd = gcd * Poly::monomial(0, Fraction(1) / gcd.coeffs()[gcd.degree()]);
     parts << paraHtml(QStringLiteral("因为最后一个不等于零的余式是 $%1$，所以").arg(polyToLtx(gcd)), th, doc);
     parts << formulaHtml(QStringLiteral("(f(x), g(x)) = %1.").arg(polyToLtx(gcd)), th, doc);
 
-    // ---- Extended GCD ----
     Poly r0 = f, r1 = g;
     Poly s0(Fraction(1)), s1(Fraction(0));
     Poly t0(Fraction(0)), t1(Fraction(1));
@@ -289,4 +270,4 @@ void PolyGCDPage::onDemo() {
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

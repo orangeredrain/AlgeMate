@@ -1,12 +1,5 @@
 #pragma once
 
-/*
-* @file StepSequence.h
-* @brief Step 序列容器, 记录算法从初始态到终止态的全部中间态
-*
-* 算法函数通过 push* 接口追加步骤, UI 层遍历 steps() 即可按序呈现
-*/
-
 #include "Step.h"
 
 #include <cstddef>

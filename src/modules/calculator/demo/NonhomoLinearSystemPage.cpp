@@ -30,7 +30,6 @@ namespace AlgeMate::Calculator::Demo {
 
 namespace {
 
-// 从增广矩阵 RREF 计算特解 γ₀（设自由未知量 = 0）
 Matrix<Fraction> computeParticularSolution(const Matrix<Fraction>& R, std::size_t n)
 {
     Matrix<Fraction> gamma = Matrix<Fraction>::zeros(n, 1);
@@ -52,11 +51,7 @@ Matrix<Fraction> computeParticularSolution(const Matrix<Fraction>& R, std::size_
     return gamma;
 }
 
-} // anonymous namespace
-
-// =====================================================================
-//  Constructor
-// =====================================================================
+} 
 
 NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
     : QWidget(parent)
@@ -65,7 +60,6 @@ NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // ---------- top bar ----------
     auto* topBar = new QWidget;
     topBar->setFixedHeight(48);
     auto* topLay = new QHBoxLayout(topBar);
@@ -87,7 +81,6 @@ NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
 
     root->addWidget(topBar);
 
-    // ---------- scrollable content ----------
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -97,7 +90,6 @@ NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
     cLay->setContentsMargins(24, 16, 24, 24);
     cLay->setSpacing(16);
 
-    // -- parameter row --
     auto* paramW = new QWidget;
     auto* pLay = new QHBoxLayout(paramW);
     pLay->setContentsMargins(0, 0, 0, 0);
@@ -129,13 +121,11 @@ NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
 
     cLay->addWidget(paramW);
 
-    // -- grid container --
     gridContainer_ = new QWidget;
     gridContainerLay_ = new QVBoxLayout(gridContainer_);
     gridContainerLay_->setContentsMargins(0, 0, 0, 0);
     cLay->addWidget(gridContainer_);
 
-    // -- solve button --
     solveBtn_ = new QPushButton(QStringLiteral("开始求解"));
     solveBtn_->setEnabled(false);
     solveBtn_->setCursor(Qt::PointingHandCursor);
@@ -148,7 +138,6 @@ NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
     connect(solveBtn_, &QPushButton::clicked, this, &NonhomoLinearSystemPage::onSolve);
     cLay->addWidget(solveBtn_);
 
-    // -- demo button --
     auto* demoBtn = new QPushButton(QStringLiteral("演示例题"));
     demoBtn->setCursor(Qt::PointingHandCursor);
     demoBtn->setStyleSheet(QStringLiteral(
@@ -158,7 +147,6 @@ NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
     connect(demoBtn, &QPushButton::clicked, this, &NonhomoLinearSystemPage::onDemo);
     cLay->addWidget(demoBtn);
 
-    // -- result browser --
     resultBrowser_ = new QTextBrowser;
         attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setOpenLinks(false);
@@ -170,10 +158,6 @@ NonhomoLinearSystemPage::NonhomoLinearSystemPage(QWidget* parent)
     scroll->setWidget(content);
     root->addWidget(scroll, 1);
 }
-
-// =====================================================================
-//  Generate coefficient grid (A + b columns)
-// =====================================================================
 
 void NonhomoLinearSystemPage::onGenerate()
 {
@@ -215,7 +199,7 @@ void NonhomoLinearSystemPage::onGenerate()
             var->setTextFormat(Qt::RichText);
             lay->addWidget(var, i, gc++);
         }
-        // b_i column
+
         auto* eq = new QLabel(QStringLiteral("= "));
         eq->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         lay->addWidget(eq, i, gc++);
@@ -234,10 +218,6 @@ void NonhomoLinearSystemPage::onGenerate()
 
     if (!cells_.empty()) cells_[0]->setFocus();
 }
-
-// =====================================================================
-//  Arrow-key navigation between coefficient cells
-// =====================================================================
 
 bool NonhomoLinearSystemPage::eventFilter(QObject* obj, QEvent* ev)
 {
@@ -290,15 +270,10 @@ bool NonhomoLinearSystemPage::eventFilter(QObject* obj, QEvent* ev)
     return QWidget::eventFilter(obj, ev);
 }
 
-// =====================================================================
-//  Solve & render
-// =====================================================================
-
 void NonhomoLinearSystemPage::onSolve()
 {
     if (curM_ == 0 || curN_ == 0) return;
 
-    // ---- 1. Parse input → Matrix<Fraction> A (m × n) and b (m × 1) ----
     Matrix<Fraction> A(static_cast<std::size_t>(curM_),
                        static_cast<std::size_t>(curN_));
     Matrix<Fraction> b(static_cast<std::size_t>(curM_), 1);
@@ -332,7 +307,6 @@ void NonhomoLinearSystemPage::onSolve()
         }
     }
 
-    // ---- 2. Augmented matrix [A|b] and RREF with trace ----
     Matrix<Fraction> Aug(static_cast<std::size_t>(curM_),
                          static_cast<std::size_t>(curN_ + 1));
     for (std::size_t i = 0; i < Aug.rows(); ++i) {
@@ -345,11 +319,9 @@ void NonhomoLinearSystemPage::onSolve()
     Matrix<Fraction> R = Aug;
     std::size_t rk = improvedRref(R, trace);
 
-    // ---- 3. Nullspace ----
     Matrix<Fraction> N = nullspace(A);
     std::size_t nullDim = N.cols();
 
-    // ---- 4. Pivot / free columns from RREF ----
     const std::size_t n = static_cast<std::size_t>(curN_);
     std::vector<std::size_t> pivotOfRow(R.rows(), n);
     std::vector<std::size_t> pivotCols;
@@ -368,7 +340,6 @@ void NonhomoLinearSystemPage::onSolve()
     for (std::size_t c = 0; c < n; ++c)
         if (!isPiv[c]) freeCols.push_back(c);
 
-    // ---- 5. Check for inconsistent system ----
     bool inconsistent = false;
     for (std::size_t r = 0; r < R.rows(); ++r) {
         bool allZero = true;
@@ -378,7 +349,6 @@ void NonhomoLinearSystemPage::onSolve()
         if (allZero && !R(r, n).isZero()) { inconsistent = true; break; }
     }
 
-    // ---- 6. Build result HTML ----
     auto th = RenderTheme::forCurrent();
     auto* doc = resultBrowser_->document();
     doc->clear();
@@ -392,7 +362,6 @@ void NonhomoLinearSystemPage::onSolve()
 
     parts << sectionHtml(QStringLiteral("解"), th);
 
-    // RREF chain
     auto ms = milestones(trace);
     if (!ms.empty()) {
         const std::size_t perLine = (ms.size() <= 4) ? ms.size() : 3;
@@ -420,14 +389,12 @@ void NonhomoLinearSystemPage::onSolve()
         return;
     }
 
-    // Particular solution γ₀
     Matrix<Fraction> gamma0 = computeParticularSolution(R, n);
 
     parts << paraHtml(QStringLiteral(
         "第一步求方程组的一个特解 $\\gamma_0$．"
         "为此先求出它的一般公式："), th, doc);
 
-    // General solution formula
     {
         QString body;
         int written = 0;
@@ -479,7 +446,6 @@ void NonhomoLinearSystemPage::onSolve()
 
     parts << formulaHtml(QStringLiteral("\\gamma_0 = ") + matLtx(gamma0), th, doc);
 
-    // Free-variable note + basis header
     {
         QString freeList;
         for (std::size_t i = 0; i < freeCols.size(); ++i) {
@@ -494,7 +460,6 @@ void NonhomoLinearSystemPage::onSolve()
             "就得到导出组的一般解．").arg(freeList), th, doc);
     }
 
-    // Basis vectors
     {
         QString basisLtx;
         for (std::size_t k = 0; k < nullDim; ++k) {
@@ -509,7 +474,6 @@ void NonhomoLinearSystemPage::onSolve()
         parts << formulaHtml(basisLtx, th, doc);
     }
 
-    // Solution set U
     parts << paraHtml(QStringLiteral(
         "第三步写出非齐次线性方程组 (7) 的解集："), th, doc);
 
@@ -533,10 +497,6 @@ void NonhomoLinearSystemPage::onSolve()
         .arg(parts.join(QString())));
 }
 
-// =====================================================================
-//  Demo button handler
-// =====================================================================
-
 void NonhomoLinearSystemPage::onDemo()
 {
     spinM_->setValue(3);
@@ -559,4 +519,4 @@ void NonhomoLinearSystemPage::onDemo()
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

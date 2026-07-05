@@ -1,4 +1,4 @@
-// SymmetricReduction.h — 对称多项式化为初等对称多项式的字典序降次法
+
 #pragma once
 
 #include "MPolynomial.h"
@@ -16,7 +16,6 @@ namespace algemate::math::mpoly {
 
 using Fraction = algemate::math::Fraction;
 
-// 解析器
 inline MPolynomial parseSymmetricPoly(const std::string& s, int n) {
     MPolynomial result;
     std::string t = s;
@@ -74,15 +73,13 @@ inline MPolynomial parseSymmetricPoly(const std::string& s, int n) {
     return result;
 }
 
-// 对称性检测, 自动补全
-// 返回: 0=不对称, 1=已对称, 2=已自动补全
 inline int ensureSymmetric(MPolynomial& poly, int n, std::string& note) {
-    // 收集所有项及其系数
+
     std::map<std::multiset<int>, Fraction> orbitCoef;
 
     for (const auto& [m, c] : poly.terms()) {
         std::multiset<int> key(m.exps_.begin(), m.exps_.end());
-        // pad with zeros to size n
+
         while (key.size() < static_cast<std::size_t>(n)) key.insert(0);
         auto it = orbitCoef.find(key);
         if (it != orbitCoef.end()) {
@@ -92,12 +89,11 @@ inline int ensureSymmetric(MPolynomial& poly, int n, std::string& note) {
         }
     }
 
-    // 检查每个轨道是否完整
     int added = 0;
     MPolynomial sym;
     for (auto& [key, c] : orbitCoef) {
         std::vector<int> pattern(key.begin(), key.end());
-        // pattern is sorted ascending (multiset order). Generate all distinct permutations.
+
         std::set<std::vector<int>> seen;
         std::sort(pattern.begin(), pattern.end());
         do {
@@ -122,12 +118,11 @@ inline int ensureSymmetric(MPolynomial& poly, int n, std::string& note) {
     return 1;
 }
 
-// 字典序降次法: f(x) → g(σ)
 struct ReductionStep {
-    MPolynomial f;            // 当前多项式 (x_i 表示)
-    std::vector<int> leadExp; // 首项指数组
-    std::string phiStr;       // φ_k 的 LaTeX 表示
-    std::string fNextStr;     // f_{k+1} 的 LaTeX 表示
+    MPolynomial f;            
+    std::vector<int> leadExp; 
+    std::string phiStr;       
+    std::string fNextStr;     
 };
 
 inline std::vector<ReductionStep> reduceSymmetric(const MPolynomial& f, int n) {
@@ -189,7 +184,6 @@ inline std::vector<ReductionStep> reduceSymmetric(const MPolynomial& f, int n) {
         fullPhi << phiLatex.str();
         step.phiStr = fullPhi.str();
 
-        // f_{k+1} = f_k - lc · φ
         MPolynomial fNext = current - phiX * lc;
         step.fNextStr.clear();
 
@@ -199,7 +193,6 @@ inline std::vector<ReductionStep> reduceSymmetric(const MPolynomial& f, int n) {
     return steps;
 }
 
-// 把 "x1^2x2^2" 转为 LaTeX "x_{1}^{2}x_{2}^{2}"
 inline std::string patternToLatex(const std::string& pattern) {
     std::string r;
     for (std::size_t i = 0; i < pattern.size(); ++i) {
@@ -208,7 +201,7 @@ inline std::string patternToLatex(const std::string& pattern) {
             ++i;
             while (i < pattern.size() && std::isdigit(pattern[i])) { r += pattern[i]; ++i; }
             r += "}";
-            --i; // adjust for loop increment
+            --i; 
         } else if (pattern[i] == '^') {
             r += "^{";
             ++i;
@@ -222,15 +215,13 @@ inline std::string patternToLatex(const std::string& pattern) {
     return r;
 }
 
-// 待定系数法
 struct GeneralResult {
-    std::vector<std::vector<int>> patterns;  // 所有可能的指数组
-    std::vector<Fraction> coefficients;       // 对应系数
-    std::vector<std::string> sigmaExprs;      // σ 表达式 (LaTeX)
-    std::string finalExpr;                    // 最终结果
+    std::vector<std::vector<int>> patterns;  
+    std::vector<Fraction> coefficients;       
+    std::vector<std::string> sigmaExprs;      
+    std::string finalExpr;                    
 };
 
-// 从模式 "x1^2x2^2" 解析出指数并扩展为对称和
 inline MPolynomial expandPattern(const std::string& pattern, int n) {
     auto poly = parseSymmetricPoly(pattern, n);
     if (poly.isZero()) return poly;
@@ -252,7 +243,6 @@ inline MPolynomial expandPattern(const std::string& pattern, int n) {
     return result;
 }
 
-
 inline std::vector<std::vector<int>> enumPatterns(int n, int d, const std::vector<int>& lead) {
     std::vector<std::vector<int>> result;
     std::vector<int> cur(n, 0);
@@ -264,14 +254,14 @@ inline std::vector<std::vector<int>> enumPatterns(int n, int d, const std::vecto
         int maxVal = std::min(remaining, prev);
         if (pos == 0) maxVal = std::min(maxVal, lead[0]);
         for (int v = maxVal; v >= 0; --v) {
-            // Early prune: if cur[0..pos] > lead[0..pos], skip
+
             cur[pos] = v;
             if (pos == 0 && v > lead[0]) continue;
             if (pos > 0) {
                 bool skip = false;
                 for (int k = 0; k <= pos; ++k) {
                     if (cur[k] > lead[k]) { skip = true; break; }
-                    if (cur[k] < lead[k]) break; // cur is already behind, OK
+                    if (cur[k] < lead[k]) break; 
                 }
                 if (skip) continue;
             }
@@ -282,7 +272,6 @@ inline std::vector<std::vector<int>> enumPatterns(int n, int d, const std::vecto
     return result;
 }
 
-// 待定系数法
 inline long long binom(int n, int k) {
     if (k < 0 || k > n) return 0;
     if (k == 0 || k == n) return 1;
@@ -291,7 +280,6 @@ inline long long binom(int n, int k) {
     for (int i = 0; i < k; ++i) r = r * (n - i) / (i + 1);
     return r;
 }
-
 
 inline Fraction evalSymmetricSum(const std::vector<int>& lead, int k) {
     int m = 0;
@@ -404,4 +392,4 @@ inline GeneralResult generalSymmetricReduction(const std::string& pattern, int n
     return r;
 }
 
-} // namespace algemate::math::mpoly
+} 

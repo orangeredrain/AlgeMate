@@ -32,7 +32,6 @@ MaxIndepPage::MaxIndepPage(QWidget* parent)
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // ---------- top bar ----------
     auto* topBar = new QWidget;
     topBar->setFixedHeight(48);
     auto* topLay = new QHBoxLayout(topBar);
@@ -54,7 +53,6 @@ MaxIndepPage::MaxIndepPage(QWidget* parent)
 
     root->addWidget(topBar);
 
-    // ---------- scrollable content ----------
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -64,7 +62,6 @@ MaxIndepPage::MaxIndepPage(QWidget* parent)
     cLay->setContentsMargins(24, 16, 24, 24);
     cLay->setSpacing(16);
 
-    // -- parameter row --
     auto* paramW = new QWidget;
     auto* pLay = new QHBoxLayout(paramW);
     pLay->setContentsMargins(0, 0, 0, 0);
@@ -96,13 +93,11 @@ MaxIndepPage::MaxIndepPage(QWidget* parent)
 
     cLay->addWidget(paramW);
 
-    // -- grid container --
     gridContainer_ = new QWidget;
     gridContainerLay_ = new QVBoxLayout(gridContainer_);
     gridContainerLay_->setContentsMargins(0, 0, 0, 0);
     cLay->addWidget(gridContainer_);
 
-    // -- solve button --
     solveBtn_ = new QPushButton(QStringLiteral("开始求解"));
     solveBtn_->setEnabled(false);
     solveBtn_->setCursor(Qt::PointingHandCursor);
@@ -115,7 +110,6 @@ MaxIndepPage::MaxIndepPage(QWidget* parent)
     connect(solveBtn_, &QPushButton::clicked, this, &MaxIndepPage::onSolve);
     cLay->addWidget(solveBtn_);
 
-    // -- demo button --
     auto* demoBtn = new QPushButton(QStringLiteral("演示例题"));
     demoBtn->setCursor(Qt::PointingHandCursor);
     demoBtn->setStyleSheet(QStringLiteral(
@@ -125,7 +119,6 @@ MaxIndepPage::MaxIndepPage(QWidget* parent)
     connect(demoBtn, &QPushButton::clicked, this, &MaxIndepPage::onDemo);
     cLay->addWidget(demoBtn);
 
-    // -- result browser --
     resultBrowser_ = new QTextBrowser;
         attachLatexAutoPostProcess(resultBrowser_);
     resultBrowser_->setOpenLinks(false);
@@ -156,7 +149,6 @@ void MaxIndepPage::onGenerate()
 
     cells_.resize(static_cast<std::size_t>(curM_ * curN_));
 
-    // Row 0: column headers α₁, α₂, ...
     for (int j = 0; j < curM_; ++j) {
         auto* hdr = new QLabel(
             QStringLiteral("α<sub>%1</sub>").arg(j + 1));
@@ -166,7 +158,6 @@ void MaxIndepPage::onGenerate()
         lay->addWidget(hdr, 0, j);
     }
 
-    // Rows 1..n: input cells
     for (int i = 0; i < curN_; ++i) {
         for (int j = 0; j < curM_; ++j) {
             auto* edit = new QLineEdit;
@@ -195,8 +186,8 @@ bool MaxIndepPage::eventFilter(QObject* obj, QEvent* ev)
             auto it = std::find(cells_.begin(), cells_.end(), edit);
             if (it != cells_.end()) {
                 int idx = static_cast<int>(std::distance(cells_.begin(), it));
-                int col = idx / curN_;   // which vector
-                int row = idx % curN_;   // which component
+                int col = idx / curN_;   
+                int row = idx % curN_;   
 
                 auto focusCell = [&](int c, int r) {
                     if (c >= 0 && c < curM_ && r >= 0 && r < curN_) {
@@ -246,7 +237,6 @@ void MaxIndepPage::onSolve()
 {
     if (curN_ == 0 || curM_ == 0) return;
 
-    // ---- 1. Parse input → Matrix<Fraction> A (n × m), columns = vectors ----
     Matrix<Fraction> A(static_cast<std::size_t>(curN_),
                        static_cast<std::size_t>(curM_));
     for (int j = 0; j < curM_; ++j) {
@@ -267,10 +257,8 @@ void MaxIndepPage::onSolve()
         }
     }
 
-    // ---- 2. Row echelon form ----
     Matrix<Fraction> E = rowEchelon(A);
 
-    // ---- 3. Rank and pivot columns from echelon ----
     std::size_t rk = 0;
     std::vector<std::size_t> pivotCols;
     for (std::size_t r = 0; r < E.rows(); ++r) {
@@ -283,14 +271,12 @@ void MaxIndepPage::onSolve()
         }
     }
 
-    // ---- 4. Build result HTML (matches sample format) ----
     auto th = RenderTheme::forCurrent();
     auto* doc = resultBrowser_->document();
     doc->clear();
 
     QStringList parts;
 
-    // Display vectors: α₁ = (col), α₂ = (col), ...
     {
         QString vecList;
         for (int j = 0; j < curM_; ++j) {
@@ -314,7 +300,6 @@ void MaxIndepPage::onSolve()
         "作初等行变换，"
         "把下述矩阵化成阶梯形矩阵:"), th);
 
-    // Single step: A → row echelon form
     {
         QString chain = matLtx(A)
             + QStringLiteral("\\longrightarrow ")
@@ -323,7 +308,6 @@ void MaxIndepPage::onSolve()
         parts << formulaHtml(chain, th, doc, 16);
     }
 
-    // Conclusion with inline LaTeX
     {
         QString rankTerm;
         rankTerm += QStringLiteral("\\operatorname{rank}\\{");
@@ -360,15 +344,11 @@ void MaxIndepPage::onDemo()
     spinM_->setValue(4);
     onGenerate();
 
-    // α₁ = (-1, 5, 3, -2)ᵀ  (column 0)
-    // α₂ = (4, 1, -2, 9)ᵀ   (column 1)
-    // α₃ = (2, 0, -1, 4)ᵀ   (column 2)
-    // α₄ = (0, 3, 4, -5)ᵀ   (column 3)
     const std::vector<std::vector<int>> demo = {
-        {-1, 5, 3, -2},   // α₁
-        {4, 1, -2, 9},    // α₂
-        {2, 0, -1, 4},    // α₃
-        {0, 3, 4, -5},    // α₄
+        {-1, 5, 3, -2},   
+        {4, 1, -2, 9},    
+        {2, 0, -1, 4},    
+        {0, 3, 4, -5},    
     };
     for (int j = 0; j < 4; ++j)
         for (int i = 0; i < 4; ++i)
@@ -377,4 +357,4 @@ void MaxIndepPage::onDemo()
     onSolve();
 }
 
-} // namespace AlgeMate::Calculator::Demo
+} 

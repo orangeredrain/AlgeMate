@@ -19,12 +19,11 @@ public:
 
     using SurfaceFunc = std::function<QVector3D(float u, float v)>;
 
-    // Surface with parameter ranges
     void setSurface(SurfaceFunc fn,
                     float uMin = 0, float uMax = 3.14159265f,
                     float vMin = 0, float vMax = 6.28318531f,
                     int uSteps = 64, int vSteps = 64);
-    // 第二个曲面（双叶双曲面另一叶等）
+
     void setSecondSurface(SurfaceFunc fn,
                           float uMin, float uMax,
                           float vMin, float vMax,
@@ -51,25 +50,21 @@ private:
     QOpenGLShaderProgram* prog_ = nullptr;
     QOpenGLShaderProgram* lineProg_ = nullptr;
 
-    // Surface
     QOpenGLVertexArrayObject surfVao_;
     QOpenGLBuffer surfVbo_{QOpenGLBuffer::VertexBuffer};
     QOpenGLBuffer surfEbo_{QOpenGLBuffer::IndexBuffer};
     GLsizei surfIndexCount_ = 0;
 
-    // Second surface
     bool       hasSurf2_ = false;
     QOpenGLVertexArrayObject surf2Vao_;
     QOpenGLBuffer surf2Vbo_{QOpenGLBuffer::VertexBuffer};
     QOpenGLBuffer surf2Ebo_{QOpenGLBuffer::IndexBuffer};
     GLsizei surf2IndexCount_ = 0;
 
-    // Axes
     QOpenGLVertexArrayObject axesVao_;
     QOpenGLBuffer axesVbo_{QOpenGLBuffer::VertexBuffer};
     GLsizei axesVertCount_ = 0;
 
-    // Grid
     QOpenGLVertexArrayObject gridVao_;
     QOpenGLBuffer gridVbo_{QOpenGLBuffer::VertexBuffer};
     GLsizei gridVertCount_ = 0;
@@ -96,4 +91,4 @@ private:
     int u2Steps_ = 64, v2Steps_ = 64;
 };
 
-} // namespace AlgeMate::Calculator::Visualize
+} 

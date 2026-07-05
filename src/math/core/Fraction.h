@@ -1,18 +1,5 @@
 #pragma once
 
-/*
-* @file Fraction.h
-* @brief 实现基于 BigInt 的分数类
-*
-* 有自动约分功能
-* 分母 = 1 时只显示分子
-*
-* @example
-* Fraction a(3, 2);
-* Fraction b = 5;
-* Fraction c = Fraction("-7/4");
-*/
-
 #include "BigInt.h"
 
 #include <iosfwd>

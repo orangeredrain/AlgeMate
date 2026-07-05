@@ -15,7 +15,6 @@ namespace algemate::math {
 
 namespace {
 
-// 计算 A^T A (Fraction 保持精确)
 Matrix<Fraction> ataFraction_(const Matrix<Fraction>& A) {
     const std::size_t m = A.rows();
     const std::size_t n = A.cols();
@@ -32,13 +31,10 @@ Matrix<Fraction> ataFraction_(const Matrix<Fraction>& A) {
     return B;
 }
 
-// 数值降级路径: 当奇异值 minPoly 次数 > 2 时使用
-// one-sided Jacobi SVD (double), 稳定且不会触发高次 AlgReal 结式爆炸
 SVDResult svdJacobiNumeric_(const Matrix<Fraction>& A) {
     const std::size_t m = A.rows();
     const std::size_t n = A.cols();
 
-    // 将 A 转为 double 矩阵 Ad (在其上原地做列旋转)
     Matrix<double> Ad(m, n);
     for (std::size_t i = 0; i < m; ++i) {
         for (std::size_t j = 0; j < n; ++j) {
@@ -89,7 +85,6 @@ SVDResult svdJacobiNumeric_(const Matrix<Fraction>& A) {
         if (maxOff < tol) break;
     }
 
-    // σ_j = ||Ad 的第 j 列||, 按降序排列
     std::vector<double> sigma(n, 0.0);
     for (std::size_t j = 0; j < n; ++j) {
         double s2 = 0.0;
@@ -101,7 +96,6 @@ SVDResult svdJacobiNumeric_(const Matrix<Fraction>& A) {
     std::sort(order.begin(), order.end(),
               [&](std::size_t a, std::size_t b) { return sigma[a] > sigma[b]; });
 
-    // V (n×n) 按 order 重排
     Matrix<AlgReal> Vout(n, n);
     for (std::size_t k = 0; k < n; ++k) {
         std::size_t src = order[k];
@@ -110,7 +104,6 @@ SVDResult svdJacobiNumeric_(const Matrix<Fraction>& A) {
         }
     }
 
-    // U (m×m): 前 r 列为 u_j = Ad_j / σ_j, 余下列以 GS 扩充标准基
     const double sigEps = 1e-10;
     std::size_t r = 0;
     while (r < n && sigma[order[r]] > sigEps) ++r;
@@ -163,7 +156,7 @@ SVDResult svdJacobiNumeric_(const Matrix<Fraction>& A) {
     return res;
 }
 
-}  // anonymous namespace
+}  
 
 SVDResult svdDecompose(const Matrix<Fraction>& A) {
     const std::size_t m = A.rows();
@@ -172,15 +165,12 @@ SVDResult svdDecompose(const Matrix<Fraction>& A) {
         throw std::invalid_argument("svdDecompose: empty matrix");
     }
 
-    // 精确路径在独立线程中执行, 限时 3 秒.
-    // 超时 / 异常 / 卡死 均自动降级到 double Jacobi SVD.
     auto exactSvd = [](Matrix<Fraction> Ac) -> SVDResult {
         const std::size_t mm = Ac.rows();
         const std::size_t nn = Ac.cols();
         Matrix<Fraction> B = ataFraction_(Ac);
         OrthoDiagResult diag = orthogonalDiagonalize(B);
 
-        // 特征值 / 特征向量 minPoly 次数 > 2 → 抛异常以触发降级
         for (std::size_t j = 0; j < nn; ++j) {
             if (diag.Lambda(j, j).minPoly().degree() > 2)
                 throw std::runtime_error("high-degree");
@@ -243,7 +233,6 @@ SVDResult svdDecompose(const Matrix<Fraction>& A) {
         return res;
     };
 
-    // 在独立线程中执行精确路径, 通过 promise/future 传递结果
     std::promise<SVDResult> prom;
     auto fut = prom.get_future();
     std::thread worker([p = std::move(prom), Ac = A, exactSvd]() mutable {
@@ -264,7 +253,7 @@ SVDResult svdDecompose(const Matrix<Fraction>& A) {
             return svdJacobiNumeric_(A);
         }
     }
-    // 超时: 精确路径卡死, 直接返回数值结果
+
     return svdJacobiNumeric_(A);
 }
 
