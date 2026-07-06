@@ -33,7 +33,7 @@ public:
     void showKnowledge();
     void showWrongBook();
 signals:
-    // 【新增】请求主窗口导航到首页的目标详情页
+    // 请求主窗口导航到首页的目标详情页
     void requestNavigateToHomeGoalDetail();
 
 protected:

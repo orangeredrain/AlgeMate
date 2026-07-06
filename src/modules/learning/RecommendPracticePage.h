@@ -22,16 +22,16 @@ public:
 
 signals:
     void requestRegenerate();
-    void backRequested(); // 新增：返回上一级的信号
+    void backRequested(); // 返回上一级的信号
 
 private slots:
     void loadBatch(int batchIndex);
     void backToList();
     void markCurrentQuestionCompleted();
-    void onNextQuestion();       // 新增：下一题
-    void onPreviousQuestion();   // 新增：上一题
-    void onSubmitAnswer();       // 新增：提交
-    void onAiGradeSubjective();  // 新增：AI评分
+    void onNextQuestion();       // 下一题
+    void onPreviousQuestion();   // 上一题
+    void onSubmitAnswer();       // 提交
+    void onAiGradeSubjective();  // AI评分
 
 private:
     QStackedWidget* m_internalStack;

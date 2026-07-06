@@ -15,7 +15,7 @@ signals:
     void deleteRequested(int id);
     void redoRequested(int id, const QString& newAnswer);
 public:
-    // 增加了 isRedoMode 参数，用于智能判断是“练习状态”还是“看解析状态”
+    // isRedoMode用于智能判断是“练习状态”还是“看解析状态”
     WrongDetailDialog(const Question& q, const QString& time, int wrongCount, void* sharedRenderer, bool isRedoMode = false, QWidget* parent = nullptr);
 };
 
@@ -25,12 +25,12 @@ class WrongBookPage : public QWidget {
 public:
     explicit WrongBookPage(QWidget* parent = nullptr);
     void reload();
-    // 🌟新增：对外暴露的 getter 接口，供队友获取当前错题总数
+    // 对外暴露的 getter 接口，供队友获取当前错题总数
     int getWrongCount() const;
 
 signals:
     void backRequested();
-    // 🌟 新增：错题数量变化信号，方便队友的页面实时更新 UI
+    // 错题数量变化信号，方便队友的页面实时更新 UI
     void wrongCountChanged(int count);
 
 private:
@@ -44,7 +44,7 @@ private:
 
 private:
     QGridLayout* contentLayout;
-    // 🌟 新增：内部缓存错题数量的变量
+    // 内部缓存错题数量的变量
     int m_wrongQuestionCount = 0;
 };
 

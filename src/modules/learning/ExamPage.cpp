@@ -750,7 +750,7 @@ void ExamProgressPage::onSubmitAnswer() {
     q.attempts++;
     QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("答案已提交"));
     loadQuestion(currentQuestionIndex);
-} //是否可以删除呢
+}
 
 void ExamProgressPage::onNextQuestion() {
     if (currentQuestionIndex < questions.size() - 1) {
@@ -768,60 +768,6 @@ void ExamProgressPage::onPreviousQuestion() {
     }
 }
 
-/*
-void ExamProgressPage::saveWrongQuestions()
-{
-    QFile file("wrong_questions.json");
-    QJsonArray allWrongQuestions;
-
-    // 读取旧错题
-    if (file.exists()) {
-        if (file.open(QIODevice::ReadOnly)) {
-            QJsonDocument oldDoc = QJsonDocument::fromJson(file.readAll());
-            allWrongQuestions = oldDoc.array();
-            file.close();
-        }
-    }
-
-    // 保存新错题
-    for (const auto& q : questions) {
-        if (q.isCorrect) {
-            continue;
-        }
-
-        QJsonObject obj;
-
-        // ⚡ 核心修复：必须保存题目的真实 ID，否则默认为0会触发全删 Bug！
-        obj["id"] = q.id;
-
-        obj["content"] = q.content;
-        obj["userAnswer"] = q.userAnswer;
-        obj["correctAnswer"] = q.correctAnswer;
-        obj["score"] = q.score;
-        obj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-        obj["wrongCount"] = 1;
-
-        if (q.type == QuestionType::Single) {
-            obj["type"] = "single";
-        } else if (q.type == QuestionType::Fill) {
-            obj["type"] = "fill";
-        } else {
-            obj["type"] = "subjective";
-        }
-
-        QJsonArray choicesArray;
-        for (const auto& c : q.choices) {
-            choicesArray.append(c);
-        }
-        obj["choices"] = choicesArray;
-
-        allWrongQuestions.append(obj);
-    }
-
-    if (!file.open(QIODevice::WriteOnly)) return;
-    file.write(QJsonDocument(allWrongQuestions).toJson());
-    file.close();
-}*/
 
 void ExamProgressPage::saveWrongQuestions() {
     QFile file("wrong_questions.json");
@@ -880,43 +826,6 @@ void ExamProgressPage::saveWrongQuestions() {
     }
 }
 
-// void ExamProgressPage::onSubmitExam() {
-//     auto* msgBox = new QMessageBox(this);
-//     msgBox->setText(QStringLiteral("确定要交卷吗？提交后不可更改答案\n交卷后客观题将立即出分，解答题将交由 DeepSeek AI 智能批阅。"));
-//     msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-
-//     if (msgBox->exec() == QMessageBox::Yes) {
-//         if (m_examTimer) m_examTimer->stop();
-//         this->setEnabled(false); // 避免判卷期间二次点击
-
-//         m_pendingAITasks = 0;
-
-//         // 1. 自动批改客观题，并初始化得分；筛选出主观题交由 AI 处理
-//         for (int i = 0; i < questions.size(); ++i) {
-//             auto& q = questions[i];
-//             if (q.type == QuestionType::Single) {
-//                 q.isCorrect = (q.userAnswer == q.correctAnswer);
-//                 q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
-//             } else if (q.type == QuestionType::Fill) {
-//                 bool ok1, ok2;
-//                 double userValue = q.userAnswer.toDouble(&ok1);
-//                 double correctValue = q.correctAnswer.toDouble(&ok2);
-//                 q.isCorrect = ok1 && ok2 && std::abs(userValue - correctValue) < 0.0001;
-//                 q.earnedScore = q.isCorrect ? q.score : 0; // 客观题得分赋值
-//             } else {
-//                 // 主观题累计进入 AI 异步流
-//                 m_pendingAITasks++;
-//                 gradeSubjectiveWithAI(i);
-//             }
-//         }
-
-//         // 如果整张试卷没有主观题，直接进入收尾保存
-//         if (m_pendingAITasks == 0) {
-//             finishExamAndSave();
-//         }
-//     }
-// }
-
 void ExamProgressPage::onSubmitExam() {
     auto* msgBox = new QMessageBox(this);
     msgBox->setText(QStringLiteral("确定要交卷吗？提交后不可更改答案\n交卷后客观题将立即出分，解答题将交由 DeepSeek AI 智能批阅。"));
@@ -928,7 +837,7 @@ void ExamProgressPage::onSubmitExam() {
 
         m_pendingAITasks = 0;
 
-        // 1. 先遍历一遍，完成客观题批改，并【预先统计】主观题总数
+        // 1. 先遍历完成客观题批改，并预先统计主观题总数
         for (int i = 0; i < questions.size(); ++i) {
             auto& q = questions[i];
             if (q.type == QuestionType::Single) {
@@ -946,13 +855,13 @@ void ExamProgressPage::onSubmitExam() {
             }
         }
 
-        // 2. 如果整张试卷没有主观题，直接进入收尾保存
+        // 2. 整张试卷没有主观题，直接保存
         if (m_pendingAITasks == 0) {
             finishExamAndSave();
-            return; // 结束函数，避免往下走
+            return; // 结束
         }
 
-        // 3. 开始统一派发 AI 判卷任务
+        // 3. 开始 AI 判卷
         // 此时 m_pendingAITasks 已经是总数（比如 8），哪怕遇到空答案立刻 --，也不会马上变成 0 触发提前交卷
         for (int i = 0; i < questions.size(); ++i) {
             if (questions[i].type == QuestionType::Subjective) {
@@ -1032,7 +941,7 @@ void ExamProgressPage::gradeSubjectiveWithAI(int index) {
 
             qRef.earnedScore = static_cast<int>(extractedScore);
 
-            // 【修改】判定核心：如果分数大于等于 60% 视为通过
+            // 判定核心：如果分数大于等于 60% 视为通过
             if (qRef.earnedScore >= (qRef.score * 0.6)) {
                 qRef.isCorrect = true;
             } else {
@@ -1068,7 +977,7 @@ void ExamProgressPage::finishExamAndSave() {
     }
 
     QJsonObject examObj;
-    examObj["examName"] = m_examName; // 【修复】把考试名称存入历史，以便后续查询区分
+    examObj["examName"] = m_examName; // 把考试名称存入历史，以便后续查询区分
     examObj["time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
     examObj["questions"] = historyArray;
 
@@ -1136,7 +1045,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     lay->addWidget(scrollArea);
 
     // ==========================================
-    // 1. 顶部导航栏 (清爽风格)
+    // 顶部导航栏
     // ==========================================
     auto* top = new QHBoxLayout;
 
@@ -1168,7 +1077,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     contentLayout->addLayout(top);
 
     // ==========================================
-    // 2. 成绩汇总卡片 (高级渐变 + 核心数据展示)
+    // 成绩汇总卡片
     // ==========================================
     int totalScore = 0;
     int earnedScore = 0;
@@ -1209,7 +1118,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
     contentLayout->addWidget(scoreCard);
 
     // ==========================================
-    // 3. 逐题解析列表 (精致化卡片流)
+    // 逐题解析列表
     // ==========================================
     auto* resultsWidget = new QWidget;
     auto* resultsLayout = new QVBoxLayout(resultsWidget);
@@ -1235,7 +1144,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
                                   ? QStringLiteral("<span style='background-color:#d1fae5; color:#059669; padding:2px 8px; border-radius:4px;'>✓ 正确</span>")
                                   : QStringLiteral("<span style='background-color:#fee2e2; color:#dc2626; padding:2px 8px; border-radius:4px;'>✗ 错误</span>");
 
-        // 【核心修复】显示具体得分
+        // --- 显示具体得分 ---
         auto* titleLabel = new QLabel(
             QStringLiteral("<span style='color:#64748b;'>[%1]</span> <b>第 %2 题</b> &nbsp;&nbsp; %3 &nbsp;&nbsp; <span style='color:#3b82f6;'>得分: %4/%5 分</span>")
                 .arg(typeStr).arg(i + 1).arg(statusBadge).arg(q.earnedScore).arg(q.score), this);
@@ -1258,7 +1167,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
 
         itemLayout->addWidget(contentBrowser);
 
-        // --- 作答与标准答案比对区 (灰色轻背景包裹) ---
+        // --- 作答与标准答案比对区 ---
         auto* answerBox = new QFrame;
         answerBox->setStyleSheet(dark ? "background: #1F1E33; border-radius: 12px; padding: 12px; border: 1px solid #3B395A;"
                                       : "background: #f8fafc; border-radius: 12px; padding: 12px; border: 1px solid #f1f5f9;");
@@ -1326,7 +1235,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
         ansLayout->addWidget(correctBrowser);
         itemLayout->addWidget(answerBox);
 
-        // --- AI 详情按钮 (解答题强制显示，兜底空报告) ---
+        // --- AI 详情按钮 (解答题强制显示，空报告作为保底) ---
         if (q.type == QuestionType::Subjective) {
             auto* detailLayout = new QHBoxLayout();
             detailLayout->addStretch();
@@ -1337,7 +1246,7 @@ ExamResultPage::ExamResultPage(const QVector<Question>& results, QWidget* parent
                 ? "QPushButton { background: #312F4A; color: #8FA1FF; border: 1px solid #3B395A; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: bold; } QPushButton:hover { background: #3B395A; color: #B0BBFF; }"
                 : "QPushButton { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: bold; } QPushButton:hover { background: #dbeafe; color: #1d4ed8; }");
 
-            // 兜底：如果没作答或由于网络断开导致 aiReport 为空，给一个默认提示
+            // 如果没作答或由于网络断开导致 aiReport 为空，给一个默认提示
             QString currentReport = q.aiReport.trimmed().isEmpty()
                                         ? QStringLiteral("### 🤖 智能评阅提醒\n\n系统未检测到您的作答，或网络连接超时。\n建议您下次作答完毕后再提交，以便 AI 导师为您提供详尽的解题思路和失分分析。")
                                         : q.aiReport;
@@ -1395,10 +1304,7 @@ ExamPage::ExamPage(QWidget* parent) : QWidget(parent), currentPage(nullptr) {
 
     currentPage = settingPage;
     lay->addWidget(currentPage);
-
-
 }
-
 
 void ExamPage::onStartExam(int timeMinutes, int examIndex, const QString& examName) {
     auto* oldPage = currentPage;
@@ -1433,7 +1339,7 @@ void ExamPage::onExamFinished(const QVector<Question>& results) {
 }
 
 void ExamPage::resetToSettings() {
-    // 1. 彻底移除并销毁当前的页面（比如考试结果页）
+    // 彻底移除并销毁当前的页面（比如考试结果页）
     if (currentPage) {
         auto* layout = this->layout();
         layout->removeWidget(currentPage);
@@ -1441,7 +1347,7 @@ void ExamPage::resetToSettings() {
         currentPage = nullptr;
     }
 
-    // 2. 重新创建全新的考试设置页
+    // 重新创建全新的考试设置页
     auto* settingPage = new ExamSettingPage(this);
     connect(settingPage, &ExamSettingPage::backRequested, this, &ExamPage::backRequested);
     connect(settingPage, &ExamSettingPage::examStarted, this, &ExamPage::onStartExam);
