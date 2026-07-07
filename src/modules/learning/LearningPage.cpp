@@ -127,15 +127,15 @@ static ClickableCard* makeStatCard(const QString& label, const QString& value,
                                    QLabel** subLabelOut = nullptr)
 {
     auto* card = new ClickableCard(parent);
-    card->setMinimumHeight(120); // 稍微调高一点，让呼吸感更好
+    card->setMinimumHeight(120);
 
-    // 【修改点】：给卡片加软阴影
+    // 给卡片加软阴影
     auto* shadow = new QGraphicsDropShadowEffect(card);
     shadow->setOffset(0, 6);
     shadow->setBlurRadius(20);
     shadow->setColor(QColor(0, 0, 0, 12)); // 极浅阴影
     card->setGraphicsEffect(shadow);
-    // 【修改点】：利用 QSS 的 radial-gradient 在卡片右上角画一个模糊的彩色光晕作为点缀
+    // 利用 QSS 的 radial-gradient 在卡片右上角画一个模糊的彩色光晕作为点缀
     // 模拟那种不规则的玻璃拟态反光感
     card->setStyleSheet(R"(
         ClickableCard {
@@ -567,10 +567,8 @@ void LearningPage::refreshProgressCard()
     if (m_progressValueLabel) {
         m_progressValueLabel->setText(QStringLiteral("%1%").arg(avgPercent));
         if (avgPercent >= 100) {
-            // 【修改点】：字体统一为和其他卡片一样的 32px 和 800字重
             m_progressValueLabel->setStyleSheet("font-size:32px; font-weight:800; color:#4CAF50; background:transparent;");
         } else {
-            // 【修改点】：字体统一为和其他卡片一样的 32px 和 800字重
             m_progressValueLabel->setStyleSheet("font-size:32px; font-weight:800; color:#6A5AE0; background:transparent;");
         }
     }

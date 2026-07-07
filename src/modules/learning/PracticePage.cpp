@@ -53,8 +53,6 @@
 
 namespace AlgeMate::Learning {
 
-// ==================== 辅助函数 ====================
-
 static QPushButton* makeBackBtn(QWidget* parent = nullptr) {
     auto* btn = new QPushButton(QStringLiteral("← 返回"), parent);
     btn->setObjectName(QStringLiteral("LearnBackBtn"));
@@ -115,7 +113,7 @@ static ClickableCard* makeCardItem(const QString& icon, const QString& title,
     return card;
 }
 
-// PracticePage
+// ========= PracticePage ============
 
 PracticePage::PracticePage(QWidget* parent) : QWidget(parent)
 {
@@ -977,7 +975,7 @@ void CalculationProblemPage::displayResult(bool isCorrect, const QString& feedba
     auto* browser = reinterpret_cast<Latex::LatexTextBrowser*>(feedbackLabel);
     auto* renderer = static_cast<Latex::LatexRenderer*>(this->property("latex_renderer").value<void*>());
 
-    // === 三重保险强制 AI 反馈区文本为黑色（dark.qss 会把 QWidget 默认色设为浅色）===
+    // === 强制 AI 反馈区文本为黑色（dark.qss 会把 QWidget 默认色设为浅色）===
     // 1) palette: 覆盖 widget 调色板默认文字色
     QPalette pal = browser->palette();
     pal.setColor(QPalette::Text,        QColor("#1f2937"));

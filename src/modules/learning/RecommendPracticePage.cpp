@@ -127,7 +127,7 @@ RecommendPracticeColors recommendPracticeColors(const QWidget* w) {
 } // namespace
 
 RecommendPracticePage::RecommendPracticePage(QWidget* parent) : QWidget(parent) {
-    // 【核心安全点 1】：必须在构造伊始将索引初始化为安全值 -1，彻底杜绝内存垃圾带来的随机闪退
+    // 核心安全点 1：必须在构造伊始将索引初始化为安全值 -1，彻底杜绝内存垃圾带来的随机闪退
     m_currentIndex = -1;
     m_currentBatchIndex = -1;
 
@@ -320,7 +320,7 @@ RecommendPracticePage::RecommendPracticePage(QWidget* parent) : QWidget(parent) 
     m_internalStack->setCurrentWidget(m_batchListPage);
 
     // ============================================================
-    // 【核心安全点 2】：利用可安全捕获局部指针的 Lambda 闭包，统一刷洗所有行内样式
+    // 核心安全点 2：利用可安全捕获局部指针的 Lambda 闭包，统一刷洗所有行内样式
     // ============================================================
     auto updateThemeStyles = [=, this]() {
         const auto themeColor = recommendPracticeColors(this);
